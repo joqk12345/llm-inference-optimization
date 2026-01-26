@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  memory-calculator:
+    build: .
+    command: python3 memory_calculator.py --help
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
