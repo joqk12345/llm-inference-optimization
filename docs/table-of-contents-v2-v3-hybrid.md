@@ -264,51 +264,204 @@
 > - **成本降低**：同样模型可在更小/更便宜的GPU上运行
 > - **精度损失**：现代量化技术精度损失<1%
 > - **硬件效率**：INT8推理速度比FP16快2-3倍
+> - **极端压缩**：INT4 QAT可将~1TB模型压缩到单H200（7倍压缩）⭐
 
 #### 7.1 量化基础
 - 7.1.1 什么是量化
 - 7.1.2 为什么量化能节省显存
 - 7.1.3 精度vs性能的权衡
+- 7.1.4 为什么量化有效：模型的冗余性
 
 #### 7.2 量化方法分类
-- 7.2.1 训练后量化 (PTQ)
-- 7.2.2 量化感知训练 (QAT)
-- 7.2.3 选择哪种方法
+- 7.2.1 PTQ (Post-Training Quantization)
+  - 训练后量化，无需重新训练
+  - 速度快，适合快速部署
+  - 可能有一定精度损失
+  - 常见方法：GPTQ、AWQ、bitsandbytes
+- 7.2.2 QAT (Quantization-Aware Training) ⭐
+  - 量化感知训练，在训练时模拟量化
+  - 精度损失更小，train-infer一致性好
+  - 需要完整训练周期
+  - 适用于RL训练和需要高精度的场景
+- 7.2.3 QLoRA vs Native Quantized Training vs QAT
+  - QLoRA：降低LoRA微调的训练内存
+  - Native Quantized Training：端到端低精度训练
+  - QAT：改善量化推理精度
+  - 对比表格：目的、适用场景、优缺点
+- 7.2.4 量化方法选择决策树
+  - 场景1：快速部署 → PTQ
+  - 场景2：精度要求高 → QAT
+  - 场景3：需要微调 → QLoRA或QAT
+  - 场景4：RL训练 → QAT
 
 #### 7.3 常用量化格式
-- 7.3.1 FP32 (32位浮点)
-- 7.3.2 FP16/BF16 (16位浮点)
-- 7.3.3 INT8 (8位整数)
-- 7.3.4 INT4 (4位整数)
-- 7.3.5 性能与精度对比
+- 7.3.1 FP32 (32位浮点) - 训练标准
+- 7.3.2 FP16/BF16 (16位浮点) - 推理常用
+- 7.3.3 INT8 (8位整数) - 经典量化
+- 7.3.4 INT4 (W4A16) ⭐
+  - 4位权重，16位激活
+  - 广泛的硬件支持（Blackwell之前的GPU）
+  - 工业界"足够好"的标准
+  - 75%显存节省
+- 7.3.5 FP4 vs INT4
+  - 精度对比：FP4表示范围更大，INT4更稳定
+  - 性能对比：FP4理论更高，INT4生态更成熟
+  - 硬件支持：INT4更广泛，FP4需要Blackwell
+  - 选择建议：当前选INT4，未来考虑FP4
+- 7.3.6 FP8 / NVFP4：未来方向
+  - NVIDIA Blackwell的原生FP4/FP8支持
+  - H100/H200的FP8支持
+  - 性能提升潜力
+- 7.3.7 AWQ / GPTQ：流行的INT4格式
+  - AWQ：Activation-aware Quantization
+  - GPTQ：Gradient-based Post-Training Quantization
+  - 性能和精度对比
 
 #### 7.4 流行的量化框架
-- 7.4.1 GPTQ原理
-- 7.4.2 AWQ原理
-- 7.4.3 bitsandbytes
-- 7.4.4 框架对比与选择
+- 7.4.1 vLLM量化支持
+  - AWQ、GPTQ、bitsandbytes
+  - KV Cache量化
+  - PagedAttention + 量化
+- 7.4.2 SGLang INT4推理 ⭐
+  - Marlin内核支持
+  - W4A16高效推理
+  - Bit packing和近零开销解包
+  - MoE算子深度融合
+  - 支持GPTQ、AWQ格式
+- 7.4.3 NVIDIA Model Optimizer ⭐
+  - QAT训练支持
+  - Megatron-LM集成
+  - MXFP4、NVFP4格式支持
+  - Fake quantization实现
+- 7.4.4 AutoGPTQ / llama.cpp
+  - 开源量化工具
+  - CPU推理支持
 
 #### 7.5 KV Cache量化
 - 7.5.1 为什么量化KV Cache
-- 7.5.2 INT8 KV Cache
-- 7.5.3 挑战与限制
+  - KV Cache占用显存的50%+
+  - 长上下文场景尤其重要
+- 7.5.2 KV Cache量化方法
+  - INT8 KV Cache
+  - 动态量化vs静态量化
+  - Per-token量化
+- 7.5.3 精度与速度平衡
+  - 精度损失评估
+  - 性能提升
+  - 生产环境注意事项
 
 #### 7.6 实战：量化部署
 - 7.6.1 使用vLLM加载量化模型
-- 7.6.2 性能对比测试
-- 7.6.3 精度损失评估
-- 7.6.4 生产环境注意事项
+  - AWQ/GPTQ模型加载
+  - 性能对比测试
+  - 精度损失评估
+- 7.6.2 使用SGLang部署INT4模型 ⭐
+  - W4A16推理配置
+  - Marlin内核启用
+  - 性能benchmark
+- 7.6.3 生产环境注意事项
+  - 模型格式选择
+  - 硬件要求
+  - 监控指标
 
-#### 7.7 量化进阶
-- 7.7.1 混合精度量化
-- 7.7.2 动态量化vs静态量化
-- 7.7.3 量化感知的调度策略
+#### 7.7 量化进阶：INT4 QAT实战 ⭐
+
+> **💡 案例来源**: SGLang RL Team, InfiXAI Team, Ant Group (2026-01-26)
+>
+> **核心成果**: 将~1TB规模的模型压缩到单张H200 (141GB)，消除跨节点通信瓶颈，显著提升rollout效率
+
+- 7.7.1 什么是QAT
+  - Fake Quantization原理
+  - STE (Straight-Through Estimator)原理
+  - train-infer一致性的重要性
+  - 消融实验：QAT vs PTQ的精度差异
+
+- 7.7.2 INT4 QAT完整Pipeline
+  - **Stage 1: QAT训练（模拟量化）**
+    - 维护BF16主权重
+    - 前向传播：fake quantization模拟量化噪声
+    - 反向传播：STE确保梯度无损传递
+  - **Stage 2: 权重转换（真量化）**
+    - 导出收敛的BF16权重
+    - 执行真正的量化：BF16 → INT4
+    - 转换为Marlin格式
+  - **Stage 3: W4A16推理**
+    - SGLang加载INT4权重
+    - 高效推理（INT4权重 × BF16激活）
+    - 生成的经验数据回流到训练
+
+- 7.7.3 训练端实现
+  - Fake Quantization和STE实现
+    - _FakeInt4QuantizationSTE类
+    - 动态量化：per-group max absolute value
+    - 模拟INT4的[-7, 7]范围
+  - 权重更新和格式适配
+    - restore_weights_before_loading机制
+    - 动态权重管理：process_weights_after_loading
+    - Marlin格式转换
+  - 消融实验：QAT的必要性
+    - 实验1：QAT INT4训练 + BF16 rollout（误差仍高）
+    - 实验2：不启用QAT + 直接INT4 rollout（误差震荡上升）
+    - **结论**：训练和推理必须同时启用量化
+
+- 7.7.4 推理端实现
+  - SGLang W4A16推理
+    - Bit packing：8个INT4值打包到1个INT32
+    - 高效解包：位运算（>> 4 和 & 0xF）
+    - 计算和IO重叠，解包近零开销
+  - MoE算子深度融合
+    - 动态moe_align_block_size
+    - Gating部分融合为单一内核
+    - 避免重复kernel启动
+
+- 7.7.5 实战案例：1TB模型压缩到单H200
+  - **案例1：Qwen3-235B-A22B**
+    - Raw-Reward：稳定增长，与BF16/FP8趋势一致
+    - AIME评估：斜率和峰值与BF16高度对齐
+    - Train-Infer Gap：几乎重叠BF16 baseline
+  - **案例2：Kimi-K2-Thinking**
+    - 双节点：受限于跨节点带宽
+    - 单节点：INT4消除通信瓶颈，大幅提升
+  - **性能对比**：
+    - 精度：INT4 QAT ≈ BF16 > FP8
+    - 速度：INT4 ≈ FP8 > BF16 (H系列GPU)
+    - 显存：INT4节省75% (关键优势)
+
+- 7.7.6 QAT的适用场景
+  - ✅ 大规模RL训练（100B+参数）
+  - ✅ 需要单节点部署超大模型
+  - ✅ 需要train-infer一致性
+  - ✅ PTQ精度损失不可接受
+  - ⚠️ 训练成本较高（需要完整微调周期）
+  - ⚠️ 实现复杂度较高（需要理解QAT、STE、格式转换）
+  - ❌ 小规模模型（成本不值得）
+  - ❌ 只推理不需要微调（用PTQ即可）
+
+#### 7.8 量化技术总结与展望
+- 7.8.1 量化技术演进路线
+- 7.8.2 不同场景的最佳实践
+- 7.8.3 未来发展方向：FP4、NVFP4、Blackwell
 
 #### 常见误区专栏
+- 误区1："量化一定会损失精度"
+- 误区2："INT4比INT8精度低很多"
+- 误区3："QAT总是比PTQ好"
+- 误区4："量化只在推理时有用"
+
 #### 实战检查清单
+- [ ] 确定量化目标和约束
+- [ ] 选择合适的量化方法（PTQ/QAT）
+- [ ] 选择合适的量化格式（INT8/INT4/FP8）
+- [ ] 准备评估数据集
+- [ ] 进行精度测试
+- [ ] 进行性能测试
+- [ ] 生产环境部署
+
 #### 动手练习
 - 练习7.1：对比不同量化格式的性能和精度
-- 练习7.2：量化Llama-3-70B并测试
+- 练习7.2：量化Llama-3-70B并测试（使用vLLM + AWQ）
+- 练习7.3：使用SGLang部署INT4模型并benchmark ⭐
+- 练习7.4：（进阶）实现简单的fake quantization ⭐
 
 ---
 

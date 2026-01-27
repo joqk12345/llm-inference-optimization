@@ -123,12 +123,85 @@
 ### 第7章 量化技术
 
 #### 7.1 量化基础
+- 7.1.1 什么是量化
+- 7.1.2 量化原理：从FP32到INT8
+- 7.1.3 为什么量化有效
+- 7.1.4 量化的优势和代价
+
 #### 7.2 量化方法分类
+- 7.2.1 PTQ (Post-Training Quantization)
+  - 训练后量化，无需重新训练
+  - 速度快，适合快速部署
+  - 可能有一定精度损失
+- 7.2.2 QAT (Quantization-Aware Training) ⭐
+  - 量化感知训练，在训练时模拟量化
+  - 精度损失更小，train-infer一致性好
+  - 需要完整训练周期
+- 7.2.3 QLoRA vs Native Quantized Training vs QAT
+  - 对比三种低精度训练技术
+  - 适用场景和选择建议
+- 7.2.4 量化方法选择决策树
+
 #### 7.3 常用量化格式
+- 7.3.1 INT8：经典的8位整数量化
+- 7.3.2 INT4 (W4A16) ⭐
+  - 4位权重，16位激活
+  - 广泛的硬件支持
+  - 工业界"足够好"的标准
+- 7.3.3 FP4 vs INT4
+  - 精度、性能、生态对比
+  - 硬件支持差异
+- 7.3.4 FP8 / NVFP4：未来方向
+- 7.3.5 AWQ / GPTQ：流行的INT4格式
+
 #### 7.4 流行的量化框架
+- 7.4.1 vLLM量化支持
+- 7.4.2 SGLang INT4推理 ⭐
+  - Marlin内核支持
+  - W4A16高效推理
+  - MoE算子深度融合
+- 7.4.3 NVIDIA Model Optimizer ⭐
+  - QAT训练支持
+  - Megatron-LM集成
+- 7.4.4 AutoGPTQ / llama.cpp
+
 #### 7.5 KV Cache量化
+- 7.5.1 为什么KV Cache需要量化
+- 7.5.2 KV Cache量化方法
+- 7.5.3 精度与速度平衡
+
 #### 7.6 实战：量化部署
-#### 7.7 量化进阶
+- 7.6.1 使用vLLM进行量化推理
+- 7.6.2 使用SGLang部署INT4模型
+- 7.6.3 性能对比测试
+
+#### 7.7 量化进阶：INT4 QAT实战 ⭐
+- 7.7.1 什么是QAT
+  - Fake Quantization + STE原理
+  - train-infer一致性的重要性
+- 7.7.2 INT4 QAT完整Pipeline
+  - Stage 1: QAT训练（模拟量化）
+  - Stage 2: 权重转换（真量化）
+  - Stage 3: W4A16推理
+- 7.7.3 训练端实现
+  - Fake Quantization和STE
+  - 权重更新和格式适配
+  - 消融实验：QAT的必要性
+- 7.7.4 推理端实现
+  - SGLang W4A16推理
+  - Bit packing和高效解包
+  - MoE算子深度融合
+- 7.7.5 实战案例：1TB模型压缩到单H200
+  - Qwen3-235B-A22B实践
+  - Kimi-K2-Thinking实践
+  - 性能对比：BF16 vs FP8 vs INT4
+- 7.7.6 QAT的适用场景
+  - ✅ 大规模RL训练
+  - ✅ 单节点部署超大模型
+  - ✅ 需要train-infer一致性
+  - ⚠️ 训练成本较高
+
+#### 7.8 量化技术总结与展望
 
 #### 常见误区专栏
 #### 实战检查清单
