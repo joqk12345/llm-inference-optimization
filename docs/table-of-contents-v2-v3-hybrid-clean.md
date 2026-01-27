@@ -214,9 +214,14 @@
 #### 8.1 生成加速的基本思路
 #### 8.2 投机采样原理
 #### 8.3 投机采样变体
+- 8.3.1 Speculative Decoding
+- 8.3.2 Assisted Decoding
+- 8.3.3 Lookahead Decoding
+- 8.3.4 Eagle系列：Eagle、Eagle 2、Eagle 3 ⭐
 #### 8.4 草稿模型选择
 #### 8.5 性能分析
 #### 8.6 实战：vLLM投机采样
+#### 8.7 实战：Eagle 3 with SGLang ⭐
 
 #### 常见误区专栏
 #### 实战检查清单

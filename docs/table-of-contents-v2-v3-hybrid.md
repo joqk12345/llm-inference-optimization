@@ -638,7 +638,16 @@
 - 8.3.1 Speculative Decoding
 - 8.3.2 Assisted Decoding
 - 8.3.3 Lookahead Decoding
-- 8.3.4 方法对比
+- 8.3.4 Eagle系列：Eagle、Eagle 2、Eagle 3 ⭐
+  - **Eagle 3**（来源：NVIDIA Model Optimizer + SGLang）
+    - 基于投机采样的训练checkpoint
+    - 使用NVIDIA Model Optimizer进行QAT训练
+    - 支持多种草稿模型策略
+    - 在SGLang中可直接使用
+    - 性能提升：生成速度提升2-3倍
+    - 与vLLM、SGLang的集成
+- 8.3.5 方法对比
+- 8.3.6 如何选择合适的变体
 
 #### 8.4 草稿模型选择
 - 8.4.1 小型号模型
@@ -658,11 +667,119 @@
 - 8.6.3 性能基准测试
 - 8.6.4 调优技巧
 
+#### 8.7 实战：Eagle 3 with SGLang ⭐
+
+> **💡 工业界实践**（来源：NVIDIA Model Optimizer Blog）
+>
+> **核心洞察**：Eagle 3是NVIDIA Model Optimizer团队训练的投机采样checkpoint，通过QAT训练优化，在SGLang中可直接使用，实现2-3倍的生成速度提升。
+
+- 8.7.1 什么是Eagle 3
+  - **NVIDIA官方训练**：使用NVIDIA Model Optimizer
+  - **QAT优化**：量化感知训练提升精度
+  - **即用型checkpoint**：无需自己训练草稿模型
+  - **SGLang原生支持**：开箱即用
+  - **性能保证**：NVIDIA团队优化和验证
+
+- 8.7.2 Eagle 3 vs 自训练草稿模型
+  - **精度优势**：
+    - QAT训练优化，接受率更高
+    - Numerical稳定性更好
+  - **成本优势**：
+    - 无需自己训练草稿模型
+    - 节省训练时间和资源
+  - **维护优势**：
+    - NVIDIA官方支持
+    - 持续更新和优化
+
+- 8.7.3 在SGLang中使用Eagle 3
+  - **安装SGLang**：
+    ```bash
+    pip install sglang
+    ```
+  - **下载Eagle 3 checkpoint**：
+    - 从Hugging Face或NVIDIA官网下载
+    - 支持的主模型：Llama、GPT等系列
+  - **配置speculative decoding**：
+    ```python
+    import sglang as sgl
+
+    # 配置Eagle 3作为草稿模型
+    model = sgl.launch_server(
+        model_path="path/to/main/model",
+        speculative_algorithm="Eagle",
+        speculative_draft_model_path="path/to/eagle3",
+        speculative_max_tokens=8
+    )
+    ```
+  - **性能调优**：
+    - 调整speculative_max_tokens
+    - 监控acceptance rate
+    - 优化batch size
+
+- 8.7.4 性能基准测试
+  - **测试环境**：
+    - GPU: H100 80GB
+    - 模型: Llama-3-70B
+    - 草稿模型: Eagle 3
+  - **性能指标**：
+    - **生成速度提升**：2-3倍
+    - **Acceptance rate**：70-80%
+    - **Latency改善**：TTFT降低40%
+    - **Throughput提升**：TPS提升2.5倍
+  - **不同场景表现**：
+    - 短文本生成：提升1.5-2倍
+    - 长文本生成：提升2.5-3倍
+    - 代码生成：提升2-3倍
+
+- 8.7.5 Eagle 3的限制和注意事项
+  - **模型支持**：
+    - 仅支持特定的主模型
+    - 需要检查兼容性列表
+  - **硬件要求**：
+    - 建议使用H100或更新一代GPU
+    - 需要足够的显存同时加载主模型和草稿模型
+  - **适用场景**：
+    - ✅ 适合长文本生成
+    - ✅ 适合高吞吐场景
+    - ⚠️ 短文本收益有限
+    - ❌ 不适合延迟敏感的实时应用
+
+- 8.7.6 Eagle系列演进
+  - **Eagle**：
+    - 初始版本
+    - 基础投机采样
+  - **Eagle 2**：
+    - 改进训练策略
+    - 更好的acceptance rate
+  - **Eagle 3**：
+    - QAT训练优化
+    - 支持更多主模型
+    - SGLang深度集成
+  - **未来方向**：
+    - 支持更多模型架构
+    - 动态草稿长度
+    - 与其他优化技术结合（如PD分离）
+
 #### 常见误区专栏
+- 误区1："投机采样总是能加速"
+- 误区2："草稿模型越小越好"
+- 误区3："acceptance rate越高越好"
+- 误区4："Eagle 3只适用于NVIDIA GPU"
+
 #### 实战检查清单
+- [ ] 确定应用场景是否适合投机采样
+- [ ] 选择合适的投机采样变体
+- [ ] 选择或训练草稿模型
+- [ ] 配置speculative decoding参数
+- [ ] 进行性能基准测试
+- [ ] 监控acceptance rate
+- [ ] 优化和调优
+
 #### 动手练习
 - 练习8.1：使用投机采样加速生成
 - 练习8.2：对比不同草稿模型的效果
+- 练习8.3：使用SGLang + Eagle 3部署推理服务 ⭐
+- 练习8.4：（进阶）训练自己的草稿模型 ⭐
 
 ---
 
