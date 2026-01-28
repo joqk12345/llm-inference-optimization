@@ -188,9 +188,298 @@
 
 ---
 
+### 第5章 LLM推理基础 ⭐ 新增
+
+> **💡 教学理念**（参考：Hugging Face "Continuous batching from first principles"）
+>
+> **核心思路**：从第一性原理出发，理解LLM推理的基本流程和优化动机。
+>
+> **学习路径**：Attention → KV Cache → Chunked Prefill → Continuous Batching
+
+#### 5.1 LLM如何生成文本
+
+- 5.1.1 自回归生成的基本过程
+  - **LLM的本质**： fancy next token predictors
+  - **生成过程**：
+    - 输入整个prompt → 生成第一个token
+    - 逐个添加token，每次读取之前所有内容
+    - 直到决定生成结束
+  - **观察**：第一个token出现慢（TTFT），之后token逐个出现
+
+- 5.1.2 Prefill阶段：并行处理prompt
+  - **定义**：处理初始prompt，生成第一个token
+  - **特点**：计算密集，可以并行处理
+  - **时间**：TTFT（Time To First Token）
+  - **示例**：prompt有100个token，一次forward pass处理全部
+
+- 5.1.3 Decode阶段：逐token生成
+  - **定义**：逐个生成后续token
+  - **特点**：内存带宽密集，每次只生成1个token
+  - **时间**：TBT（Time Between Tokens）
+  - **示例**：生成100个token需要100次forward pass
+
+- 5.1.4 图解完整流程
+  - 可视化：Prefill → Decode[1] → Decode[2] → ... → Decode[n]
+  - 标注每个阶段的特点和优化方向
+
+#### 5.2 Attention机制详解
+
+> **💡 为什么重要**：Attention是唯一让不同token产生交互的地方。理解Attention，就理解了LLM的核心。
+
+- 5.2.1 Token的表示：向量与hidden dimension
+  - **Tokenization**：文本 → token序列
+  - **Embedding**：每个token → d维向量（hidden dimension）
+  - **Tensor形状**：[batch_size, sequence_length, hidden_dim]
+  - **示例**：7个token → [1, 7, d]（batch=1）
+
+- 5.2.2 Query、Key、Value投影
+  - **三个权重矩阵**：Wq、Wk、Wv
+  - **投影操作**：Q = x·Wq, K = x·Wk, V = x·Wv
+  - **输出形状**：[1, n, A]（A = attention head dimension）
+  - **物理意义**：
+    - Q：这个token想找什么？
+    - K：这个token能提供什么？
+    - V：这个token的实际内容
+
+- 5.2.3 Attention计算：QK^T与二次复杂度
+  - **计算步骤**：
+    1. Q·K^T → 相似度矩阵 [n, n]
+    2. 除以√d（缩放）
+    3. Softmax（归一化）
+    4. 乘以V
+  - **复杂度**：O(n²·d)
+  - **关键洞察**：Attention的二次复杂度是性能瓶颈
+
+- 5.2.4 Attention Mask：控制token交互
+  - **什么是Mask**：布尔矩阵，决定哪些token可以交互
+  - **形状**：与QK^T相同 [n, n]
+  - **作用**：Mask=False的位置，attention权重=0
+  - **可视化方法**：
+    - 绿色方块 = True（可以交互）
+    - 白色方块 = False（不能交互）
+
+- 5.2.5 Causal Mask：因果关系的可视化
+  - **定义**：每个token只能与之前的token交互
+  - **直觉**：因必须在果之前
+  - **Mask形状**：下三角矩阵
+  - **可视化示例**：
+    ```
+    Token:  <bos>  I     am    sure
+    <bos>:  [✓]   [✓]   [✓]   [✓]
+    I:      [ ]    [✓]   [✓]   [✓]
+    am:     [ ]    [ ]    [✓]   [✓]
+    sure:   [ ]    [ ]    [ ]    [✓]
+    ```
+  - **读mask方法**：行=当前token，列=历史token
+
+- 5.2.6 为什么Attention是唯一让token交互的地方
+  - **其他操作**：token-wise，每个token独立处理
+    - Layer normalization
+    - 激活函数
+    - 矩阵乘法
+  - **Attention的作用**：让token之间"交流"
+  - **结论**：理解了attention mask，就理解了LLM的信息流
+
+#### 5.3 从朴素生成到KV Cache
+
+- 5.3.1 朴素方法：每次重新计算（O(n²)）
+  - **问题场景**：生成第n+1个token
+  - **朴素做法**：
+    1. 将所有n+1个token重新输入模型
+    2. 重新计算所有token的K和V
+    3. 只使用最后一个token的输出
+  - **计算复杂度**：O((n+1)²) → 随序列长度二次增长
+  - **可视化浪费**：灰色token的K、V被重复计算
+
+- 5.3.2 重复计算问题的可视化
+  - **关键观察**：新token（如"will"）不影响旧token的attention计算
+  - **原因**：Causal mask，未来token不影响过去
+  - **图示**：最后一个token只关心自己的预测，不影响其他token
+
+- 5.3.3 KV Cache的核心思想
+  - **核心洞察**：旧token的K、V已经计算过，缓存起来！
+  - **做法**：
+    - Prefill阶段：计算并存储所有token的K、V
+    - Decode阶段：只计算新token的K、V，复用缓存的K、V
+  - **效果**：避免重复计算
+  - **代价**：显存占用 O(n)
+
+- 5.3.4 计算复杂度降低：从O(n²)到O(n)
+  - **无KV Cache**：每个token O(n²)
+  - **有KV Cache**：第一个token O(n²)，后续token O(n)
+  - **平均复杂度**：O(n)
+  - **加速效果**：序列越长，加速越明显
+
+- 5.3.5 显存代价：每个token需要多少显存？
+  - **单token的cache大小**：2·L·H·A（K和V）
+    - L = 层数（如32）
+    - H = heads数（如32）
+    - A = head dimension（如128）
+  - **示例计算**：
+    - Llama-2-7B：2 × 32 × 128 × 2 bytes = 16 KB/token
+    - 1000 tokens = 16 MB
+    - 10000 tokens = 160 MB
+  - **权衡**：用显存换计算
+
+#### 5.4 Chunked Prefill：处理长prompt
+
+- 5.4.1 问题：大prompt超过显存
+  - **场景**：Cursor添加整个代码仓库到prompt
+  - **问题**：n个token的激活值超过GPU显存
+  - **约束**：每次forward pass最多处理m个token
+
+- 5.4.2 解决方案：分块处理
+  - **思路**：将n个token的prompt分成⌈n/m⌉个chunks
+  - **示例**：n=7, m=4 → 分成2个chunks
+    - Chunk 1：tokens[0:4]
+    - Chunk 2：tokens[4:7]
+  - **关键**：如何保持信息连续性？
+
+- 5.4.3 KV Cache在chunked prefill中的作用
+  - **Chunk 1**：
+    - 处理tokens[0:4]
+    - 计算并缓存K、V
+  - **Chunk 2**：
+    - 处理tokens[4:7]
+    - 复用Chunk 1缓存的K、V
+    - 拼接：KV_cached + KV_new
+  - **Attention mask调整**：确保跨chunk的token正确交互
+
+- 5.4.4 图解分块处理流程
+  - **无chunked prefill**：一次性处理，memory不够
+  - **有chunked prefill**：
+    - Chunk 1: [tokens 0-3] → cache KV
+    - Chunk 2: [cached KV] + [tokens 4-6] → cache KV
+  - **灵活性**：可根据内存约束动态调整chunk大小
+
+#### 5.5 批处理的挑战：从静态到动态
+
+- 5.5.1 静态批处理
+  - **目标**：提高吞吐量（throughput）
+  - **方法**：将多个prompt打包成一个batch
+  - **约束**：所有prompt必须有相同长度
+  - **解决方案**：左侧padding，右侧对齐
+
+- 5.5.2 Padding的问题：计算浪费
+  - **Padding位置**：左侧（添加`<pad>` token）
+  - **Attention mask**：padding位置设为False
+  - **问题**：padding token占用了计算资源，但没有实际贡献
+  - **示例**：2个prompt，长度3和7 → 需要padding到7
+    - Prompt 1: `<pad><pad><pad><token1><token2><token3><eos>`
+    - Prompt 2: `<token1><token2><token3><token4><token5><token6><token7>`
+
+- 5.5.3 不同序列长度的困境
+  - **场景**：batch中有多个prompt，长度差异大
+  - **问题1**：短prompt完成后，长prompt还在生成
+    - 短prompt的计算浪费（padding）
+  - **问题2**：动态调度引入大量padding
+    - 新加入的prompt需要prefill
+    - 正在decode的prompt每次只加1个token
+    - Padding数量 = (n-1) × (B-1)
+
+- 5.5.4 示例：为什么padding成本随batch和长度二次增长
+  - **参数**：
+    - B = 8（batch中8个prompt在decode）
+    - n = 100（新prompt有100个token）
+  - **Padding数量**：(100-1) × (8-1) = 99 × 7 = 693个padding tokens！
+  - **结论**：动态调度 + 传统batching = 灾难
+
+#### 5.6 Continuous Batching入门 ⭐
+
+> **💡 核心洞察**：去掉batch维度，用attention mask控制token交互，让GPU时刻满载。
+
+- 5.6.1 核心思想：去掉batch维度
+  - **问题根源**：batch维度引入了padding
+  - **激进想法**：不要batch维度！
+  - **替代方案**：拼接所有prompt
+  - **新问题**：如何防止不同prompt的token互相干扰？
+
+- 5.6.2 Ragged Batching：用attention mask控制交互
+  - **方法**：
+    1. 将多个prompt拼接成一个序列
+    2. 用attention mask控制token交互
+    3. Prompt A的token不能attend to Prompt B的token
+  - **Mask形状**：块对角矩阵（block-diagonal）
+  - **可视化**：
+    ```
+    Prompt A (3 tokens): [A1, A2, A3]
+    Prompt B (2 tokens): [B1, B2]
+
+    Attention Mask:
+    A1:  [✓] [  ] [  ] [  ] [  ]
+    A2:  [✓] [✓] [  ] [  ] [  ]
+    A3:  [✓] [✓] [✓] [  ] [  ]
+    B1:  [  ] [  ] [  ] [✓] [  ]
+    B2:  [  ] [  ] [  ] [✓] [✓]
+    ```
+  - **优势**：无padding，所有计算都有意义
+
+- 5.6.3 Dynamic Scheduling：动态替换完成的请求
+  - **场景**：某个prompt生成`<eos>`
+  - **动作**：
+    1. 立即从batch中移除
+    2. 用等待中的prompt替换
+    3. 重新构建attention mask
+  - **目标**：保持GPU时刻满载
+  - **关键**：Ragged batching让替换成本低
+
+- 5.6.4 混合Prefill和Decode：最大化throughput
+  - **挑战**：
+    - Decode阶段的prompt每次只加1个token
+    - 新加入的prompt需要prefill很多token
+  - **调度算法**：
+    1. 目标：每个batch达到m个token（memory budget）
+    2. 优先：所有decode prompt加入（每个占1个token）
+    3. 填充：用chunked prefill加入新prompt
+  - **示例**：
+    - Memory budget: m=1000
+    - 10个decode prompts → 占用10个token
+    - 剩余990个token → 用于prefill新请求
+
+- 5.6.5 完整的Continuous Batching流程图
+  - **步骤1**：初始batch（多个decode阶段的请求）
+  - **步骤2**：某个请求完成 → 移除
+  - **步骤3**：新请求加入 → chunked prefill
+  - **步骤4**：重建attention mask → ragged batching
+  - **步骤5**：forward pass → 生成token
+  - **循环**：回到步骤2
+
+- 5.6.6 Continuous Batching vs 传统方法对比
+  - **Static Batching**：
+    - 优点：简单
+    - 缺点：大量padding，吞吐量低
+  - **Dynamic Batching**：
+    - 优点：动态调整
+    - 缺点：padding仍然严重
+  - **Continuous Batching**：
+    - 优点：无padding，GPU利用率最高
+    - 缺点：实现复杂，需要动态管理attention mask
+
+#### 常见误区专栏
+- 误区1："Attention很复杂，很难理解" → 其实核心就是QK^T
+- 误区2："KV Cache总是好的" → 显存换计算，长序列显存压力大
+- 误区3："Batch越大越好" → padding浪费，continuous batching才是正解
+- 误区4："Prefill和Decode应该分开处理" → 混合处理才能最大化throughput
+
+#### 实战检查清单
+- [ ] 理解Attention的Q、K、V投影
+- [ ] 能够画出Causal Mask的可视化
+- [ ] 计算给定模型的KV Cache显存占用
+- [ ] 理解Chunked Prefill的应用场景
+- [ ] 理解Ragged Batching的attention mask构建
+- [ ] 能够解释Continuous Batching的完整流程
+
+#### 动手练习
+- 练习5.1：手动计算一个简单模型的KV Cache大小
+- 练习5.2：可视化不同batching策略的attention mask
+- 练习5.3：对比static batching和continuous batching的padding数量
+- 练习5.4：（进阶）实现一个简单的continuous batching调度器
+
+---
+
 ## 第三部分：核心技术篇 (Part 3: Core Techniques)
 
-### 第5章 KV Cache优化
+### 第6章 KV Cache优化
 
 > **💰 成本影响**（基于行业数据）
 > - **显存节省**：KV Cache优化可减少显存占用50-70%
@@ -238,85 +527,85 @@
 
 ---
 
-### 第6章 请求调度策略
+### 第7章 请求调度策略
 
 > **💰 成本影响**（基于行业数据）
 > - **吞吐提升**：Continuous Batching可将吞吐量提升3-10倍
 > - **延迟改善**：P95延迟可降低50-70%
 > - **GPU利用率**：从30-40%提升到80-90%
 
-#### 6.1 调度的必要性
-- 6.1.1 为什么需要调度
-- 6.1.2 服务质量vs吞吐量
-- 6.1.3 调度器的目标
+#### 7.1 调度的必要性
+- 7.1.1 为什么需要调度
+- 7.1.2 服务质量vs吞吐量
+- 7.1.3 调度器的目标
 
-#### 6.2 基础调度策略
-- 6.2.1 FIFO (First In First Out)
-- 6.2.2 静态批处理 (Static Batching)
-- 6.2.3 优缺点分析
+#### 7.2 基础调度策略
+- 7.2.1 FIFO (First In First Out)
+- 7.2.2 静态批处理 (Static Batching)
+- 7.2.3 优缺点分析
 
-#### 6.3 动态批处理 (Continuous Batching)
-- 6.3.1 问题：静态批处理的浪费
-- 6.3.2 Continuous Batching原理
-- 6.3.3 图解工作流程
-- 6.3.4 性能提升分析
+#### 7.3 动态批处理 (Continuous Batching)
+- 7.3.1 问题：静态批处理的浪费
+- 7.3.2 Continuous Batching原理
+- 7.3.3 图解工作流程
+- 7.3.4 性能提升分析
 
-#### 6.4 vLLM的调度器实现
-- 6.4.1 请求生命周期管理
-- 6.4.2 预分配vs动态分配
-- 6.4.3 迭代级调度 (Iteration-level Scheduling)
-- 6.4.4 优先级队列
+#### 7.4 vLLM的调度器实现
+- 7.4.1 请求生命周期管理
+- 7.4.2 预分配vs动态分配
+- 7.4.3 迭代级调度 (Iteration-level Scheduling)
+- 7.4.4 优先级队列
 
-#### 6.5 高级调度策略
-- 6.5.1 优先级调度
-- 6.5.2 最短作业优先 (SJF)
-- 6.5.3 轮询调度
-- 6.5.4 自适应调度
+#### 7.5 高级调度策略
+- 7.5.1 优先级调度
+- 7.5.2 最短作业优先 (SJF)
+- 7.5.3 轮询调度
+- 7.5.4 自适应调度
 
-#### 6.6 实战配置
-- 6.6.1 vLLM调度参数调优
-- 6.6.2 不同场景的调度策略
+#### 7.6 实战配置
+- 7.6.1 vLLM调度参数调优
+- 7.6.2 不同场景的调度策略
 
-#### 6.7 Prefill-Decode分离（PD分离）⭐
+#### 7.7 Prefill-Decode分离（PD分离）⭐
 
 > **💡 2025年技术趋势**：PD分离在2025年从概念快速演进为生产标准。vLLM、SGLang等主流框架都已支持，几乎所有厂商都在采用这种架构。
 
-- 6.7.1 什么是PD分离
+- 7.7.1 什么是PD分离
   - Prefill阶段：并行处理prompt，计算密集
   - Decode阶段：串行生成token，内存带宽密集
   - 两种阶段的计算模式差异
   - 为什么需要分离？
 
-- 6.7.2 PD分离的架构演进
+- 7.7.2 PD分离的架构演进
   - 2025年初：概念提出
   - 2025年中：vLLM、SGLang等社区合作实现
   - 2025年底：成为生产标准架构
   - 从概念到生产只用了一年
 
-- 6.7.3 PD分离的技术优势
+- 7.7.3 PD分离的技术优势
   - **异构部署**：Prefill用计算能力强的GPU，Decode用带宽大的GPU
   - **资源隔离**：避免长请求阻塞短请求
   - **弹性扩展**：Prefill和Decode可独立扩缩容
   - **性能优化**：针对不同阶段做专门优化
 
-- 6.7.4 vLLM的PD分离实现
+- 7.7.4 vLLM的PD分离实现
   - 架构设计：Prefill worker + Decode worker
   - 通信机制：KV Cache的传输
   - 调度策略：如何分配请求到不同worker
   - 性能提升：吞吐量和延迟的改善
 
-- 6.7.5 SGLang的PD分离实践
+- 7.7.5 SGLang的PD分离实践
   - RadixAttention：统一的注意力抽象
   - 自动分离：无需手动配置
   - 生产经验：稳定性、性能监控
 
-- 6.7.6 PD分离的挑战
+- 7.7.6 PD分离的挑战
   - **KV Cache传输**：网络开销和序列化
   - **负载均衡**：Prefill和Decode的速率匹配
   - **容错处理**：Worker故障如何恢复
   - **复杂度增加**：部署和运维的挑战
 
-- 6.7.7 实战案例
+- 7.7.7 实战案例
   - 案例1：单机GPU的PD分离
   - 案例2：跨机器的PD分离部署
   - 案例3：异构GPU（H100+H200）的实践
@@ -331,7 +620,7 @@
 
 ---
 
-### 第7章 量化技术
+### 第8章 量化技术
 
 > **💰 成本影响**（基于行业数据）
 > - **显存节省**：INT8量化节省50%显存，INT4节省75%
@@ -340,117 +629,117 @@
 > - **硬件效率**：INT8推理速度比FP16快2-3倍
 > - **极端压缩**：INT4 QAT可将~1TB模型压缩到单H200（7倍压缩）⭐
 
-#### 7.1 量化基础
-- 7.1.1 什么是量化
-- 7.1.2 为什么量化能节省显存
-- 7.1.3 精度vs性能的权衡
-- 7.1.4 为什么量化有效：模型的冗余性
+#### 8.1 量化基础
+- 8.1.1 什么是量化
+- 8.1.2 为什么量化能节省显存
+- 8.1.3 精度vs性能的权衡
+- 8.1.4 为什么量化有效：模型的冗余性
 
-#### 7.2 量化方法分类
-- 7.2.1 PTQ (Post-Training Quantization)
+#### 8.2 量化方法分类
+- 8.2.1 PTQ (Post-Training Quantization)
   - 训练后量化，无需重新训练
   - 速度快，适合快速部署
   - 可能有一定精度损失
   - 常见方法：GPTQ、AWQ、bitsandbytes
-- 7.2.2 QAT (Quantization-Aware Training) ⭐
+- 8.2.2 QAT (Quantization-Aware Training) ⭐
   - 量化感知训练，在训练时模拟量化
   - 精度损失更小，train-infer一致性好
   - 需要完整训练周期
   - 适用于RL训练和需要高精度的场景
-- 7.2.3 QLoRA vs Native Quantized Training vs QAT
+- 8.2.3 QLoRA vs Native Quantized Training vs QAT
   - QLoRA：降低LoRA微调的训练内存
   - Native Quantized Training：端到端低精度训练
   - QAT：改善量化推理精度
   - 对比表格：目的、适用场景、优缺点
-- 7.2.4 量化方法选择决策树
+- 8.2.4 量化方法选择决策树
   - 场景1：快速部署 → PTQ
   - 场景2：精度要求高 → QAT
   - 场景3：需要微调 → QLoRA或QAT
   - 场景4：RL训练 → QAT
 
-#### 7.3 常用量化格式
-- 7.3.1 FP32 (32位浮点) - 训练标准
-- 7.3.2 FP16/BF16 (16位浮点) - 推理常用
-- 7.3.3 INT8 (8位整数) - 经典量化
-- 7.3.4 INT4 (W4A16) ⭐
+#### 8.3 常用量化格式
+- 8.3.1 FP32 (32位浮点) - 训练标准
+- 8.3.2 FP16/BF16 (16位浮点) - 推理常用
+- 8.3.3 INT8 (8位整数) - 经典量化
+- 8.3.4 INT4 (W4A16) ⭐
   - 4位权重，16位激活
   - 广泛的硬件支持（Blackwell之前的GPU）
   - 工业界"足够好"的标准
   - 75%显存节省
-- 7.3.5 FP4 vs INT4
+- 8.3.5 FP4 vs INT4
   - 精度对比：FP4表示范围更大，INT4更稳定
   - 性能对比：FP4理论更高，INT4生态更成熟
   - 硬件支持：INT4更广泛，FP4需要Blackwell
   - 选择建议：当前选INT4，未来考虑FP4
-- 7.3.6 FP8 / NVFP4：未来方向
+- 8.3.6 FP8 / NVFP4：未来方向
   - NVIDIA Blackwell的原生FP4/FP8支持
   - H100/H200的FP8支持
   - 性能提升潜力
-- 7.3.7 AWQ / GPTQ：流行的INT4格式
+- 8.3.7 AWQ / GPTQ：流行的INT4格式
   - AWQ：Activation-aware Quantization
   - GPTQ：Gradient-based Post-Training Quantization
   - 性能和精度对比
 
-#### 7.4 流行的量化框架
-- 7.4.1 vLLM量化支持
+#### 8.4 流行的量化框架
+- 8.4.1 vLLM量化支持
   - AWQ、GPTQ、bitsandbytes
   - KV Cache量化
   - PagedAttention + 量化
-- 7.4.2 SGLang INT4推理 ⭐
+- 8.4.2 SGLang INT4推理 ⭐
   - Marlin内核支持
   - W4A16高效推理
   - Bit packing和近零开销解包
   - MoE算子深度融合
   - 支持GPTQ、AWQ格式
-- 7.4.3 NVIDIA Model Optimizer ⭐
+- 8.4.3 NVIDIA Model Optimizer ⭐
   - QAT训练支持
   - Megatron-LM集成
   - MXFP4、NVFP4格式支持
   - Fake quantization实现
-- 7.4.4 AutoGPTQ / llama.cpp
+- 8.4.4 AutoGPTQ / llama.cpp
   - 开源量化工具
   - CPU推理支持
 
-#### 7.5 KV Cache量化
-- 7.5.1 为什么量化KV Cache
+#### 8.5 KV Cache量化
+- 8.5.1 为什么量化KV Cache
   - KV Cache占用显存的50%+
   - 长上下文场景尤其重要
-- 7.5.2 KV Cache量化方法
+- 8.5.2 KV Cache量化方法
   - INT8 KV Cache
   - 动态量化vs静态量化
   - Per-token量化
-- 7.5.3 精度与速度平衡
+- 8.5.3 精度与速度平衡
   - 精度损失评估
   - 性能提升
   - 生产环境注意事项
 
-#### 7.6 实战：量化部署
-- 7.6.1 使用vLLM加载量化模型
+#### 8.6 实战：量化部署
+- 8.6.1 使用vLLM加载量化模型
   - AWQ/GPTQ模型加载
   - 性能对比测试
   - 精度损失评估
-- 7.6.2 使用SGLang部署INT4模型 ⭐
+- 8.6.2 使用SGLang部署INT4模型 ⭐
   - W4A16推理配置
   - Marlin内核启用
   - 性能benchmark
-- 7.6.3 生产环境注意事项
+- 8.6.3 生产环境注意事项
   - 模型格式选择
   - 硬件要求
   - 监控指标
 
-#### 7.7 量化进阶：INT4 QAT实战 ⭐
+#### 8.7 量化进阶：INT4 QAT实战 ⭐
 
 > **💡 案例来源**: SGLang RL Team, InfiXAI Team, Ant Group (2026-01-26)
 >
 > **核心成果**: 将~1TB规模的模型压缩到单张H200 (141GB)，消除跨节点通信瓶颈，显著提升rollout效率
 
-- 7.7.1 什么是QAT
+- 8.7.1 什么是QAT
   - Fake Quantization原理
   - STE (Straight-Through Estimator)原理
   - train-infer一致性的重要性
   - 消融实验：QAT vs PTQ的精度差异
 
-- 7.7.2 INT4 QAT完整Pipeline
+- 8.7.2 INT4 QAT完整Pipeline
   - **Stage 1: QAT训练（模拟量化）**
     - 维护BF16主权重
     - 前向传播：fake quantization模拟量化噪声
@@ -464,7 +753,7 @@
     - 高效推理（INT4权重 × BF16激活）
     - 生成的经验数据回流到训练
 
-- 7.7.3 训练端实现
+- 8.7.3 训练端实现
   - Fake Quantization和STE实现
     - _FakeInt4QuantizationSTE类
     - 动态量化：per-group max absolute value
@@ -478,7 +767,7 @@
     - 实验2：不启用QAT + 直接INT4 rollout（误差震荡上升）
     - **结论**：训练和推理必须同时启用量化
 
-- 7.7.4 推理端实现
+- 8.7.4 推理端实现
   - SGLang W4A16推理
     - Bit packing：8个INT4值打包到1个INT32
     - 高效解包：位运算（>> 4 和 & 0xF）
@@ -488,7 +777,7 @@
     - Gating部分融合为单一内核
     - 避免重复kernel启动
 
-- 7.7.5 实战案例：1TB模型压缩到单H200
+- 8.7.5 实战案例：1TB模型压缩到单H200
   - **案例1：Qwen3-235B-A22B**
     - Raw-Reward：稳定增长，与BF16/FP8趋势一致
     - AIME评估：斜率和峰值与BF16高度对齐
@@ -501,7 +790,7 @@
     - 速度：INT4 ≈ FP8 > BF16 (H系列GPU)
     - 显存：INT4节省75% (关键优势)
 
-- 7.7.6 QAT的适用场景
+- 8.7.6 QAT的适用场景
   - ✅ 大规模RL训练（100B+参数）
   - ✅ 需要单节点部署超大模型
   - ✅ 需要train-infer一致性
@@ -511,7 +800,7 @@
   - ❌ 小规模模型（成本不值得）
   - ❌ 只推理不需要微调（用PTQ即可）
 
-#### 7.8 精度对齐：Train vs Inference ⭐
+#### 8.8 精度对齐：Train vs Inference ⭐
 
 > **💡 工业界实践**（来源：2025"青稞"AI嘉年华 - 朱立耕@NVIDIA）
 >
@@ -520,19 +809,19 @@
 > **大团队的做法**：Train和Inference的算子在同一个大的wrapper里维护，精度问题就不是问题。
 > **开源社区的问题**：Train和Inference是两帮人做，算子没对齐导致accuracy不稳定。
 
-- 7.8.1 精度不对齐的问题
+- 8.8.1 精度不对齐的问题
   - 训练时：自定义kernel（如自己写的Flash Attention）
   - 推理时：社区优化的kernel（如SGLang的Flash Attention）
   - 结果：Numerical gap导致accuracy不稳定
   - 表现：Training loss spike、最终accuracy掉点
 
-- 7.8.2 为什么精度不对齐？
+- 8.8.2 为什么精度不对齐？
   - **开发团队分离**：Training team和Inference team各自优化
   - **优化目标不同**：Training关注收敛，Inference关注速度
   - **实现细节差异**：不同的算法、不同的数值处理
   - **测试场景不同**：Training用合成数据，Inference用真实数据
 
-- 7.8.3 如何确保精度对齐
+- 8.8.3 如何确保精度对齐
   - **方法1：统一算子库**（推荐）
     - Train和Inference使用同一套算子
     - 在同一个wrapper里维护
@@ -546,14 +835,14 @@
     - 比较训练时和推理时的output
     - 发现并修复精度regression
 
-- 7.8.4 不同任务对精度的敏感度
+- 8.8.4 不同任务对精度的敏感度
   - **LLM**：离散采样，对低精度容忍度高
   - **Diffusion**：连续空间采样，误差累积严重
     - FP4可能掉10-20个点（张博涵@浙大）
     - 需要特殊的clipping和修正
   - **推荐**：Diffusion模型至少使用FP8
 
-- 7.8.5 低精度的软件抽象复杂度
+- 8.8.5 低精度的软件抽象复杂度
   - **BF16/FP16**：一个tensor就是一个数据
   - **FP8**：一个weight变成3个tensor（data + scale + metadata）
   - **FP4**：需要padding、pack等操作
@@ -561,7 +850,7 @@
     - 软件生态需要大规模演进
   - **挑战**：用户心智负担大，如何平衡收益和复杂度
 
-- 7.8.6 低精度训练的稳定性问题
+- 8.8.6 低精度训练的稳定性问题
   - **常见症状**：
     - 训练到一半loss炸了
     - 同样task高精度没问题，低精度直接起飞
@@ -574,18 +863,18 @@
     - 不要上来就搞很难的题目，从简单开始
     - 低精度可能引入噪声，反而有助于收敛（Kimi K2的INT4经验）
 
-- 7.8.7 从历史看精度演进（朱立耕@NVIDIA）
+- 8.8.7 从历史看精度演进（朱立耕@NVIDIA）
   - **FP32 → FP16**：见过类似问题，最终解决
   - **FP16 → BF16**：见过类似问题，最终解决
   - **BF16 → FP8**：现在是过渡期阵痛
   - **结论**：随着算法stabilize和config摸清，问题可以解决
   - **展望**：低精度收益还是很大的，值得投入
 
-#### 7.9 量化技术总结与展望
-- 7.9.1 量化技术演进路线
-- 7.9.2 不同场景的最佳实践
-- 7.9.3 未来发展方向：FP4、NVFP4、Blackwell
-- 7.9.4 算法和系统的co-design（张博涵@浙大）
+#### 8.9 量化技术总结与展望
+- 8.9.1 量化技术演进路线
+- 8.9.2 不同场景的最佳实践
+- 8.9.3 未来发展方向：FP4、NVFP4、Blackwell
+- 8.9.4 算法和系统的co-design（张博涵@浙大）
   - 不是系统等算法成熟
   - 不是算法等系统优化
   - 需要同步螺旋式上升
@@ -616,29 +905,29 @@
 
 ---
 
-### 第8章 投机采样
+### 第9章 投机采样
 
 > **💰 成本影响**（基于行业数据）
 > - **速度提升**：生成速度可提升2-3倍
 > - **成本降低**：同样时间的输出增加，单位token成本降低
 > - **适用场景**：长文本生成（文章、代码、报告）
 
-#### 8.1 生成加速的基本思路
-- 8.1.1 为什么自回归生成慢
-- 8.1.2 并行化生成的挑战
-- 8.1.3 投机执行的概念
+#### 9.1 生成加速的基本思路
+- 9.1.1 为什么自回归生成慢
+- 9.1.2 并行化生成的挑战
+- 9.1.3 投机执行的概念
 
-#### 8.2 投机采样原理
-- 8.2.1 核心思想：小模型先行
-- 8.2.2 草稿模型 (Draft Model)
-- 8.2.3 验证过程
-- 8.2.4 图解完整流程
+#### 9.2 投机采样原理
+- 9.2.1 核心思想：小模型先行
+- 9.2.2 草稿模型 (Draft Model)
+- 9.2.3 验证过程
+- 9.2.4 图解完整流程
 
-#### 8.3 投机采样变体
-- 8.3.1 Speculative Decoding
-- 8.3.2 Assisted Decoding
-- 8.3.3 Lookahead Decoding
-- 8.3.4 Eagle系列：Eagle、Eagle 2、Eagle 3 ⭐
+#### 9.3 投机采样变体
+- 9.3.1 Speculative Decoding
+- 9.3.2 Assisted Decoding
+- 9.3.3 Lookahead Decoding
+- 9.3.4 Eagle系列：Eagle、Eagle 2、Eagle 3 ⭐
   - **Eagle 3**（来源：NVIDIA Model Optimizer + SGLang）
     - 基于投机采样的训练checkpoint
     - 使用NVIDIA Model Optimizer进行QAT训练
@@ -646,41 +935,41 @@
     - 在SGLang中可直接使用
     - 性能提升：生成速度提升2-3倍
     - 与vLLM、SGLang的集成
-- 8.3.5 方法对比
-- 8.3.6 如何选择合适的变体
+- 9.3.5 方法对比
+- 9.3.6 如何选择合适的变体
 
-#### 8.4 草稿模型选择
-- 8.4.1 小型号模型
-- 8.4.2 量化后的主模型
-- 8.4.3 专门训练的草稿模型
-- 8.4.4 选择标准
+#### 9.4 草稿模型选择
+- 9.4.1 小型号模型
+- 9.4.2 量化后的主模型
+- 9.4.3 专门训练的草稿模型
+- 9.4.4 选择标准
 
-#### 8.5 性能分析
-- 8.5.1 理论加速比
-- 8.5.2 实际加速比影响因素
-- 8.5.3 什么时候投机采样有效
-- 8.5.4 什么时候会失败
+#### 9.5 性能分析
+- 9.5.1 理论加速比
+- 9.5.2 实际加速比影响因素
+- 9.5.3 什么时候投机采样有效
+- 9.5.4 什么时候会失败
 
-#### 8.6 实战：vLLM投机采样
-- 8.6.1 配置投机采样
-- 8.6.2 选择合适的草稿模型
-- 8.6.3 性能基准测试
-- 8.6.4 调优技巧
+#### 9.6 实战：vLLM投机采样
+- 9.6.1 配置投机采样
+- 9.6.2 选择合适的草稿模型
+- 9.6.3 性能基准测试
+- 9.6.4 调优技巧
 
-#### 8.7 实战：Eagle 3 with SGLang ⭐
+#### 9.7 实战：Eagle 3 with SGLang ⭐
 
 > **💡 工业界实践**（来源：NVIDIA Model Optimizer Blog）
 >
 > **核心洞察**：Eagle 3是NVIDIA Model Optimizer团队训练的投机采样checkpoint，通过QAT训练优化，在SGLang中可直接使用，实现2-3倍的生成速度提升。
 
-- 8.7.1 什么是Eagle 3
+- 9.7.1 什么是Eagle 3
   - **NVIDIA官方训练**：使用NVIDIA Model Optimizer
   - **QAT优化**：量化感知训练提升精度
   - **即用型checkpoint**：无需自己训练草稿模型
   - **SGLang原生支持**：开箱即用
   - **性能保证**：NVIDIA团队优化和验证
 
-- 8.7.2 Eagle 3 vs 自训练草稿模型
+- 9.7.2 Eagle 3 vs 自训练草稿模型
   - **精度优势**：
     - QAT训练优化，接受率更高
     - Numerical稳定性更好
@@ -691,7 +980,7 @@
     - NVIDIA官方支持
     - 持续更新和优化
 
-- 8.7.3 在SGLang中使用Eagle 3
+- 9.7.3 在SGLang中使用Eagle 3
   - **安装SGLang**：
     ```bash
     pip install sglang
@@ -716,7 +1005,7 @@
     - 监控acceptance rate
     - 优化batch size
 
-- 8.7.4 性能基准测试
+- 9.7.4 性能基准测试
   - **测试环境**：
     - GPU: H100 80GB
     - 模型: Llama-3-70B
@@ -731,7 +1020,7 @@
     - 长文本生成：提升2.5-3倍
     - 代码生成：提升2-3倍
 
-- 8.7.5 Eagle 3的限制和注意事项
+- 9.7.5 Eagle 3的限制和注意事项
   - **模型支持**：
     - 仅支持特定的主模型
     - 需要检查兼容性列表
@@ -744,7 +1033,7 @@
     - ⚠️ 短文本收益有限
     - ❌ 不适合延迟敏感的实时应用
 
-- 8.7.6 Eagle系列演进
+- 9.7.6 Eagle系列演进
   - **Eagle**：
     - 初始版本
     - 基础投机采样
@@ -760,7 +1049,7 @@
     - 动态草稿长度
     - 与其他优化技术结合（如PD分离）
 
-- 8.7.7 实战：vLLM Speculators v0.3.0 - 端到端Eagle 3训练 ⭐💡
+- 9.7.7 实战：vLLM Speculators v0.3.0 - 端到端Eagle 3训练 ⭐💡
 
   > **💡 2025年技术趋势**（来源：vLLM Official Blog - 2025/12/13）
   >
@@ -907,7 +1196,7 @@
 
 ## 第四部分：生产部署篇 (Part 4: Production Deployment)
 
-### 第9章 生产环境部署
+### 第10章 生产环境部署
 
 > **💰 成本影响**（基于行业数据）
 > - **可用性提升**：从99%提升到99.9%，故障成本降低10倍
@@ -915,77 +1204,77 @@
 > - **监控ROI**：及时发现问题，避免资源浪费
 > - **成本优化**：通过Spot实例等策略可节省60-80%云GPU成本
 
-#### 9.1 生产环境vs开发环境
-- 9.1.1 关键差异
-- 9.1.2 生产环境的特殊要求
-- 9.1.3 SLA定义
+#### 10.1 生产环境vs开发环境
+- 10.1.1 关键差异
+- 10.1.2 生产环境的特殊要求
+- 10.1.3 SLA定义
 
-#### 9.2 部署架构设计
-- 9.2.1 单机部署
-- 9.2.2 多机部署 (模型并行)
-- 9.2.3 负载均衡策略
-- 9.2.4 高可用架构
+#### 10.2 部署架构设计
+- 10.2.1 单机部署
+- 10.2.2 多机部署 (模型并行)
+- 10.2.3 负载均衡策略
+- 10.2.4 高可用架构
 
-#### 9.3 Kubernetes部署
-- 9.3.1 K8s基础概念
-- 9.3.2 部署vLLM到K8s
-- 9.3.3 配置管理
-- 9.3.4 资源调度与GPU共享
+#### 10.3 Kubernetes部署
+- 10.3.1 K8s基础概念
+- 10.3.2 部署vLLM到K8s
+- 10.3.3 配置管理
+- 10.3.4 资源调度与GPU共享
 
-#### 9.4 监控与可观测性
-- 9.4.1 关键监控指标
-- 9.4.2 Prometheus + Grafana
-- 9.4.3 日志收集与分析
-- 9.4.4 分布式追踪
+#### 10.4 监控与可观测性
+- 10.4.1 关键监控指标
+- 10.4.2 Prometheus + Grafana
+- 10.4.3 日志收集与分析
+- 10.4.4 分布式追踪
 
-#### 9.5 性能调优实战
-- 9.5.1 调优流程
-- 9.5.2 瓶颈定位方法
-- 9.5.3 常见性能问题
-- 9.5.4 真实案例：从50 tps到200 tps
+#### 10.5 性能调优实战
+- 10.5.1 调优流程
+- 10.5.2 瓶颈定位方法
+- 10.5.3 常见性能问题
+- 10.5.4 真实案例：从50 tps到200 tps
 
-#### 9.6 成本优化
-- 9.6.1 云GPU选择策略
-- 9.6.2 Spot实例使用
-- 9.6.3 自动伸缩
-- 9.6.4 成本监控工具
+#### 10.6 成本优化
+- 10.6.1 云GPU选择策略
+- 10.6.2 Spot实例使用
+- 10.6.3 自动伸缩
+- 10.6.4 成本监控工具
 
-#### 9.7 ROI监控与成本追踪
-- 9.7.1 如何追踪推理成本
-- 9.7.2 优化措施的ROI计算
-- 9.7.3 持续优化流程
+#### 10.7 ROI监控与成本追踪
+- 10.7.1 如何追踪推理成本
+- 10.7.2 优化措施的ROI计算
+- 10.7.3 持续优化流程
 
-#### 9.8 安全性考虑
-- 9.8.1 API认证与授权
-- 9.8.2 内容安全过滤
-- 9.8.3 速率限制
-- 9.8.4 数据隐私
+#### 10.8 安全性考虑
+- 10.8.1 API认证与授权
+- 10.8.2 内容安全过滤
+- 10.8.3 速率限制
+- 10.8.4 数据隐私
 
-#### 9.9 灾备与容错
-- 9.9.1 失败场景分析
-- 9.9.2 健康检查
-- 9.9.3 自动重启策略
-- 9.9.4 降级方案
+#### 10.9 灾备与容错
+- 10.9.1 失败场景分析
+- 10.9.2 健康检查
+- 10.9.3 自动重启策略
+- 10.9.4 降级方案
 
-#### 9.10 RL系统部署 ⭐
+#### 10.10 RL系统部署 ⭐
 
 > **💡 2025年技术趋势**（来源：2025"青稞"AI嘉年华 - 朱子林@质朴、朱立耕@NVIDIA）
 >
 > **核心洞察**：RL系统不同于传统推理系统，需要同时处理训练和推理两个workload，对infra提出了全新的挑战。
 
-- 9.10.1 什么是RL系统
+- 10.10.1 什么是RL系统
   - **训练（Training）**：更新模型参数
   - **推理（Rollout）**：生成experience数据
   - **区别于传统推理**：需要同时运行两个workload
   - **为什么复杂**：训练和推理的资源需求差异巨大
 
-- 9.10.2 RL系统的关键挑战（朱子林@质朴）
+- 10.10.2 RL系统的关键挑战（朱子林@质朴）
   - **缺少统一主线**：不像pretrain那样只卷MFU
   - **需要灵活性**：不同场景需要不同的workflow
   - **CPU的重要性**：Agent环境需要大量CPU（张明星@清华）
   - **开源生态缺失**：Agent system基本是负分（朱立耕@NVIDIA）
 
-- 9.10.3 Scalable Sandbox System
+- 10.10.3 Scalable Sandbox System
   - **问题**（朱立耕@NVIDIA）：
     - 搭建Jupyter agent在公司内部都很难
     - 需要manage K8S、自动起virtual environment
@@ -999,7 +1288,7 @@
     - 导致无法很好地做agent
     - 只能用dirty方法（mock python进程）
 
-- 9.10.4 Train和Rollout的资源动态分配（朱立耕@NVIDIA）
+- 10.10.4 Train和Rollout的资源动态分配（朱立耕@NVIDIA）
   - **问题**：
     - 传统做法：训练和Rollout用同样卡数（如128卡）
     - GPU空置，利用率非常低
@@ -1015,7 +1304,7 @@
     - GPU经常空在那里闲置
     - 自动scaling可以大幅提升GPU利用率
 
-- 9.10.5 RL框架介绍
+- 10.10.5 RL框架介绍
   - **slime**（朱子林@质朴）：
     - 同时有训练框架和推理框架
     - Rollout和驱动框架的联合
@@ -1029,7 +1318,7 @@
   - **arewe**：
     - RL训练和推理的统一框架
 
-- 9.10.6 部署架构
+- 10.10.6 部署架构
   - **单机部署**：
     - 适合小规模实验
     - Training和Rollout共享GPU
@@ -1041,13 +1330,13 @@
     - Rollout用H200或其他卡
     - 充分利用不同硬件的优势
 
-- 9.10.7 监控和可观测性
+- 10.10.7 监控和可观测性
   - **Training metrics**：Loss、Reward、Gradient norm
   - **Rollout metrics**：TPS、Latency、Success rate
   - **Resource utilization**：GPU、CPU、Memory、Network
   - **系统健康度**：Worker status、Checkpoint状态
 
-- 9.10.8 实战案例
+- 10.10.8 实战案例
   - **案例1**：使用slime部署简单RL任务
   - **案例2**：异构GPU的RL部署（H100+H200）
   - **案例3**：大规模RL的弹性资源分配
@@ -1062,7 +1351,7 @@
 
 ---
 
-### 第10章 高级话题
+### 第11章 高级话题
 
 > **💰 成本影响**（基于行业数据）
 > - **MoE模型**：稀疏激活可降低30-50%推理成本
@@ -1070,13 +1359,13 @@
 > - **边缘部署**：将推理移到边缘，降低中心成本和延迟
 > - **异构部署**：训练用H100，推理用H200，充分利用硬件（朱立耕@NVIDIA）
 
-#### 10.1 Agent基础设施 ⭐
+#### 11.1 Agent基础设施 ⭐
 
 > **💡 2025年技术趋势**（来源：2025"青稞"AI嘉年华 - 张明星@清华、朱立耕@NVIDIA）
 >
 > **核心洞察**：2025年下半年Agent快速兴起（Google NotebookLM、Gemini Nano），但开源Agent System基本是负分。这是当前最大的机会之一。
 
-- 10.1.1 为什么Agent Infra很重要
+- 11.1.1 为什么Agent Infra很重要
   - **2025年的爆发**：
     - Google: NotebookLM、Gemini Flash、Gemini Nano
     - 国内: AutoJam、多宝书记
@@ -1088,7 +1377,7 @@
     - 不像传统推理只有text input/output
     - 需要复杂的环境交互
 
-- 10.1.2 Agent System的缺失（朱立耕@NVIDIA）
+- 11.1.2 Agent System的缺失（朱立耕@NVIDIA）
   - **当前状态**：
     - 开源agent system是负数
     - 在公司内部搭建Jupyter agent都很难
@@ -1102,7 +1391,7 @@
     - 无法很好地做agent
     - 学术界几乎没有使用经验
 
-- 10.1.3 Agent环境的复杂性（张明星@清华）
+- 11.1.3 Agent环境的复杂性（张明星@清华）
   - **文件系统**：
     - Agent需要操作文件系统
     - 可能挂载失败需要处理
@@ -1117,7 +1406,7 @@
     - Agent环境需要大量CPU
     - 开源生态CPU支持是负分
 
-- 10.1.4 Agent环境的类型
+- 11.1.4 Agent环境的类型
   - **简单环境**：
     - Docker容器
     - 基本的文件系统操作
@@ -1129,7 +1418,7 @@
     - 复杂workflow
     - 多个服务协同
 
-- 10.1.5 Agent部署架构
+- 11.1.5 Agent部署架构
   - **单机部署**：
     - 适合开发和实验
   - **K8S部署**：
@@ -1139,18 +1428,18 @@
     - 使用AWS Lambda、GCP Cloud Functions
     - Serverless架构
 
-- 10.1.6 实战案例
+- 11.1.6 实战案例
   - **案例1**：搭建简单的Jupyter Agent
   - **案例2**：使用Docker部署Agent环境
   - **案例3**：生产级Agent System的挑战
 
-#### 10.2 异构硬件部署 ⭐
+#### 11.2 异构硬件部署 ⭐
 
 > **💡 2025年技术趋势**（来源：2025"青稞"AI嘉年华 - 朱立耕@NVIDIA）
 >
 > **核心洞察**：Training和Rollout的算力需求差异2-3个数量级（Training: 10^5 flops/byte, Rollout: ~80 flops/byte）。RL天生适合用不同硬件。
 
-- 10.2.1 训练vs推理的算力差异
+- 11.2.1 训练vs推理的算力差异
   - **训练**（朱立耕@NVIDIA）：
     - Flops per byte ≈ 10^5
     - 计算密集
@@ -1160,7 +1449,7 @@
   - **差距**：2-3个数量级
   - **启示**：应该用不同的硬件
 
-- 10.2.2 异构部署的机会（朱立耕@NVIDIA）
+- 11.2.2 异构部署的机会（朱立耕@NVIDIA）
   - **之前的问题**：
     - 大家都在SPMD时不会考虑
     - 物理上在同一集群但权限不同
@@ -1173,7 +1462,7 @@
     - 推理之间没有异构通信
     - 可以独立操作
 
-- 10.2.3 不同GPU的应用场景
+- 11.2.3 不同GPU的应用场景
   - **H100**：
     - 训练优化
     - 高计算能力
@@ -1184,7 +1473,7 @@
     - 推理场景可选择硬件多
     - 训练仍是NV的privilege
 
-- 10.2.4 容灾和混部的机会（朱子林@质朴）
+- 11.2.4 容灾和混部的机会（朱子林@质朴）
   - **之前的问题**：
     - NCCL/MPI不太能容灾
     - 一个节点挂了就整体夯死
@@ -1198,7 +1487,7 @@
     - SMP和RL的大集群混用
     - 提升整体硬件利用率
 
-- 10.2.5 异构部署的挑战
+- 11.2.5 异构部署的挑战
   - **Checkpoint管理**：
     - 不同硬件间checkpoint转换
     - T级别模型checkpoint巨大（张博涵@浙大）
@@ -1209,26 +1498,26 @@
     - 统一监控不同硬件
     - 资源调度复杂
 
-- 10.2.6 实战案例
+- 11.2.6 实战案例
   - **案例1**：H100训练 + H200推理
   - **案例2**：跨集群训练和推理
   - **案例3**：潮汐队列的实践
 
-#### 10.3 MoE模型推理优化
-- 10.3.1 MoE架构简介
-- 10.3.2 MoE推理的特殊挑战
-- 10.3.3 专家路由优化
-- 10.3.4 Checkpoint管理（张博涵@浙大）
+#### 11.3 MoE模型推理优化
+- 11.3.1 MoE架构简介
+- 11.3.2 MoE推理的特殊挑战
+- 11.3.3 专家路由优化
+- 11.3.4 Checkpoint管理（张博涵@浙大）
   - T级别模型checkpoint巨大
   - Partial checkpoint保存和加载
   - 故障恢复：屏蔽挂掉的专家
-- 10.3.5 实战：Mixtral部署
+- 11.3.5 实战：Mixtral部署
 
-#### 10.4 多模态模型推理
-- 10.4.1 多模态模型概述 (LLaVA等)
-- 10.4.2 视觉编码器优化
-- 10.4.3 多模态推理流水线
-- 10.4.4 Video Generation的挑战（张博涵@浙大）
+#### 11.4 多模态模型推理
+- 11.4.1 多模态模型概述 (LLaVA等)
+- 11.4.2 视觉编码器优化
+- 11.4.3 多模态推理流水线
+- 11.4.4 Video Generation的挑战（张博涵@浙大）
   - **Diffusion RL的尴尬**：
     - 做算法的：infra太慢，训练时间太长
     - 做系统的：算法还没成熟，等算法成熟再说
@@ -1241,16 +1530,16 @@
     - Video generation没有好的开源训练框架
     - 市面上没有很好的Diffusion RL系统
 
-#### 10.5 Torch Compile优化
-- 10.5.1 torch.compile原理
-- 10.5.2 在推理中的应用
-- 10.5.3 与vLLM结合
-- 10.5.4 实战效果
+#### 11.5 Torch Compile优化
+- 11.5.1 torch.compile原理
+- 11.5.2 在推理中的应用
+- 11.5.3 与vLLM结合
+- 11.5.4 实战效果
 
-#### 10.6 Flash Attention
-- 10.6.1 Flash Attention原理
-- 10.6.2 Flash Attention 2
-- 10.6.3 Sparse Attention vs Linear Attention（张博涵@浙大）
+#### 11.6 Flash Attention
+- 11.6.1 Flash Attention原理
+- 11.6.2 Flash Attention 2
+- 11.6.3 Sparse Attention vs Linear Attention（张博涵@浙大）
   - **趋势**：
     - 大厂逐渐放弃linear attention
     - 收敛到sparse attention
@@ -1263,48 +1552,48 @@
     - 怎么把sparse attention做不掉点？
     - 例如：Needle In A Haystack（大海捞多针）
       - Claude 3精度只有20-30%
-- 10.6.4 性能提升
-- 10.6.5 在vLLM中的使用
+- 11.6.4 性能提升
+- 11.6.5 在vLLM中的使用
 
-#### 10.7 自定义算子开发
-- 10.7.1 何时需要自定义算子
-- 10.7.2 CUDA编程基础
-- 10.7.3 Triton语言简介
-- 10.7.4 开发流程
-- 10.7.5 前端性能优化（刘海超@vLLM）
+#### 11.7 自定义算子开发
+- 11.7.1 何时需要自定义算子
+- 11.7.2 CUDA编程基础
+- 11.7.3 Triton语言简介
+- 11.7.4 开发流程
+- 11.7.5 前端性能优化（刘海超@vLLM）
   - Python写web service性能差
   - 需要加rest
   - Inference的CPU优化
   - 是否用C++（PyTorch也在考虑）
 
-#### 10.8 边缘部署
-- 10.8.1 边缘设备的挑战
-- 10.8.2 模型压缩技术
-- 10.8.3 移动端优化
-- 10.8.4 低精度在边缘侧的应用（张明星@清华）
+#### 11.8 边缘部署
+- 11.8.1 边缘设备的挑战
+- 11.8.2 模型压缩技术
+- 11.8.3 移动端优化
+- 11.8.4 低精度在边缘侧的应用（张明星@清华）
   - LUT查表方式
   - 大幅降低能耗
   - 不是SOTA模型，而是特殊边端场景
 
-#### 10.9 前沿技术展望
-- 10.9.1 技术栈越来越深（刘海超@vLLM）
+#### 11.9 前沿技术展望
+- 11.9.1 技术栈越来越深（刘海超@vLLM）
   - 2024年：从框架层面优化
   - 2025年：需要到RDMA、networking层面
   - 需要懂算法、硬件、系统
   - 需要联合优化
-- 10.9.2 从SPMD到Event Driven（张明星@清华）
+- 11.9.2 从SPMD到Event Driven（张明星@清华）
   - Workflow模式：事先program好
   - Event Driven模式：动态调度
   - 适合batch size达不到的场景
   - 编程复杂性高但更灵活
-- 10.9.3 算法和系统的co-design（张博涵@浙大）
+- 11.9.3 算法和系统的co-design（张博涵@浙大）
   - 不是系统等算法成熟
   - 不是算法等系统优化
   - 需要同步螺旋式上升
-- 10.9.4 新的量化技术
-- 10.9.5 硬件加速器 (TPU, NPU)
-- 10.9.6 模型架构演进
-- 10.9.7 未来趋势
+- 11.9.4 新的量化技术
+- 11.9.5 硬件加速器 (TPU, NPU)
+- 11.9.6 模型架构演进
+- 11.9.7 未来趋势
 
 #### 常见误区专栏
 #### 实战检查清单
