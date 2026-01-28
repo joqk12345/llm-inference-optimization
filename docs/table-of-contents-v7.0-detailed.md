@@ -486,38 +486,179 @@
 > - **吞吐提升**：在同样硬件上可服务2-3倍更多用户
 > - **成本节省**：典型场景从$0.002/token降到$0.001/token
 
-#### 5.1 Transformer回顾
-- 5.1.1 注意力机制原理
-- 5.1.2 K、V、Q是什么
-- 5.1.3 为什么需要缓存
+#### 6.1 Transformer回顾
+- 6.1.1 注意力机制原理
+- 6.1.2 K、V、Q是什么
+- 6.1.3 为什么需要缓存
 
-#### 5.2 KV Cache原理
-- 5.2.1 生成过程的重复计算问题
-- 5.2.2 KV Cache的核心思想
-- 5.2.3 如何减少计算量
-- 5.2.4 图解KV Cache工作流程
+#### 6.2 KV Cache原理
+- 6.2.1 生成过程的重复计算问题
+- 6.2.2 KV Cache的核心思想
+- 6.2.3 如何减少计算量
+- 6.2.4 图解KV Cache工作流程
 
-#### 5.3 KV Cache实现
-- 5.3.1 朴素实现方式
-- 5.3.2 PagedAttention原理（vLLM的核心）
-- 5.3.3 内存管理策略
-- 5.3.4 代码示例：手动实现简单KV Cache
+#### 6.3 KV Cache实现
+- 6.3.1 朴素实现方式
+- 6.3.2 PagedAttention原理（vLLM的核心）
+- 6.3.3 内存管理策略
+- 6.3.4 代码示例：手动实现简单KV Cache
 
-#### 5.4 KV Cache优化技术
-- 5.4.1 Multi-Query Attention vs Multi-Head Attention
-- 5.4.2 Grouped-Query Attention (GQA)
-- 5.4.3 Shared KV Cache
-- 5.4.4 量化KV Cache
+#### 6.4 KV Cache优化技术
+- 6.4.1 Multi-Query Attention vs Multi-Head Attention
+- 6.4.2 Grouped-Query Attention (GQA)
+- 6.4.3 Shared KV Cache
+- 6.4.4 量化KV Cache
 
-#### 5.5 KV Cache的代价
-- 5.5.1 显存占用分析
-- 5.5.2 序列长度限制
-- 5.5.3 权衡：计算vs显存
+#### 6.5 KV Cache的代价
+- 6.5.1 显存占用分析
+- 6.5.2 序列长度限制
+- 6.5.3 权衡：计算vs显存
 
-#### 5.6 实战对比
-- 5.6.1 无KV Cache vs 有KV Cache
-- 5.6.2 性能提升量化分析
-- 5.6.3 vLLM的KV Cache实现
+#### 6.6 实战对比
+- 6.6.1 无KV Cache vs 有KV Cache
+- 6.6.2 性能提升量化分析
+- 6.6.3 vLLM的KV Cache实现
+
+#### 6.7 Prefix Caching ⭐⭐⭐
+
+> **💡 核心洞察**：重复的prompt（如系统提示词）只需要计算一次，后续请求直接复用KV Cache。
+> **🎯 性能提升**：ChatGPT风格对话场景可提升2-5倍吞吐量。
+> **来源**：vLLM核心特性之一，已在生产环境大规模验证。
+
+- 6.7.1 什么是Prefix Caching
+  - **定义**：跨请求复用相同prompt的KV Cache
+  - **核心问题**：重复prompt的计算浪费
+  - **典型场景**：
+    - 系统提示词（"You are a helpful assistant..."）
+    - 多轮对话的上下文
+    - RAG场景的固定知识prefix
+  - **为什么叫"Prefix"**：
+    - Cache的是prompt部分（即序列的prefix）
+    - 生成的部分（decode阶段）因人而异，无法复用
+
+- 6.7.2 Prefix Caching的核心思想
+  - **传统KV Cache**：单次请求内复用
+    - Token 0的KV被token 1, 2, 3...复用
+    - 但请求结束后，Cache被清空
+  - **Prefix Caching**：跨请求复用
+    - 请求1：计算完整prompt的KV → Cache
+    - 请求2：检测到相同prefix → 直接复用 → 跳过计算
+    - 请求3、4、5...：同请求2
+  - **类比**：
+    - 传统Cache：函数内的memoization
+    - Prefix Caching：全局distributed cache（如Redis）
+
+- 6.7.3 vLLM的实现：Hash-based KV Cache
+  - **挑战**：如何检测两个请求的prefix是否相同？
+  - **方案1：字符串比较**（Naive）
+    - 每次比较prompt文本
+    - 问题：慢！而且语义相同的token可能来自不同文本
+  - **方案2：vLLM的Hash-based方法** ⭐
+    - 对每个Block的KV Cache计算Hash
+    - Hash相同的Block被认为内容相同
+    - **Hash算法**：
+      - 输入：Block的KV tensor
+      - 输出：固定长度的hash值
+      - 实现：SHA256或自定义快速hash
+  - **Cache Hit检测流程**：
+    1. 新请求到来
+    2. 计算prompt tokens对应的logical blocks
+    3. 查询hash table：是否已有这些blocks的KV？
+    4. 如果hit：直接引用已有physical blocks
+    5. 如果miss：分配新的physical blocks并计算
+
+- 6.7.4 Prefix Caching的工作流程
+  - **首次请求（Cold Path）**：
+    1. 用户发送prompt（含系统提示词）
+    2. vLLM计算所有tokens的KV Cache
+    3. 将KV Cache分成blocks，计算每个block的hash
+    4. 存储到cache engine（hash table）
+    5. 返回结果
+  - **后续请求（Warm Path）**：
+    1. 用户发送相同系统提示词的新请求
+    2. vLLM计算blocks的hash
+    3. **Cache Hit！**：发现已有对应的KV Cache
+    4. 直接引用已有blocks，跳过prefill计算
+    5. 只需计算用户输入的新tokens
+    6. 返回结果（快得多！）
+  - **部分Hit场景**：
+    - 系统提示词hit，用户输入miss
+    - 复用系统提示词的KV，只计算用户输入部分
+
+- 6.7.5 性能提升分析
+  - **理论加速比**：
+    - 假设系统提示词长度 = P tokens
+    - 用户输入长度 = U tokens
+    - 无Prefix Caching：每次计算P+U
+    - 有Prefix Caching：首次P+U，后续只需U
+    - 加速比 ≈ (P+U) / U = 1 + P/U
+  - **实际案例**：
+    - 场景1：系统提示词200 tokens，用户输入50 tokens
+      - 加速比 = (200+50)/50 = **5倍**
+    - 场景2：系统提示词1000 tokens（RAG场景），用户输入20 tokens
+      - 加速比 = (1000+20)/20 = **51倍**（极端case）
+  - **内存开销**：
+    - Hash table存储：每个block ~32 bytes hash
+    - KV Cache存储：原本就需要，不算额外开销
+    - 总计：<1%额外显存
+  - **最佳实践**：
+    - ✅ 系统提示词越固定，效果越好
+    - ✅ 适合ChatGPT风格对话
+    - ✅ 适合RAG场景（固定知识prefix）
+    - ❌ 不适合每次prompt完全不同的场景（如补全）
+
+- 6.7.6 实战：在vLLM中启用Prefix Caching
+
+  **方法1：代码中启用**（推荐）
+  ```python
+  from vllm import LLM, SamplingParams
+
+  # 初始化LLM，启用Prefix Caching
+  llm = LLM(
+      model="meta-llama/Llama-3.1-8B",
+      enable_prefix_caching=True,  # 关键参数
+      max_model_len=8192,
+      gpu_memory_utilization=0.9
+  )
+
+  # 系统提示词（会被自动缓存）
+  system_prompt = "You are a helpful assistant..."
+
+  # 第一次请求：Cold Path（计算并缓存）
+  prompts = [system_prompt + "Explain quantum computing"]
+  outputs = llm.generate(prompts)
+
+  # 第二次请求：Warm Path（复用Cache）
+  prompts = [system_prompt + "Explain black holes"]
+  outputs = llm.generate(prompts)  # 快得多！
+
+  # 第三次、第四次...：全部Warm Path
+  ```
+
+  **方法2：命令行启动**
+  ```bash
+  vllm serve meta-llama/Llama-3.1-8B \
+    --enable-prefix-caching \  # 启用Prefix Caching
+    --max-model-len 8192 \
+    --gpu-memory-utilization 0.9
+  ```
+
+  **性能监控**：
+  ```bash
+  # 查看vLLM metrics
+  curl http://localhost:8000/metrics | grep cache
+
+  # 关键指标：
+  # - vllm:num_prefix_cache_hits: Cache命中次数
+  # - vllm:num_prefix_cache_misses: Cache未命中次数
+  # 命中率 = hits / (hits + misses)
+  ```
+
+  **性能基准**（参考vLLM官方数据）：
+  - 场景：系统提示词200 tokens，用户输入50 tokens
+  - 无Prefix Caching：~50 ms延迟
+  - 有Prefix Caching：~10 ms延迟（首次~50ms，后续~10ms）
+  - **提升：5倍吞吐量**
 
 #### 常见误区专栏
 #### 实战检查清单
@@ -566,7 +707,7 @@
 - 7.6.1 vLLM调度参数调优
 - 7.6.2 不同场景的调度策略
 
-#### 7.7 Prefill-Decode分离（PD分离）⭐
+#### 7.7 Prefill-Decode分离（PD分离）⚠️ 2025年技术评估中
 
 > **💡 2025年技术趋势**：PD分离在2025年从概念快速演进为生产标准。vLLM、SGLang等主流框架都已支持，几乎所有厂商都在采用这种架构。
 
@@ -727,7 +868,7 @@
   - 硬件要求
   - 监控指标
 
-#### 8.7 量化进阶：INT4 QAT实战 ⭐
+#### 8.7 量化进阶：INT4 QAT实战 ⚠️ SGLang团队验证
 
 > **💡 案例来源**: SGLang RL Team, InfiXAI Team, Ant Group (2026-01-26)
 >
@@ -800,7 +941,7 @@
   - ❌ 小规模模型（成本不值得）
   - ❌ 只推理不需要微调（用PTQ即可）
 
-#### 8.8 精度对齐：Train vs Inference ⭐
+#### 8.8 精度对齐：Train vs Inference ⚠️ 2025年工业界实践
 
 > **💡 工业界实践**（来源：2025"青稞"AI嘉年华 - 朱立耕@NVIDIA）
 >
@@ -956,7 +1097,7 @@
 - 9.6.3 性能基准测试
 - 9.6.4 调优技巧
 
-#### 9.7 实战：Eagle 3 with SGLang ⭐
+#### 9.7 实战：Eagle 3 with SGLang ⚠️ NVIDIA官方支持
 
 > **💡 工业界实践**（来源：NVIDIA Model Optimizer Blog）
 >
@@ -1256,7 +1397,7 @@
 - 10.9.3 自动重启策略
 - 10.9.4 降级方案
 
-#### 10.10 RL系统部署 ⭐
+#### 10.10 RL系统部署 ⚠️ 开源生态缺失
 
 > **💡 2025年技术趋势**（来源：2025"青稞"AI嘉年华 - 朱子林@质朴、朱立耕@NVIDIA）
 >
@@ -1359,7 +1500,7 @@
 > - **边缘部署**：将推理移到边缘，降低中心成本和延迟
 > - **异构部署**：训练用H100，推理用H200，充分利用硬件（朱立耕@NVIDIA）
 
-#### 11.1 Agent基础设施 ⭐
+#### 11.1 Agent基础设施 ⚠️ 开源生态缺失
 
 > **💡 2025年技术趋势**（来源：2025"青稞"AI嘉年华 - 张明星@清华、朱立耕@NVIDIA）
 >

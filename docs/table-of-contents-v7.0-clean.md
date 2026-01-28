@@ -246,6 +246,14 @@
 - 6.6.2 性能提升量化分析
 - 6.6.3 vLLM的KV Cache实现
 
+#### 6.7 Prefix Caching ⭐⭐⭐
+- 6.7.1 什么是Prefix Caching
+- 6.7.2 Prefix Caching的核心思想
+- 6.7.3 vLLM的实现：Hash-based KV Cache
+- 6.7.4 Prefix Caching的工作流程
+- 6.7.5 性能提升分析
+- 6.7.6 实战：在vLLM中启用Prefix Caching
+
 #### 常见误区专栏
 #### 实战检查清单
 #### 动手练习
@@ -291,7 +299,7 @@
 - 7.6.4 批处理场景
 - 7.6.5 混合负载
 
-#### 7.7 Prefill-Decode分离（PD分离）⭐
+#### 7.7 Prefill-Decode分离（PD分离）⚠️ 2025年技术评估中
 - 7.7.1 什么是PD分离
 - 7.7.2 PD分离的架构演进
 - 7.7.3 PD分离的技术优势
@@ -346,7 +354,7 @@
 - 8.6.2 使用SGLang部署INT4模型
 - 8.6.3 性能对比测试
 
-#### 8.7 量化进阶：INT4 QAT实战 ⭐
+#### 8.7 量化进阶：INT4 QAT实战 ⚠️ SGLang团队验证
 - 8.7.1 什么是QAT
 - 8.7.2 INT4 QAT完整Pipeline
 - 8.7.3 训练端实现
@@ -401,7 +409,7 @@
 - 9.6.3 性能基准测试
 - 9.6.4 调优技巧
 
-#### 9.7 实战：Eagle 3 with SGLang ⭐
+#### 9.7 实战：Eagle 3 with SGLang ⚠️ NVIDIA官方支持
 - 9.7.1 什么是Eagle 3
 - 9.7.2 Eagle 3 vs 自训练草稿模型
 - 9.7.3 在SGLang中使用Eagle 3
@@ -472,7 +480,7 @@
 - 10.9.3 自动重启策略
 - 10.9.4 降级方案
 
-#### 10.10 RL系统部署 ⭐
+#### 10.10 RL系统部署 ⚠️ 开源生态缺失
 - 10.10.1 什么是RL系统
 - 10.10.2 RL系统的关键挑战
 - 10.10.3 Scalable Sandbox System
@@ -487,7 +495,7 @@
 
 ### 第11章 高级话题
 
-#### 11.1 Agent基础设施 ⭐
+#### 11.1 Agent基础设施 ⚠️ 开源生态缺失
 - 11.1.1 为什么Agent Infra很重要
 - 11.1.2 Agent System的缺失（朱立耕@NVIDIA）
 - 11.1.3 Agent环境的复杂性（张明星@清华）
