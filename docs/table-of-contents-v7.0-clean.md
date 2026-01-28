@@ -36,7 +36,7 @@
 
 ---
 
-### 第2章 技术全景与学习路径
+### 第2章 技术全景与2025技术趋势
 
 #### 2.1 五大优化方向速览
 - 2.1.1 快速评估矩阵
@@ -156,7 +156,7 @@
 
 ---
 
-### 第5章 LLM推理基础 ⭐ 新增
+### 第5章 LLM推理基础
 
 #### 5.1 LLM如何生成文本
 - 5.1.1 自回归生成的基本过程
@@ -191,7 +191,7 @@
 - 5.5.3 不同序列长度的困境
 - 5.5.4 示例：为什么padding成本随batch和长度二次增长
 
-#### 5.6 Continuous Batching入门 ⭐
+#### 5.6 Continuous Batching入门
 - 5.6.1 核心思想：去掉batch维度
 - 5.6.2 Ragged Batching：用attention mask控制交互
 - 5.6.3 Dynamic Scheduling：动态替换完成的请求
@@ -246,14 +246,15 @@
 - 6.6.2 性能提升量化分析
 - 6.6.3 vLLM的KV Cache实现
 
-#### 6.7 Prefix Caching ⭐⭐⭐
+#### 6.7 Prefix Caching
 - 6.7.1 什么是Prefix Caching
 - 6.7.2 Prefix Caching的核心思想
 - 6.7.3 vLLM的实现：Hash-based KV Cache
 - 6.7.4 Prefix Caching的工作流程
 - 6.7.5 性能提升分析
+- 6.7.8 Agent系统的KV Cache优化实战
 - 6.7.6 实战：在vLLM中启用Prefix Caching
-- 6.7.7 实战案例：OpenAI Codex的Prompt Caching ⭐💡
+- 6.7.7 实战案例：OpenAI Codex的Prompt Caching
 
 #### 常见误区专栏
 #### 实战检查清单
@@ -300,7 +301,7 @@
 - 7.6.4 批处理场景
 - 7.6.5 混合负载
 
-#### 7.7 Prefill-Decode分离（PD分离）⚠️ 2025年技术评估中
+#### 7.7 Prefill-Decode分离（PD分离）
 - 7.7.1 什么是PD分离
 - 7.7.2 PD分离的架构演进
 - 7.7.3 PD分离的技术优势
@@ -314,7 +315,7 @@
 #### 动手练习
 - 练习6.1：对比静态批处理和动态批处理
 - 练习6.2：针对不同场景优化调度参数
-- 练习6.3：使用vLLM部署PD分离架构 ⭐
+- 练习6.3：使用vLLM部署PD分离架构
 
 ---
 
@@ -328,21 +329,21 @@
 
 #### 8.2 量化方法分类
 - 8.2.1 PTQ (Post-Training Quantization)
-- 8.2.2 QAT (Quantization-Aware Training) ⭐
+- 8.2.2 QAT (Quantization-Aware Training)
 - 8.2.3 QLoRA vs Native Quantized Training vs QAT
 - 8.2.4 量化方法选择决策树
 
 #### 8.3 常用量化格式
 - 8.3.1 INT8：经典的8位整数量化
-- 8.3.2 INT4 (W4A16) ⭐
+- 8.3.2 INT4 (W4A16)
 - 8.3.3 FP4 vs INT4
 - 8.3.4 FP8 / NVFP4：未来方向
 - 8.3.5 AWQ / GPTQ：流行的INT4格式
 
 #### 8.4 流行的量化框架
 - 8.4.1 vLLM量化支持
-- 8.4.2 SGLang INT4推理 ⭐
-- 8.4.3 NVIDIA Model Optimizer ⭐
+- 8.4.2 SGLang INT4推理
+- 8.4.3 NVIDIA Model Optimizer
 - 8.4.4 AutoGPTQ / llama.cpp
 
 #### 8.5 KV Cache量化
@@ -355,7 +356,7 @@
 - 8.6.2 使用SGLang部署INT4模型
 - 8.6.3 性能对比测试
 
-#### 8.7 量化进阶：INT4 QAT实战 ⚠️ SGLang团队验证
+#### 8.7 量化进阶：INT4 QAT实战
 - 8.7.1 什么是QAT
 - 8.7.2 INT4 QAT完整Pipeline
 - 8.7.3 训练端实现
@@ -388,7 +389,7 @@
 - 9.3.1 Speculative Decoding
 - 9.3.2 Assisted Decoding
 - 9.3.3 Lookahead Decoding
-- 9.3.4 Eagle系列：Eagle、Eagle 2、Eagle 3 ⭐
+- 9.3.4 Eagle系列：Eagle、Eagle 2、Eagle 3
 - 9.3.5 方法对比
 - 9.3.6 如何选择合适的变体
 
@@ -410,14 +411,14 @@
 - 9.6.3 性能基准测试
 - 9.6.4 调优技巧
 
-#### 9.7 实战：Eagle 3 with SGLang ⚠️ NVIDIA官方支持
+#### 9.7 实战：Eagle 3 with SGLang
 - 9.7.1 什么是Eagle 3
 - 9.7.2 Eagle 3 vs 自训练草稿模型
 - 9.7.3 在SGLang中使用Eagle 3
 - 9.7.4 性能基准测试
 - 9.7.5 Eagle 3的限制和注意事项
 - 9.7.6 Eagle系列演进
-- 9.7.7 实战：vLLM Speculators v0.3.0 - 端到端Eagle 3训练 ⭐💡
+- 9.7.7 实战：vLLM Speculators v0.3.0 - 端到端Eagle 3训练
 
 #### 常见误区专栏
 #### 实战检查清单
@@ -463,6 +464,7 @@
 - 10.6.2 Spot实例使用
 - 10.6.3 自动伸缩
 - 10.6.4 成本监控工具
+- 10.6.5 Agent系统的成本优化策略
 
 #### 10.7 ROI监控与成本追踪
 - 10.7.1 如何追踪推理成本
@@ -481,14 +483,14 @@
 - 10.9.3 自动重启策略
 - 10.9.4 降级方案
 
-#### 10.10 RL系统部署 ⚠️ 开源生态缺失
+#### 10.10 RL系统部署
 - 10.10.1 什么是RL系统
 - 10.10.2 RL系统的关键挑战
 - 10.10.3 Scalable Sandbox System
 - 10.10.4 Train和Rollout的资源动态分配
 - 10.10.5 RL框架介绍
 
-#### 10.11 vLLM插件系统 ⭐⭐
+#### 10.11 vLLM插件系统
 - 10.11.1 为什么需要插件系统
 - 10.11.2 插件系统 vs Fork vs Monkey Patch
 - 10.11.3 VLLMPatch基础
@@ -504,19 +506,20 @@
 
 ### 第11章 高级话题
 
-#### 11.1 Agent基础设施 ⚠️ 开源生态缺失
+#### 11.1 Agent基础设施
 - 11.1.1 为什么Agent Infra很重要
-- 11.1.2 Agent System的缺失（朱立耕@NVIDIA）
-- 11.1.3 Agent环境的复杂性（张明星@清华）
+- 11.1.2 Agent System的缺失
+- 11.1.3 Agent环境的复杂性
 - 11.1.4 Agent环境的类型
 - 11.1.5 Agent部署架构
 - 11.1.6 实战案例
+- 11.1.7 Context Engineering最佳实践
 
-#### 11.2 异构硬件部署 ⭐
+#### 11.2 异构硬件部署
 - 11.2.1 训练vs推理的算力差异
-- 11.2.2 异构部署的机会（朱立耕@NVIDIA）
+- 11.2.2 异构部署的机会
 - 11.2.3 不同GPU的应用场景
-- 11.2.4 容灾和混部的机会（朱子林@质朴）
+- 11.2.4 容灾和混部的机会
 - 11.2.5 异构部署的挑战
 - 11.2.6 实战案例
 
@@ -524,14 +527,14 @@
 - 11.3.1 MoE架构简介
 - 11.3.2 MoE推理的特殊挑战
 - 11.3.3 专家路由优化
-- 11.3.4 Checkpoint管理（张博涵@浙大）
+- 11.3.4 Checkpoint管理
 - 11.3.5 实战：Mixtral部署
 
 #### 11.4 多模态模型推理
 - 11.4.1 多模态模型概述 (LLaVA等)
 - 11.4.2 视觉编码器优化
 - 11.4.3 多模态推理流水线
-- 11.4.4 Video Generation的挑战（张博涵@浙大）
+- 11.4.4 Video Generation的挑战
 
 #### 11.5 Torch Compile优化
 - 11.5.1 torch.compile原理
@@ -542,7 +545,7 @@
 #### 11.6 Flash Attention
 - 11.6.1 Flash Attention原理
 - 11.6.2 Flash Attention 2
-- 11.6.3 Sparse Attention vs Linear Attention（张博涵@浙大）
+- 11.6.3 Sparse Attention vs Linear Attention
 - 11.6.4 性能提升
 - 11.6.5 在vLLM中的使用
 
@@ -551,22 +554,16 @@
 - 11.7.2 CUDA编程基础
 - 11.7.3 Triton语言简介
 - 11.7.4 开发流程
-- 11.7.5 前端性能优化（刘海超@vLLM）
+- 11.7.5 前端性能优化
 
-#### 11.8 边缘部署
-- 11.8.1 边缘设备的挑战
-- 11.8.2 模型压缩技术
-- 11.8.3 移动端优化
-- 11.8.4 低精度在边缘侧的应用（张明星@清华）
-
-#### 11.9 前沿技术展望
-- 11.9.1 技术栈越来越深（刘海超@vLLM）
-- 11.9.2 从SPMD到Event Driven（张明星@清华）
-- 11.9.3 算法和系统的co-design（张博涵@浙大）
-- 11.9.4 新的量化技术
-- 11.9.5 硬件加速器 (TPU, NPU)
-- 11.9.6 模型架构演进
-- 11.9.7 未来趋势
+#### 11.8 前沿技术展望
+- 11.8.1 大规模MoE服务
+- 11.8.2 EPD (Expert-Parallel Data Parallelism)
+- 11.8.3 Elastic Expert Parallelism
+- 11.8.4 MoonCake
+- 11.8.5 技术栈越来越深
+- 11.8.6 从SPMD到Event Driven
+- 11.8.7 算法和系统的co-design
 
 #### 常见误区专栏
 #### 实战检查清单
@@ -628,9 +625,9 @@
 ---
 
 **本书特色**：
-- 📊 数据驱动：震撼数字建立动机
+- 数据驱动：震撼数字建立动机
 - 💼 商业导向：ROI案例证明价值
-- 🏛️ 文明视角：人类当量理论
-- 🔧 实战导向：每项技术都有代码
-- 📈 成本意识：连接优化与价值
-- 🎯 结构清晰：动机→路径→技术→部署
+- 文明视角：人类当量理论
+- 实战导向：每项技术都有代码
+- 成本意识：连接优化与价值
+- 结构清晰：动机→路径→技术→部署

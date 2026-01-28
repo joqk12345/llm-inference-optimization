@@ -599,6 +599,131 @@
       - 加速比 = (1000+20)/20 = **51倍**（极端case）
   - **内存开销**：
     - Hash table存储：每个block ~32 bytes hash
+
+- 6.7.8 Agent系统的KV Cache优化实战 ⚡️ 2025更新
+
+  > **来源**：[Manus - Context Engineering for AI Agents](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus)
+  >
+  > **核心洞察**：KV-cache hit rate是生产级AI agent最重要的指标——直接决定成本和延迟
+
+  **6.7.8.1 Agent vs Chatbot的根本差异**
+
+  - **输入输出token比例**：
+    - **Chatbot**：1:1
+      - 用户输入："What's the weather?"
+      - 模型输出："The weather is sunny..."
+      - Prefill和decode时间相近
+
+    - **Agent**：100:1
+      - 用户输入："Book a flight to Tokyo"
+      - Agent内部：50步tool calls（search、compare、book...）
+      - 每步的context包含之前所有actions/observations
+      - Context快速累积到数万tokens
+      - 但每步输出只是简短的function call
+
+  - **成本影响**（Claude Sonnet）：
+    - Cached tokens: **$0.30/MTok**
+    - Uncached tokens: **$3.00/MTok**
+    - **10倍成本差异！**
+
+  **6.7.8.2 生产级优化策略**
+
+  - **策略1：稳定的Prompt Prefix**
+    ```python
+    # ❌ Bad - 破坏cache
+    system_prompt = f"""
+    You are a helpful assistant.
+    Current time: {datetime.now()}  # 每秒不同！
+    """
+
+    # ✅ Good - 保持cache
+    system_prompt = """
+    You are a helpful assistant.
+    Current time: <use get_current_time() tool>
+    """
+    ```
+
+    - **问题**：
+      - LLM是autoregressive：单个token差异会破坏后续所有cache
+      - Timestamp精确到秒 = 每次请求都cache miss
+
+    - **解决方案**：
+      - 移除timestamp
+      - 使用相对时间（"2 hours ago"）
+      - 通过工具获取时间而非硬编码
+
+    - **效果**：Cache hit rate提升20-30%
+
+  - **策略2：Append-only Context设计**
+    ```python
+    # ❌ Bad - 动态修改context
+    def update_context(context, new_action):
+        # 修改之前的action
+        context["actions"][-1]["status"] = "completed"
+        return context
+
+    # ✅ Good - append-only
+    def update_context(context, new_action):
+        # 只追加，不修改
+        context["actions"].append({
+            "action": new_action,
+            "status": "completed"
+        })
+        return context
+    ```
+
+    - **关键原则**：
+      - 不修改之前的actions/observations
+      - 确定性序列化（JSON key顺序稳定）
+      - 避免动态工具定义（会破坏prefix）
+
+    - **效果**：Cache hit rate提升15-25%
+
+  - **策略3：Session-aware Routing**
+    ```python
+    # vLLM配置
+    # 1. 启用prefix caching
+    VLLM_ATTENTION_BACKEND=flashattention
+    VLLM_USE_PREFIX_CACHING=true
+
+    # 2. 使用session ID路由
+    requests = [
+        {"session_id": "user123", "prompt": "..."},
+        {"session_id": "user123", "prompt": "..."},  # 相同session
+        {"session_id": "user456", "prompt": "..."},
+    ]
+
+    # 路由策略：同一session → 同一GPU worker
+    def route_request(request):
+        worker_id = hash(request["session_id"]) % num_workers
+        return workers[worker_id]
+    ```
+
+    - **原理**：
+      - Prefix caching是per-worker的
+      - 同一session的请求路由到同一worker
+      - 最大化cache复用
+
+    - **效果**：TTFT降低40-60%
+
+  **6.7.8.3 高级技巧：Cache Breakpoints策略**
+
+  - **问题**：某些provider不支持自动incremental caching
+
+  - **Solution**：显式标记cache breakpoints
+    ```python
+    context = [
+        {"role": "system", "content": "...", "cache_breakpoint": True},
+        {"role": "user", "content": "..."},
+        {"role": "assistant", "content": "...", "cache_breakpoint": True},
+        # 可以在此断点复用之前的cache
+    ]
+    ```
+
+  - **考虑因素**：
+    - Cache expiration时间
+    - Memory pressure
+    - 至少保留system prompt的breakpoint
     - KV Cache存储：原本就需要，不算额外开销
     - 总计：<1%额外显存
   - **最佳实践**：
@@ -1490,12 +1615,333 @@
 - 10.5.2 瓶颈定位方法
 - 10.5.3 常见性能问题
 - 10.5.4 真实案例：从50 tps到200 tps
+- 10.5.5 性能分析工具与实战 ⚡️ 2025更新
+
+> **来源**：
+> - [vLLM Profiling Documentation](https://docs.vllm.ai/en/stable/contributing/profiling/)
+> - [阿里云 - Nsight Systems性能分析实战](https://help.aliyun.com/zh/ack/cloud-native-ai-suite/use-cases/using-nsight-system-to-realize-performance-analysis)
+
+**核心工具链**：
+- **PyTorch Profiler**：Python级别的性能分析
+- **NVIDIA Nsight Systems**：GPU系统级分析（timeline view）
+- **NVIDIA Nsight Compute**：GPU kernel级深度分析
+
+**10.5.5.1 PyTorch Profiler基础**
+- **vLLM集成方式**：
+  ```python
+  from vllm import LLM, SamplingParams
+  from torch.profiler import profile, ProfilerActivity
+
+  llm = LLM(model="meta-llama/Llama-2-7b-hf")
+
+  with profile(
+      activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+      record_shapes=True,
+      profile_memory=True,
+      with_stack=True
+  ) as prof:
+      prompts = ["Hello, my name is"] * 10
+      sampling_params = SamplingParams(temperature=0.7, top_p=0.95, max_tokens=20)
+      outputs = llm.generate(prompts, sampling_params)
+
+  print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+  ```
+- **分析场景**：
+  - Offline inference profiling：单次生成请求分析
+  - Server mode profiling：持续请求负载下的性能分析
+- **关键指标**：
+  - CUDA time total：GPU耗时统计
+  - Memory usage：显存占用峰值
+  - Kernel launch overhead：kernel启动开销
+
+**10.5.5.2 NVIDIA Nsight Systems - 系统级分析**
+- **什么是Nsight Systems**：
+  - GPU timeline可视化工具
+  - 分析CPU-GPU交互、kernel重叠、内存传输
+  - 识别性能瓶颈的"第一道防线"
+
+- **vLLM profiling流程**：
+  ```bash
+  # 1. 启动vLLM server并启用profiling
+  vllm serve meta-llama/Llama-2-7b-hf \
+      --tensor-parallel-size 1 \
+      > /dev/null &
+
+  # 2. 使用nsys进行profiling（30秒）
+  nsys profile \
+      --trace=cuda,nvtx,osrt \
+      --cuda-memory-usage=true \
+      --output=profile_report \
+      --stats=true \
+      --force-overwrite=true \
+      --duration=30 \
+      --capture-range=nvtx \
+      --capture-range-end=stop \
+      python benchmark_serving.py
+
+  # 3. 生成summary报告
+  nys stats profile_report.nsys-rep
+  ```
+
+- **关键分析维度**：
+  - **GPU利用率**：理想状态>80%，低于说明有CPU/内存瓶颈
+  - **Kernel重叠**：检查compute和memory transfer是否overlap
+  - **CPU-GPU同步**：过多的cudaDeviceSynchronize会降低性能
+  - **Memory bandwidth**：是否达到GPU峰值带宽
+  - **NVTX markers**：vLLM代码中已标注关键阶段的markers
+
+- **实战案例**（阿里云）：
+  - **训练优化**：542 samples/s → 3173 samples/s（5.85x提升）
+  - **7项关键优化**：
+    1. DataLoader workers优化：减少CPU等待
+    2. Pin memory优化：加速CPU→GPU传输
+    3. Gradient accumulation checkpoint优化：减少内存开销
+    4. Mixed precision (FP16)训练：2x计算吞吐
+    5. Gradient clipping优化：减少同步开销
+    6. Optimizer state placement：将optimizer state放在GPU而非CPU
+    7. DDP bucket size调优：减少通信频率
+
+**10.5.5.3 NVIDIA Nsight Compute - Kernel级深度分析**
+- **什么时候使用Nsight Compute**：
+  - Nsight Systems发现某个kernel耗时异常
+  - 需要分析kernel内部计算和内存访问模式
+
+- **典型工作流**：
+  ```bash
+  # 1. 从Nsight Systems中识别慢kernel（例如：fused_add_rms_norm）
+  # 2. 使用ncu进行kernel级profiling
+  ncu --set full \
+      --target-processes all \
+      --export profile_kernel \
+      --page replay \
+      python benchmark_serving.py
+
+  # 3. 分析指标
+  # - DRAM bandwidth utilization
+  # - L2 cache hit rate
+  # - Warp execution efficiency
+  # - Memory coalescing
+  ```
+
+- **关键性能指标**：
+  - **Memory bandwidth utilization**：是否达到H100峰值（3.35 TB/s）
+  - **Compute throughput**：Tensor Core利用率
+  - **Occupancy**：每个SM的active warp数量（理想>50%）
+  - **L1/L2 cache hit rate**：数据局部性是否良好
+  - **Warp efficiency**：branch divergence程度
+
+**10.5.5.4 性能优化checklist**
+- **Step 1: 基线测试**
+  - 使用`benchmark_serving.py`建立性能基线
+  - 记录关键指标：throughput (tokens/s), TTFT, TPOT, GPU利用率
+
+- **Step 2: PyTorch Profiler快速诊断**
+  - 找出top CUDA time operators
+  - 检查是否有unexpected的CPU overhead
+
+- **Step 3: Nsight Systems系统级分析**
+  - 验证GPU利用率是否合理
+  - 检查CPU-GPU pipeline是否有gap
+  - 确认memory transfer是否overlap
+
+- **Step 4: Nsight Compute kernel优化**（如需要）
+  - 针对slow kernel进行深度分析
+  - 优化memory access pattern
+  - 调整block/grid配置
+
+- **Step 5: 验证优化效果**
+  - 重新运行benchmark
+  - 对比优化前后的指标
+  - 确认没有regression
+
+**10.5.5.5 vLLM特定profiling建议**
+- **KV Cache profiling**：
+  - 关注`CacheEngine`相关的kernel
+  - 检查prefill和decode阶段的显存占用差异
+
+- **Attention kernel分析**：
+  - FlashAttention是否正确启用
+  - PagedAttention的page miss rate
+
+- **Scheduler overhead**：
+  - 使用NVTX markers分析scheduler调度时间
+  - 检查是否成为bottleneck（理想<5%总时间）
+
+- **Multi-GPU profiling**：
+  - 使用`--tensor-parallel-size=N`测试扩展性
+  - Nsight Systems中查看NCCL all-reduce时间占比
+  - 检查是否有GPU load imbalance
 
 #### 10.6 成本优化
 - 10.6.1 云GPU选择策略
 - 10.6.2 Spot实例使用
 - 10.6.3 自动伸缩
 - 10.6.4 成本监控工具
+- 10.6.5 Agent系统的成本优化策略 ⚡️ 2025新增
+
+  > **来源**：[Manus - Context Engineering for AI Agents](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus)
+  >
+  > **核心观点**：围绕KV-Cache设计Agent系统——这是成本优化的"银弹"
+
+  **10.6.5.1 成本对比：Cached vs Uncached**
+
+  - **Claude Sonnet定价**（2025）：
+    - Cached tokens: **$0.30/MTok**
+    - Uncached tokens: **$3.00/MTok**
+    - **10倍差异！**
+
+  - **Agent系统的成本放大效应**：
+    - 典型Agent任务：50步tool calls
+    - 每步context增长：~500 tokens
+    - 总token数：25,000 tokens（大部分是prefill）
+    - **无优化成本**：25K × $3/MTok = $0.075/任务
+    - **优化后成本**：prefix cached → ~$0.01/任务
+    - **节省**：7.5倍
+
+  **10.6.5.2 四大优化手段**
+
+  - **优化1：移除动态内容**
+    ```python
+    # ❌ Before: 每次请求都不同
+    system_prompt = f"""
+    You are Manus AI assistant.
+    Current time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    Today's date: {datetime.now().date()}
+    User ID: {user_id}
+    Session ID: {session_id}
+    """
+
+    # ✅ After: 完全静态
+    system_prompt = """
+    You are Manus AI assistant.
+    Use get_current_time() tool to get the time.
+    Use get_user_context() tool to get user info.
+    """
+    ```
+
+    - **估算影响**：
+      - Cache hit rate: 30% → 60%（提升30%）
+      - 成本节省：~30%
+
+  - **优化2：Append-only Context**
+    ```python
+    # ❌ Bad: 破坏cache
+    context[-1]["status"] = "completed"  # 修改历史
+    context[-1]["result"] = formatted_result
+
+    # ✅ Good: 追加新信息
+    context.append({
+        "type": "status_update",
+        "action_index": len(context) - 1,
+        "status": "completed",
+        "result": formatted_result
+    })
+    ```
+
+    - **关键点**：
+      - 确定性JSON序列化（`sort_keys=True`）
+      - 避免修改历史actions/observations
+      - 不动态增删工具定义
+
+    - **估算影响**：
+      - Cache hit rate: 60% → 75%（提升15%）
+      - 成本节省：~15%
+
+  - **优化3：File System as External Memory**
+    ```python
+    # ❌ Bad: 大型observation直接放context
+    observation = {
+        "type": "web_page",
+        "content": fetch_web_page(url),  # 可能50K tokens
+        "url": url
+    }
+
+    # ✅ Good: 保存到文件，context只保留引用
+    file_path = save_to_file(observation["content"])
+    context_obs = {
+        "type": "web_page",
+        "file_path": file_path,
+        "url": url,
+        "summary": summarize_page(observation["content"])  # 100 tokens
+    }
+    ```
+
+    - **可恢复压缩策略**：
+      - 网页内容：保留URL
+      - PDF文档：保留文件路径
+      - 数据库查询：保留查询语句
+      - 需要时agent再读取文件
+
+    - **估算影响**：
+      - Token使用：减少50-70%
+      - Context长度：20K → 8K tokens
+      - 成本节省：~40%
+
+  - **优化4：Session-aware Routing**
+    ```python
+    # vLLM配置
+    config = {
+        "enable_prefix_caching": True,
+        "distributed_executor_backend": "ray"
+    }
+
+    # 路由层
+    class SessionAwareRouter:
+        def __init__(self, num_workers):
+            self.worker_cache = {}  # session_id → worker_id
+            self.num_workers = num_workers
+
+        def get_worker(self, session_id):
+            # 同一session → 同一worker
+            if session_id in self.worker_cache:
+                return self.worker_cache[session_id]
+
+            worker_id = hash(session_id) % self.num_workers
+            self.worker_cache[session_id] = worker_id
+            return worker_id
+    ```
+
+    - **效果**：
+      - Prefix cache复用率提升
+      - TTFT降低40-60%
+      - 吞吐量提升2-3倍
+
+  **10.6.5.3 成本优化Checklist**
+
+  - **基线测量**：
+    - [ ] 测量当前KV-cache hit rate
+    - [ ] 计算平均每个任务的token数
+    - [ ] 统计prefill vs decode比例
+    - [ ] 记录每1000个任务的cost
+
+  - **快速优化（1天内）**：
+    - [ ] 移除prompt中的timestamp等动态内容
+    - [ ] 检查JSON序列化是否使用`sort_keys=True`
+    - [ ] 审查是否有修改历史的代码
+    - [ ] 禁用动态工具定义
+
+  - **中期优化（1周内）**：
+    - [ ] 启用vLLM prefix caching
+    - [ ] 实现session-aware routing
+    - [ ] 添加file system fallback机制
+    - [ ] 监控cache hit rate指标
+
+  - **长期优化（持续）**：
+    - [ ] 建立成本监控dashboard
+    - [ ] A/B测试不同context策略
+    - [ ] 优化工具调用频率
+    - [ ] 实施context压缩策略
+
+  **10.6.5.4 实战案例对比**
+
+  | 场景 | 优化前 | 优化后 | 节省 |
+  |------|--------|--------|------|
+  | 简单任务（10步） | $0.02 | $0.005 | 75% |
+  | 中等任务（30步） | $0.05 | $0.015 | 70% |
+  | 复杂任务（50步） | $0.075 | $0.025 | 67% |
+  | 超长任务（100步） | $0.15 | $0.06 | 60% |
+
+  **关键洞察**：任务越复杂，优化效果越明显——因为context累积更多。
 
 #### 10.7 ROI监控与成本追踪
 - 10.7.1 如何追踪推理成本
@@ -2250,6 +2696,296 @@ vLLM插件系统提供了更好的解决方案。
   - **案例2**：使用Docker部署Agent环境
   - **案例3**：生产级Agent System的挑战
 
+- 11.1.7 Context Engineering最佳实践 ⚡️ 2025新增
+
+  > **来源**：[Manus - Context Engineering for AI Agents](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus)
+  >
+  > **核心观点**：Context Engineering是Agent系统的"Stochastic Gradient Descent"——通过实验和迭代找到局部最优解。Manus团队重建了4次Agent框架才总结出这些模式。
+
+  **11.1.7.1 六大核心原则**
+
+  **原则1：Design Around the KV-Cache** ⭐⭐⭐
+
+  - **核心洞察**：
+    - KV-cache hit rate是生产级agent最重要的单一指标
+    - 直接影响latency（TTFT）和cost
+    - Agent的输入输出比例100:1（vs chatbot 1:1）
+
+  - **三大实践**：
+    1. **稳定的Prompt Prefix**
+       - 避免timestamp等动态内容
+       - 使用相对时间
+       - 单token差异破坏后续所有cache
+
+    2. **Append-only Context**
+       - 不修改历史actions/observations
+       - 确定性序列化（JSON key order）
+       - 避免动态工具定义
+
+    3. **Cache Breakpoints策略**
+       - 显式标记可复用的断点
+       - vLLM prefix caching + session ID路由
+       - 考虑cache expiration
+
+  **原则2：Mask, Don't Remove** ⭐⭐⭐
+
+  - **问题**：工具数量爆炸
+    - MCP协议让用户plug数百个工具
+    - 工具过多导致模型选择错误action
+    - 动态添加/删除工具破坏KV-cache
+
+  - **Solution**：Context-aware State Machine
+    - 保持工具定义稳定（保护KV-cache）
+    - 使用response prefill控制action space
+    - 通过logit masking而非修改context
+
+  - **三种Function Calling模式**：
+    ```python
+    # Mode 1: Auto - 模型自主选择
+    prefix = "<|im_start|>assistant\n"
+
+    # Mode 2: Required - 必须调用工具
+    prefix = "<|im_start|>assistant\n<|tool|>"
+
+    # Mode 3: Specified - 必须调用特定工具组
+    prefix = "<|im_start|>assistant\n<|tool|>{\"name\": \"browser_"
+    # 只能选择browser_开头的工具
+    ```
+
+  - **实战技巧**：
+    - 工具命名使用前缀分组（browser_*, shell_*）
+    - 根据agent state动态mask token logits
+    - 保持context稳定的同时精确控制行为
+
+  **原则3：File System as Ultimate Context** ⭐⭐
+
+  - **长context的三大痛点**：
+    1. **Observations巨大**：网页、PDF可能数万tokens
+    2. **性能下降**：超过一定长度后模型性能degrade
+    3. **成本高昂**：即使有cache，长context仍贵
+
+  - **Solution**：文件系统作为外部memory
+    - **无限容量**：不受context window限制
+    - **持久化**：天然persistent
+    - **Agent可控**：模型学会read/write files
+
+  - **可恢复压缩策略**：
+    ```python
+    # 网页内容 → 保存到文件
+    web_content = fetch_page(url)
+    file_path = agent.filesystem.write(web_content)
+
+    # Context只保留引用
+    context.append({
+        "type": "web_page",
+        "url": url,
+        "file_path": file_path,  # 需要时可读取
+        "summary": summarize(web_content)  # 100 tokens
+    })
+    ```
+
+  - **压缩原则**：
+    - 网页：保留URL
+    - PDF：保留文件路径
+    - 数据库：保留查询语句
+    - 关键：可恢复性（information not lost, just externalized）
+
+  **原则4：Manipulate Attention Through Recitation** ⭐⭐
+
+  - **问题**：
+    - 典型Agent任务：~50步tool calls
+    - Context快速增长到数万tokens
+    - 模型容易"lost-in-the-middle"或偏移目标
+
+  - **Solution**：todo.md机制
+    ```python
+    # Agent自动创建和更新todo.md
+    todo_content = """
+    # Task: Research and book flight to Tokyo
+
+    - [ ] Search flights to Tokyo (Mar 1-7, 2025)
+    - [ ] Compare prices across airlines
+    - [ ] Check hotel availability
+    - [x] Get user preferences (budget, dates)
+    - [ ] Book best option
+    - [ ] Send confirmation
+
+    Current step: Comparing prices...
+    """
+    ```
+
+  - **原理**：
+    - 将全局plan复述到context末尾
+    - 推入模型的recent attention span
+    - 避免"lost-in-the-middle"
+    - 用自然语言bias任务目标
+
+  **原则5：Keep the Wrong Stuff In** ⭐⭐
+
+  - **常见错误**：
+    - Agent出错 → 清理trace → 重试
+    - 使用temperature"重启"
+    - 隐藏错误让context"干净"
+
+  - **为什么错误**：
+    - 移除失败 = 移除证据
+    - 模型无法从错误中学习
+    - 无法更新内部beliefs
+    - 容易重复同样错误
+
+  - **正确做法**：
+    ```python
+    # 保留完整trace（包括错误）
+    context = [
+        {"role": "user", "content": "Extract data from PDF"},
+        {"role": "assistant", "tool_call": {
+            "name": "pdf_parse",
+            "args": {"file": "wrong.pdf"}  # 错误！
+        }},
+        {"role": "tool", "content": "Error: File not found"},
+        {"role": "assistant", "tool_call": {
+            "name": "pdf_parse",
+            "args": {"file": "correct.pdf"}  # 修正
+        }},
+        # 模型看到错误 → 学习避坑
+    ]
+    ```
+
+  - **关键洞察**：
+    - **错误恢复是true agentic behavior的标志**
+    - 学术界忽视的指标
+    - 人类从错误中学习，Agent也应如此
+
+  **原则6：Don't Get Few-Shotted** ⭐
+
+  - **问题**：
+    - LLM是优秀的mimic
+    - Few-shot在Agent中可能适得其反
+    - Context充满相似action-observation pairs
+    - 模型陷入模式，失去灵活性
+
+  - **案例**：
+    - 批量处理20份简历
+    - Agent陷入节奏：重复相似动作
+    - 结果：drift、overgeneralization、hallucination
+
+  - **Solution**：增加多样性
+    ```python
+    # 引入微小变化
+    templates = [
+        "Action: {tool}",
+        "Execute: {tool}",
+        "Calling {tool}...",
+        "{tool}()",
+    ]
+    # 随机使用不同模板
+    ```
+
+  - **关键**：
+    - 避免uniform context
+    - 增加结构化多样性
+    - 让模型保持注意力
+
+  **11.1.7.2 实战案例：Manus的Context设计**
+
+  - **典型任务特征**：
+    - 平均50步tool calls
+    - Context快速增长到20K+ tokens
+    - 容易"lost-in-the-middle"或偏移目标
+
+  - **Manus的完整方案**：
+
+    1. **自动创建todo.md**
+       - 任务开始时生成
+       - 每步update进度
+       - 勾选已完成项
+       - 保持目标对齐
+
+    2. **File System Integration**
+       - 网页内容保存到`/tmp/pages/`
+       - PDF保存到`/tmp/docs/`
+       - Context只保留path和summary
+       - 需要时再read
+
+    3. **Error Trace保留**
+       - 不清理错误
+       - 保留stack trace
+       - 让模型学习避坑
+       - 提升error recovery能力
+
+    4. **Context Diversity**
+       - 避免重复serialization模板
+       - 随机化phrasing
+       - 增加微小噪声
+       - 保持模型flexibility
+
+  **11.1.7.3 开源生态的机会**
+
+  - **当前缺失**：
+    - ❌ 没有标准化的context management
+    - ❌ 每个agent都要re-invent这些模式
+    - ❌ 缺乏best practices文档
+    - ❌ 没有agent-oriented的profiling工具
+
+  - **可以做的事情**：
+
+    1. **开源Context Management Library**
+       ```python
+       class AgentContext:
+           def __init__(self):
+               self.kv_cache_aware = True
+               self.append_only = True
+               self.deterministic_serialization = True
+
+           def add_observation(self, obs, compressible=False):
+               if compressible:
+                   return self.externalize(obs)  # 文件系统
+               return self.append(obs)  # Context
+
+           def mask_tools(self, allowed_prefixes):
+               return self.logit_mask(allowed_prefixes)
+       ```
+
+    2. **标准化Metrics**
+       - KV-cache hit rate
+       - Context length distribution
+       - Tool call success rate
+       - **Error recovery rate**（学术界忽视！）
+       - Session stickiness
+
+    3. **Agent-oriented Profiling**
+       - Context growth rate
+       - Token cost breakdown（by step）
+       - Tool call latency
+       - File system usage
+       - Cache effectiveness
+
+    4. **Context Optimization Framework**
+       - Auto-detect cache-breakers
+       - Suggest compression strategies
+       - Monitor hit rate in real-time
+       - A/B test context designs
+
+  **11.1.7.4 总结：Context Engineering是未来**
+
+  - **为什么重要**：
+    - 模型越来越强、快、便宜
+    - 但context设计仍是瓶颈
+    - 好的context = 好的agent behavior
+
+  - **核心教训**：
+    - 围绕KV-cache设计（最重要）
+    - 保持context稳定和可预测
+    - 外部化大型observations
+    - 保留错误trace（让模型学习）
+    - 避免模式僵化（增加多样性）
+
+  - **行动指南**：
+    - 立即：测量KV-cache hit rate
+    - 本周：移除cache breakers
+    - 本月：实施file system fallback
+    - 持续：A/B测试context策略
+
 #### 11.2 异构硬件部署 ⭐
 
 > **💡 2025年技术趋势**（来源：2025"青稞"AI嘉年华 - 朱立耕@NVIDIA）
@@ -2383,34 +3119,213 @@ vLLM插件系统提供了更好的解决方案。
   - Inference的CPU优化
   - 是否用C++（PyTorch也在考虑）
 
-#### 11.8 边缘部署
-- 11.8.1 边缘设备的挑战
-- 11.8.2 模型压缩技术
-- 11.8.3 移动端优化
-- 11.8.4 低精度在边缘侧的应用（张明星@清华）
-  - LUT查表方式
-  - 大幅降低能耗
-  - 不是SOTA模型，而是特殊边端场景
+#### 11.8 前沿技术展望
 
-#### 11.9 前沿技术展望
-- 11.9.1 技术栈越来越深（刘海超@vLLM）
-  - 2024年：从框架层面优化
-  - 2025年：需要到RDMA、networking层面
-  - 需要懂算法、硬件、系统
-  - 需要联合优化
-- 11.9.2 从SPMD到Event Driven（张明星@清华）
-  - Workflow模式：事先program好
-  - Event Driven模式：动态调度
+> **💡 2025年技术趋势**：MoE架构的大规模部署成为热点，从单一模型到分布式专家系统，新的架构模式正在涌现。
+
+##### 11.8.1 大规模MoE服务 (Large-scale Expert Parallelism) ⭐⭐⭐
+
+> **来源**：[vLLM Blog - Large-scale Serving](https://blog.vllm.ai/2025/12/17/large-scale-serving.html)
+>
+> **核心价值**：解决万亿参数MoE模型的部署难题
+
+- **什么是Large EP**
+  - 传统的Tensor Parallelism在MoE上的局限
+  - Expert Parallelism：将不同专家分配到不同GPU
+  - 跨节点的专家路由和负载均衡
+  - All-to-All通信优化
+
+- **关键技术挑战**
+  - **专家负载均衡**：
+    - 不同专家的访问频率差异
+    - 动态路由策略
+    - 避免热点专家过载
+  - **通信优化**：
+    - 减少跨节点All-to-All通信
+    - 通信计算重叠
+    - RDMA加速
+  - **容错和弹性**：
+    - 专家失败的处理
+    - 动态扩缩容专家数量
+
+- **vLLM的实现**
+  - 分布式调度器设计
+  - 专家路由算法
+  - 性能基准测试
+  - 生产环境最佳实践
+
+##### 11.8.2 EPD：Expert-Parallel Data Parallelism ⭐⭐⭐
+
+> **来源**：[vLLM Blog - EPD](https://blog.vllm.ai/2025/12/15/vllm-epd.html)
+>
+> **核心价值**：结合专家并行和数据并行，提升MoE推理效率
+
+- **EPD的核心思想**
+  - **传统MoE部署的问题**：
+    - 单纯Expert Parallelism：GPU利用率不均
+    - 单纯Data Parallelism：无法处理超大MoE
+  - **EPD的创新**：
+    - 每个GPU：多个专家的副本 + Data并行
+    - 更好的负载均衡
+    - 提升整体GPU利用率
+
+- **EPD架构设计**
+  - 专家分组策略
+  - 请求调度算法
+  - KV Cache共享
+  - 跨GPU通信优化
+
+- **性能提升**
+  - 吞吐量提升：2-3x
+  - 延迟降低：P95改善40%
+  - GPU利用率：从60%提升到85%+
+
+- **实战应用**
+  - DeepSeek-V3的部署
+  - Mixtral 8x22B的优化
+  - 成本节省案例
+
+##### 11.8.3 Elastic Expert Parallelism ⭐⭐
+
+> **来源**：[vLLM Issue #20323](https://github.com/vllm-project/vllm/issues/20323)
+>
+> **核心价值**：动态调整专家并行度，适应不同负载
+
+- **什么是Elastic EP**
+  - 静态EP的问题：无法适应流量波动
+  - Elastic EP：根据负载动态调整专家副本数
+  - 弹性扩缩容专家
+
+- **技术挑战**
+  - 专家副本的动态创建和销毁
+  - 路由表的实时更新
+  - 无缝迁移请求
+  - 一致性保证
+
+- **应用场景**
+  - 流量波动大的服务
+  - 多租户环境
+  - 成本敏感的部署
+
+##### 11.8.4 分离式架构：MoonCake范式 ⭐⭐⭐
+
+> **来源**：[MoonCake GitHub](https://github.com/kvcache-aif/MoonCake)
+>
+> **核心价值**：彻底解耦Prefill和Decode，实现专用的推理集群
+
+- **MoonCake的核心设计**
+  - ** disaggregated architecture**：
+    - Prefill集群：计算优化型GPU（H100）
+    - Decode集群：带宽优化型GPU（H200、L40s）
+    - KV Cache集群：高内存带宽
+  - **为什么分离**：
+    - Prefill和Decode的计算模式完全不同
+    - 统一部署导致资源浪费
+    - 分离后可分别优化
+
+- **关键技术**
+  - **KV Cache传输协议**：
+    - 高效的序列化和反序列化
+    - 增量传输
+    - 压缩算法
+  - **请求调度**：
+    - Prefill队列管理
+    - Decode队列管理
+    - 两者之间的速率匹配
+  - **容错机制**：
+    - KV Cache的持久化
+    - 故障恢复
+    - 重新计算策略
+
+- **性能优势**
+  - **成本降低**：40-60%
+  - **吞吐提升**：2-3x
+  - **资源利用率**：从50%提升到80%+
+  - **弹性扩展**：Prefill和Decode独立扩缩容
+
+- **生产实践**
+  - 清华大学MoonCake系统（张明星@清华）
+  - Kitchen推理平台
+  - 与vLLM的集成
+
+- **对比其他方案**
+  - vLLM Integrated Serving
+  - TGI的分离式架构
+  - 各自的适用场景
+
+##### 11.8.5 技术栈深化：从框架到网络 ⭐⭐
+
+> **来源**：刘海超@vLLM (2025"青稞"AI嘉年华)
+>
+> **核心洞察**：2025年的优化已经超出了推理框架本身
+
+- **2024 vs 2025对比**
+  - **2024年**：框架层面优化（vLLM、TGI）
+  - **2025年**：需要深入到更低层次
+    - RDMA优化
+    - Networking层优化
+    - Kernel层优化
+
+- **为什么需要更深层**
+  - 框架层的优化已经接近极限
+  - 瓶颈转移到网络和通信
+  - 需要全栈协同优化
+
+- **技术要求**
+  - 需要懂：算法 + 硬件 + 系统 + 网络
+  - 跨领域协作成为常态
+  - 人才稀缺性增加
+
+##### 11.8.6 从SPMD到Event Driven ⭐
+
+> **来源**：张明星@清华 (2025"青稞"AI嘉年华)
+>
+> **核心洞察**：传统SPMD模式不适合所有场景
+
+- **SPMD (Single Program Multiple Data)**
+  - 传统的数据并行模式
+  - Workflow事先program好
+  - 适合大规模批量处理
+
+- **Event Driven模式**
+  - 动态调度和执行
   - 适合batch size达不到的场景
-  - 编程复杂性高但更灵活
-- 11.9.3 算法和系统的co-design（张博涵@浙大）
-  - 不是系统等算法成熟
-  - 不是算法等系统优化
-  - 需要同步螺旋式上升
-- 11.9.4 新的量化技术
-- 11.9.5 硬件加速器 (TPU, NPU)
-- 11.9.6 模型架构演进
-- 11.9.7 未来趋势
+  - 更灵活但编程复杂度高
+
+- **适用场景对比**
+  - **SPMD适合**：
+    - 高吞吐量场景
+    - 请求模式稳定
+    - 批处理任务
+  - **Event Driven适合**：
+    - 低延迟要求
+    - 请求模式多变
+    - 交互式应用
+
+##### 11.8.7 算法和系统的Co-Design ⭐⭐
+
+> **来源**：张博涵@浙大 (2025"青稞"AI嘉年华)
+>
+> **核心洞察**：算法和系统需要同步螺旋式上升
+
+- **传统模式的问题**
+  - 系统团队：等算法成熟再做优化
+  - 算法团队：等系统优化好再实验
+  - 结果：两边都在等，进度缓慢
+
+- **Co-Design方法**
+  - **同步螺旋式上升**：
+    - 算法和系统同步演进
+    - 每个版本都互相反馈
+    - 快速迭代验证
+  - **案例**：
+    - INT4 QAT：算法创新 + 系统优化
+    - PD分离：架构创新 + 工程实现
+
+- **实践建议**
+  - 建立联合开发团队
+  - 共享性能基准
+  - 定期技术同步
 
 #### 常见误区专栏
 #### 实战检查清单
