@@ -1599,13 +1599,572 @@
   - **案例2**：异构GPU的RL部署（H100+H200）
   - **案例3**：大规模RL的弹性资源分配
 
+#### 10.11 vLLM插件系统 ⭐⭐
+
+> **💡 工业界实践**（来源：vLLM官方博客 2025-11-20）
+>
+> **核心洞察**：插件系统是生产环境中管理vLLM定制化修改的官方推荐方案，避免了维护fork的负担，同时保持了与上游的同步更新能力。
+
+在部署vLLM到生产环境时，我们经常需要修改某些行为来满足特定需求。传统的方法包括：
+- Fork整个vLLM仓库
+- 使用Monkey Patch
+- 等待上游合并
+
+vLLM插件系统提供了更好的解决方案。
+
+- 10.11.1 为什么需要插件系统
+
+  **生产环境的常见需求**：
+  - 修改调度策略（如自定义priority计算）
+  - 添加新的采样算法
+  - 定制日志和监控
+  - 集成内部的认证系统
+  - 修改API行为
+
+  **传统方法的痛点**：
+  - **Fork仓库**：
+    - 维护成本高，需要持续同步上游更新
+    - 容易产生冲突
+    - 丢失社区的新特性
+  - **Monkey Patch**：
+    - 脆弱，依赖代码结构
+    - 升级vLLM时容易失效
+    - 难以管理和追踪
+  - **等待上游**：
+    - 时间不确定
+    - 你的需求可能不是上游的优先级
+
+  **插件系统的优势**：
+  - **官方支持**：vLLM内置的扩展机制
+  - **最小化修改**：只修改需要改变的部分
+  - **版本兼容**：支持版本检查，自动匹配
+  - **运行时激活**：通过环境变量控制
+  - **易于维护**：升级vLLM时插件仍可工作
+
+- 10.11.2 插件系统 vs Fork vs Monkey Patch
+
+  | 方案 | 维护成本 | 升级兼容性 | 可靠性 | 灵活性 |
+  |------|---------|-----------|--------|--------|
+  | Fork | 高 ❌ | 需要手动merge | 中 ✅ | 高 ✅ |
+  | Monkey Patch | 低 ✅ | 差 ❌ | 低 ❌ | 中 |
+  | Plugin System | 低 ✅ | 好 ✅ | 高 ✅ | 中 |
+
+  **选择建议**：
+  - **插件系统**：首选方案，适合大多数定制需求
+  - **Fork**：仅当需要大规模架构修改时
+  - **Monkey Patch**：仅用于快速实验，不适合生产
+
+- 10.11.3 VLLMPatch基础
+
+  **核心概念**：
+  - `VLLMPatch`：插件基类，用于声明要修改的类
+  - Surgical-level override：只重写需要的方法
+  - Entry point registration：在`setup.py`中注册插件
+  - Runtime activation：通过`VLLM_CUSTOM_PATCHES`环境变量激活
+
+  **基本模式**：
+
+  ```python
+  from vllm.plugin import VLLMPatch
+
+  # 1. 定义插件：指定要修改的目标类
+  class MySchedulerPatch(VLLMPatch[Scheduler]):
+      # 2. 重写需要修改的方法
+      def _schedule(self):
+          # 自定义调度逻辑
+          print("Using custom scheduler!")
+          return super()._schedule()
+
+      # 3. 保留其他方法不变
+      # Scheduler的其他方法保持原样
+  ```
+
+  **版本兼容性装饰器**：
+
+  ```python
+  from vllm.plugin import min_vllm_version
+
+  class MySchedulerPatch(VLLMPatch[Scheduler]):
+      @min_vllm_version("0.6.0")  # 要求vLLM >= 0.6.0
+      def _schedule(self):
+          # 自定义逻辑
+          pass
+  ```
+
+  **Entry Point注册**（在`setup.py`中）：
+
+  ```python
+  setup(
+      name="vllm-custom-plugins",
+      # ...其他配置
+      entry_points={
+          'vllm.general_plugins': [
+              'custom_patches = my_vllm_patches:register_patches'
+          ]
+      }
+  )
+  ```
+
+  **注册函数**（`my_vllm_patches/__init__.py`）：
+
+  ```python
+   def register_patches():
+       from .scheduler_patch import MySchedulerPatch
+       from .logger_patch import MyLoggerPatch
+
+       return [
+           MySchedulerPatch,
+           MyLoggerPatch,
+       ]
+  ```
+
+- 10.11.4 实战：创建自定义插件
+
+  **场景**：修改vLLM的调度策略，让高优先级请求总是被优先处理
+
+  **步骤1：创建插件项目结构**
+
+  ```
+  vllm-custom-plugins/
+  ├── setup.py
+  ├── vllm_custom_patches/
+  │   ├── __init__.py
+  │   └── priority_scheduler.py
+  └── README.md
+  ```
+
+  **步骤2：实现插件**（`priority_scheduler.py`）
+
+  ```python
+  from vllm.core.scheduler import Scheduler
+  from vllm.plugin import VLLMPatch, min_vllm_version
+  from typing import List
+  import logging
+
+  logger = logging.getLogger(__name__)
+
+  class PrioritySchedulerPatch(VLLMPatch[Scheduler]):
+      """
+      自定义调度策略：优先处理高优先级请求
+
+      使用方法：
+      1. 在请求中添加 'priority' 字段
+      2. scheduler将按priority排序（数值越大越优先）
+      """
+
+      @min_vllm_version("0.6.0")
+      def _schedule(self) -> List:
+          """重写调度方法，添加优先级逻辑"""
+
+          # 获取当前等待的请求
+          scheduled = self._schedule_original()
+
+          if not scheduled:
+              return scheduled
+
+          # 按priority排序（如果有）
+          def get_priority(request):
+              return request.get('priority', 0)
+
+          scheduled.sort(key=get_priority, reverse=True)
+
+          logger.info(f"Scheduled {len(scheduled)} requests with priority")
+
+          return scheduled
+  ```
+
+  **步骤3：注册插件**（`__init__.py`）
+
+  ```python
+  def register_patches():
+      from .priority_scheduler import PrioritySchedulerPatch
+
+      return [
+          PrioritySchedulerPatch,
+      ]
+  ```
+
+  **步骤4：安装插件**
+
+  ```bash
+  # 开发模式安装
+  cd vllm-custom-plugins
+  pip install -e .
+
+  # 或者构建wheel后安装
+  python setup.py bdist_wheel
+  pip install dist/vllm_custom_plugins-0.1.0-py3-none-any.whl
+  ```
+
+  **步骤5：激活插件**
+
+  ```bash
+  # 方式1：环境变量（推荐）
+  export VLLM_CUSTOM_PATCHES="vllm_custom_patches"
+
+  # 方式2：在Python代码中
+  import os
+  os.environ['VLLM_CUSTOM_PATCHES'] = 'vllm_custom_patches'
+
+  from vllm import LLM
+
+  # 启动vLLM，插件会自动加载
+  llm = LLM(model="meta-llama/Llama-3.1-8B")
+  ```
+
+  **步骤6：使用插件**
+
+  ```python
+  from vllm import LLM, SamplingParams
+
+  llm = LLM(model="meta-llama/Llama-3.1-8B")
+
+  # 高优先级请求
+  prompts_high = [
+      {"prompt": "紧急任务", "priority": 100},
+      {"prompt": "VIP用户", "priority": 90},
+  ]
+
+  # 普通请求
+  prompts_normal = [
+      {"prompt": "普通任务", "priority": 0},
+  ]
+
+  # 高优先级请求会先被处理
+  outputs = llm.generate(prompts_high + prompts_normal)
+  ```
+
+- 10.11.5 版本管理与兼容性
+
+  **版本兼容性检查**：
+  - 使用`@min_vllm_version`装饰器
+  - vLLM启动时会自动检查
+  - 版本不匹配时给出清晰的错误信息
+
+  ```python
+  from vllm.plugin import min_vllm_version
+
+  class MyPatch(VLLMPatch[Scheduler]):
+      @min_vllm_version("0.6.0")
+      def my_method(self):
+          # 这个方法只在vLLM >= 0.6.0时生效
+          pass
+
+      @min_vllm_version("0.6.3")
+      def another_method(self):
+          # 这个方法需要vLLM >= 0.6.3
+          pass
+  ```
+
+  **多版本支持**：
+
+  ```python
+  class MySchedulerPatch(VLLMPatch[Scheduler]):
+      def _schedule(self):
+          # 根据vLLM版本选择不同实现
+          if self._vllm_version >= (0, 6, 3):
+              return self._schedule_v2()
+          else:
+              return self._schedule_v1()
+
+      def _schedule_v2(self):
+          # 0.6.3+的新实现
+          pass
+
+      def _schedule_v1(self):
+          # 0.6.0-0.6.2的旧实现
+          pass
+  ```
+
+  **升级vLLM时的注意事项**：
+  1. 测试插件是否仍正常工作
+  2. 查看vLLM changelog，检查API变化
+  3. 更新`@min_vllm_version`约束
+  4. 必要时更新插件代码
+
+- 10.11.6 生产环境最佳实践
+
+  **1. 插件项目结构**
+
+  ```
+  company-vllm-plugins/
+  ├── plugins/
+  │   ├── scheduler/
+  │   │   ├── __init__.py
+  │   │   └── priority.py
+  │   ├── logging/
+  │   │   ├── __init__.py
+  │   │   └── custom.py
+  │   └── auth/
+  │       ├── __init__.py
+  │       └── rbac.py
+  ├── setup.py
+  ├── requirements.txt
+  ├── README.md
+  └── tests/
+  ```
+
+  **2. Docker集成**
+
+  ```dockerfile
+  # Dockerfile
+  FROM vllm/vllm-openai:v0.6.0
+
+  # 安装自定义插件
+  COPY company-vllm-plugins /app/plugins
+  RUN pip install /app/plugins
+
+  # 激活插件
+  ENV VLLM_CUSTOM_PATCHES="company_vllm_plugins"
+
+  # 启动vLLM
+  CMD ["--model", "meta-llama/Llama-3.1-8B"]
+  ```
+
+  ```yaml
+  # Kubernetes deployment
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: vllm-with-plugins
+  spec:
+    template:
+      spec:
+        containers:
+        - name: vllm
+          image: your-registry/vllm-custom:latest
+          env:
+          - name: VLLM_CUSTOM_PATCHES
+            value: "company_vllm_plugins"
+          - name: ENABLE_CUSTOM_PLUGINS
+            value: "true"
+  ```
+
+  **3. 插件开发规范**
+
+  ```python
+  """
+  company_vllm/plugins/scheduler/priority.py
+
+  公司内部优先级调度插件
+
+  使用方法：
+  1. 安装：pip install company-vllm-plugins
+  2. 激活：export VLLM_CUSTOM_PATCHES="company_vllm_plugins"
+  3. 测试：pytest tests/test_priority_scheduler.py
+
+  版本要求：vLLM >= 0.6.0
+  维护者：infra-team@company.com
+  """
+
+  from vllm.core.scheduler import Scheduler
+  from vllm.plugin import VLLMPatch, min_vllm_version
+
+  class PrioritySchedulerPatch(VLLMPatch[Scheduler]):
+      """优先级调度插件"""
+
+      # 文档字符串
+      """
+      修改vLLM调度策略，支持基于priority字段的优先级调度。
+
+      Priority字段：
+      - 0：普通请求（默认）
+      - 1-50：低优先级
+      - 51-90：中优先级
+      - 91-100：高优先级
+      - 101+：紧急请求
+
+      示例：
+          prompts = [
+              {"text": "hello", "priority": 100},  # 紧急
+              {"text": "world", "priority": 0},    # 普通
+          ]
+      """
+
+      @min_vllm_version("0.6.0")
+      def _schedule(self):
+          # 实现逻辑
+          pass
+
+      def _validate_priority(self, priority):
+          """参数验证"""
+          if not isinstance(priority, int):
+              raise TypeError(f"Priority must be int, got {type(priority)}")
+          if priority < 0 or priority > 1000:
+              raise ValueError(f"Priority must be 0-1000, got {priority}")
+          return True
+  ```
+
+  **4. 测试插件**
+
+  ```python
+  # tests/test_priority_scheduler.py
+  import pytest
+  from vllm import LLM, SamplingParams
+
+  @pytest.mark.unit
+  def test_priority_scheduler():
+      """测试优先级调度"""
+      llm = LLM(model="meta-llama/Llama-3.1-8B")
+
+      # 测试高优先级优先执行
+      prompts = [
+          {"prompt": "low", "priority": 1},
+          {"prompt": "high", "priority": 100},
+          {"prompt": "medium", "priority": 50},
+      ]
+
+      outputs = llm.generate(prompts)
+
+      # 验证执行顺序
+      assert outputs[0].prompt == "high"  # 优先级100
+      assert outputs[1].prompt == "medium"  # 优先级50
+      assert outputs[2].prompt == "low"  # 优先级1
+  ```
+
+  **5. 监控和日志**
+
+  ```python
+  import logging
+
+  class MySchedulerPatch(VLLMPatch[Scheduler]):
+      def __init__(self, *args, **kwargs):
+          super().__init__(*args, **kwargs)
+          # 自定义logger
+          self.logger = logging.getLogger("vllm.custom.scheduler")
+
+      def _schedule(self):
+          self.logger.info("Custom scheduler active")
+          self.logger.debug(f"Scheduling {len(self.waiting)} requests")
+
+          # 采集自定义指标
+          self.metrics.custom_schedule_calls += 1
+
+          return super()._schedule()
+  ```
+
+  **6. 插件发布流程**
+
+  ```bash
+  # 1. 版本号管理
+  # setup.py
+  setup(
+      name="company-vllm-plugins",
+      version="1.2.0",  # 遵循语义化版本
+      # ...
+  )
+
+  # 2. 构建发布
+  python setup.py sdist bdist_wheel
+
+  # 3. 测试
+  twine check dist/*
+  pip install dist/company_vllm_plugins-1.2.0-py3-none-any.whl
+
+  # 4. 发布到内部PyPI
+  twine upload --repository-url https://pypi.company.com/ dist/*
+
+  # 5. 在vLLM服务中使用
+  pip install --index-url https://pypi.company.com/ company-vllm-plugins==1.2.0
+  ```
+
+  **7. 插件清单管理**
+
+  ```markdown
+  # README.md
+
+  ## 公司vLLM插件清单
+
+  ### 已安装插件
+
+  | 插件名 | 版本 | 用途 | 维护者 | 状态 |
+  |--------|------|------|--------|------|
+  | priority-scheduler | 1.2.0 | 优先级调度 | infra-team | ✅ 生产 |
+  | custom-logger | 0.9.0 | 统一日志 | platform-team | ✅ 生产 |
+  | rbac-auth | 2.1.0 | RBAC认证 | security-team | 🧪 测试 |
+
+  ### 使用方法
+
+  1. 安装所有插件：
+      ```bash
+      pip install -r requirements.txt
+      ```
+
+  2. 激活插件：
+      ```bash
+      export VLLM_CUSTOM_PATCHES="company_vllm_plugins"
+      ```
+
+  3. 验证插件加载：
+      ```bash
+      python -c "import vllm; print(vllm.__version__)"
+      ```
+
+  ### 版本兼容性
+
+  | 插件 | vLLM 0.5.x | vLLM 0.6.x | vLLM 0.7.x |
+  |------|-----------|-----------|-----------|
+  | priority-scheduler | ❌ | ✅ | ✅ |
+  | custom-logger | ✅ | ✅ | ❌ |
+  | rbac-auth | ❌ | ✅ | 🧪 |
+  ```
+
+  **8. 故障排查**
+
+  ```bash
+  # 检查插件是否加载
+  python -c "
+  import os
+  os.environ['VLLM_CUSTOM_PATCHES'] = 'company_vllm_plugins'
+  from vllm import LLM
+  print('Plugins loaded successfully')
+  "
+
+  # 查看插件日志
+  export VLLM_LOGGING_LEVEL=DEBUG
+  vllm serve ... 2>&1 | grep -i plugin
+
+  # 常见问题
+  # 1. 插件未生效：检查VLLM_CUSTOM_PATCHES环境变量
+  # 2. 版本不兼容：检查@min_vllm_version装饰器
+  # 3. 方法名错误：检查目标类是否有此方法
+  # 4. 导入失败：检查entry_points配置
+  ```
+
+  **9. 性能考虑**
+
+  - **插件开销**：插件系统的开销极小（<1%）
+  - **避免过度重写**：只重写必要的方法
+  - **性能测试**：使用`--help`查看是否有性能影响
+
+  ```python
+  # 性能基准测试
+  import time
+
+  # 无插件
+  start = time.time()
+  llm = LLM(model="meta-llama/Llama-3.1-8B")
+  # ... 运行benchmark
+  no_plugin_time = time.time() - start
+
+  # 有插件
+  os.environ['VLLM_CUSTOM_PATCHES'] = 'company_vllm_plugins'
+  start = time.time()
+  llm = LLM(model="meta-llama/Llama-3.1-8B")
+  # ... 运行benchmark
+  with_plugin_time = time.time() - start
+
+  print(f"Overhead: {(with_plugin_time/no_plugin_time - 1)*100:.2f}%")
+  ```
+
 #### 常见误区专栏
 #### 实战检查清单
 #### 动手练习
-- 练习9.1：部署vLLM到Kubernetes
-- 练习9.2：搭建完整的监控系统
-- 练习9.3：建立ROI监控仪表盘
-- 练习9.4：使用slime部署简单RL任务 ⭐
+- 练习10.1：部署vLLM到Kubernetes
+- 练习10.2：搭建完整的监控系统
+- 练习10.3：建立ROI监控仪表盘
+- 练习10.4：使用slime部署简单RL任务 ⭐
+- 练习10.5：开发并部署vLLM自定义插件 ⭐⭐
 
 ---
 
