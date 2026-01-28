@@ -1,6 +1,8 @@
-# LLM Inference Optimization
+# LLM推理性能优化
 
-> A practical guide to optimizing LLM inference - from GPU basics to production deployment
+> 从原理到生产环境的性能优化实战
+
+**LLM Inference Optimization: A Practical Guide to Performance Optimization from Principles to Production Environment**
 
 [![Progress](https://img.shields.io/badge/progress-0%25-red)](https://github.com/joqk12345/llm-inference-optimization)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
