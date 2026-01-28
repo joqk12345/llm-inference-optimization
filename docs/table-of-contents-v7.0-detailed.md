@@ -660,6 +660,123 @@
   - 有Prefix Caching：~10 ms延迟（首次~50ms，后续~10ms）
   - **提升：5倍吞吐量**
 
+- 6.7.7 实战案例：OpenAI Codex的Prompt Caching ⭐💡
+
+  > **💡 案例来源**: OpenAI Codex CLI - "Unrolling the Codex agent loop" (2026-01-22)
+  >
+  > **核心挑战**: Agent场景下prompt持续增长，从Quadratic优化到Linear
+  > **关键洞察**: Cache hits仅对exact prefix matches有效，需要精心设计prompt结构
+
+  **背景：Codex Agent Loop的挑战**
+  - **Agent工作流程**：
+    ```
+    用户输入 → 模型推理 → 工具调用 → 执行工具 → 追加结果 → 重新推理 → 循环
+    ```
+  - **问题**：每次迭代都需要发送完整的prompt（包括之前所有轮次的内容）
+  - **复杂度**：没有cache时是**O(n²)** - quadratic增长！
+    - 第1次推理：1个单位
+    - 第10次推理：发送1-9轮的所有内容
+    - 第100次推理：发送1-99轮的所有内容
+
+  **Prompt Caching的威力**
+  - **有cache时**：从Quadratic降到**Linear O(n)**
+  - **关键要求**：exact prefix matches（完全匹配的前缀）
+  - **设计原则**：
+    1. **静态内容放在开头**：
+       - System instructions
+       - Tool definitions
+       - Examples
+    2. **变化内容放在结尾**：
+       - User messages
+       - Tool call results
+       - Dynamic context
+
+  **Codex的优化实践**
+  - **Prompt结构**（从前往后）：
+    1. System message（固定）
+    2. Tools definitions（固定）
+    3. Developer instructions（固定）
+    4. Environment context（半固定，工作目录变化时append新消息）
+    5. User messages（变化）
+    6. Tool calls和results（变化）
+
+  - **避免Cache Miss的关键设计**：
+    ```python
+    # ❌ 错误做法：修改已有消息（破坏prefix）
+    prompt[3].content = new_directory  # 修改环境上下文
+
+    # ✅ 正确做法：追加新消息（保持prefix）
+    prompt.append({
+        "role": "user",
+        "content": f"Changed to: {new_directory}"
+    })
+    ```
+
+  **导致Cache Miss的危险操作** ⚠️
+  - ❌ 中途改变可用tools（MCP服务器通知tools/list_changed）
+  - ❌ 切换模型（model-specific instructions变化）
+  - ❌ 修改sandbox配置或approval mode
+  - ❌ 修改工作目录（必须用append而非modify）
+
+  **Codex的解决方案**：
+  - **配置变化时append新消息**：
+    ```python
+    # 环境变化：追加新消息而非修改
+    if directory_changed:
+        prompt.append({
+            "role": "user",
+            "type": "environment_context",
+            "content": new_directory
+        })
+    ```
+  - **MCP工具枚举顺序保持一致**：
+    - Bug案例：MCP tools枚举顺序不一致导致cache miss
+    - 修复：排序工具列表，确保每次请求顺序相同
+
+  **性能影响分析**
+  - **无Prompt Caching**：
+    - Agent loop：10轮工具调用
+    - Token发送量：1 + 2 + 3 + ... + 10 = **55个单位**（Quadratic）
+  - **有Prompt Caching**：
+    - Agent loop：10轮工具调用
+    - Token发送量：**10个单位**（仅新增内容）
+    - **节省：82%**（55 vs 10）
+
+  **Context Window管理**
+  - **挑战**：即使有cache，context window也会满
+  - **Codex的compact策略**：
+    - 使用`/responses/compact` endpoint
+    - 自动压缩历史对话
+    - 保留模型的latent understanding（通过encrypted_content）
+  - **Auto-compact触发**：
+    ```python
+    if token_count > auto_compact_limit:
+        compacted = call_compact_endpoint(conversation)
+        conversation = compacted.items  # 更小的prompt
+    ```
+
+  **关键经验总结** 💡
+  1. **Prompt结构设计至关重要**：
+     - 固定内容在前，变化内容在后
+     - 从不修改已有消息，总是追加新消息
+  2. **监控Cache命中率**：
+     - Codex团队发现的MCP bug就是因为监控cache miss
+  3. **平衡cache与context window**：
+     - Cache提升性能
+     - Compact管理内存
+     - 两者配合实现最优效果
+
+  **对你的启发**
+  - **Agent场景是Prefix Caching的黄金应用**：
+    - 系统提示词固定
+    - 工具定义固定
+    - 只有用户输入和工具结果变化
+  - **实现Agent系统时的 Checklist**：
+    - [ ] Prompt中固定内容是否都在前面？
+    - [ ] 是否用append而非modify来更新状态？
+    - [ ] 是否监控了cache hit rate？
+    - [ ] 当context window满时，compact策略是什么？
+
 #### 常见误区专栏
 #### 实战检查清单
 #### 动手练习

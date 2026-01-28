@@ -253,6 +253,7 @@
 - 6.7.4 Prefix Caching的工作流程
 - 6.7.5 性能提升分析
 - 6.7.6 实战：在vLLM中启用Prefix Caching
+- 6.7.7 实战案例：OpenAI Codex的Prompt Caching ⭐💡
 
 #### 常见误区专栏
 #### 实战检查清单
