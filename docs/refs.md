@@ -180,7 +180,7 @@
 
 #### vLLM插件系统
 - **vLLM Plugin System Blog**: https://blog.vllm.ai/2025/11/20/vllm-plugin-system.html
-  - 引用章节：10.11
+  - 引用章节：5.7.7
   - 核心内容：无需fork即可定制vLLM
 
 #### Mini-SGLang
@@ -270,6 +270,8 @@
 ### 第5章 - LLM推理基础
 - **5.7** vLLM架构全景
   - Berkeley EECS-2025-192 - Deconstructing vLLM
+- **5.7.7** vLLM插件系统
+  - vLLM Plugin System Blog
 
 ### 第6章 - KV Cache优化
 - **6.3.2** PagedAttention原理（vLLM的核心）
@@ -335,9 +337,6 @@
 
 - **10.10** RL系统部署
   - 朱子林@质朴、朱立耕@NVIDIA
-
-- **10.11** vLLM插件系统
-  - vLLM Plugin System Blog
 
 ### 第11章 - 高级话题
 - **11.1** Agent基础设施
