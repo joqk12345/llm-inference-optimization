@@ -246,7 +246,7 @@
   - 6.3.2.9 性能监控
   - 6.3.2.10 总结：PagedAttention的核心价值
 - 6.3.3 内存管理策略
-- 6.3.4 Radix Attention (SGLang/Mini-SGLang) ⚡️ 2025新增
+- 6.3.4 Radix Attention (SGLang/Mini-SGLang)
   - 6.3.4.1 Radix Cache vs PagedAttention
   - 6.3.4.2 Radix Tree结构
   - 6.3.4.3 共享前缀检测算法
@@ -311,7 +311,7 @@
 - 7.4.1 请求生命周期管理
 - 7.4.2 预分配vs动态分配
 - 7.4.3 迭代级调度 (Iteration-level Scheduling)
-- 7.4.4 Overlap Scheduling (Mini-SGLang) ⚡️ 2025新增
+- 7.4.4 Overlap Scheduling (Mini-SGLang)
   - 7.4.4.1 CPU开销导致GPU闲置问题
   - 7.4.4.2 Overlap Scheduling设计思想
   - 7.4.4.3 实现机制
@@ -498,7 +498,7 @@
 - 10.6.3 自动伸缩
 - 10.6.4 成本监控工具
 - 10.6.5 Agent系统的成本优化策略
-- 10.6.6 轻量级参考实现：Mini-SGLang ⚡️ 2025新增
+- 10.6.6 轻量级参考实现：Mini-SGLang
   - 10.6.6.1 为什么需要轻量级实现？
   - 10.6.6.2 5k行代码实现的核心功能
   - 10.6.6.3 研究原型最佳实践
