@@ -174,6 +174,21 @@
     - 性能：5x throughput vs Guidance and vLLM
   - 引用章节：6.3.4
 
+#### SGLang v0.2 Slides
+- **SGLang v0.2: Faster Interface and Runtime for LLM inference**
+  - 文件路径：/Users/mac/Downloads/sglang_v0_2.pdf
+  - 发布日期：2024年
+  - 核心内容：
+    - SGLang发展历程（Early → Middle → Production Stage）
+    - RadixAttention + LRU Cache管理
+    - Cache-Aware Scheduling（按matched prefix length排序）
+    - Dynamic Memory Management（动态调整β系数）
+    - Jump-forward JSON Decoding（3x faster latency）
+    - SGLang技术栈总结（RadixAttention, Token Attention, Torch Compile等）
+    - 生产案例：x.ai (grok-2), Databricks, LMSys Chatbot Arena
+  - 引用章节：6.3.4.8 (LRU Cache), 7.4.7 (Dynamic Memory Mgmt), 10/11 (生产案例)
+  - 性能数据：RAG场景~5x throughput, Multi-turn chat~3x throughput
+
 ### 技术博客
 
 #### vLLM Official Blog
@@ -203,6 +218,7 @@
 - **6.3.4** Radix Attention (SGLang/Mini-SGLang)
   - Mini-SGLang Blog - Radix Cache vs PagedAttention
   - Mini-SGLang Blog - 5k行代码实现精要
+  - SGLang v0.2 Slides - LRU Cache管理 (6.3.4.8)
 
 - **6.7.8** Agent系统的KV Cache优化实战
   - Manus Blog - Context Engineering
@@ -218,6 +234,9 @@
 
 - **7.4.6** Cache-Aware Load Balancer (SGLang)
   - SGLang v0.4 Blog - 智能路由，3.8倍cache hit率提升
+
+- **7.4.7** Dynamic Memory Management (SGLang)
+  - SGLang v0.2 Slides - 动态调整β系数，节省27-33%内存
 
 - **7.7** Prefill-Decode分离（PD分离）
   - vLLM、SGLang社区合作
@@ -296,6 +315,7 @@
 - **2025-01-29**: 添加Mini-SGLang博客资源（6.3.4 Radix Attention, 7.4.4 Overlap Scheduling, 10.6.6 轻量级参考实现）
 - **2025-01-29**: 添加SGLang v0.4博客资源（7.4.4.8 Zero-Overhead Scheduler, 7.4.6 Cache-Aware Load Balancer）
 - **2025-01-29**: 添加SGLang原始博客资源（6.3.4 RadixAttention原始设计）
+- **2025-01-29**: 添加SGLang v0.2 Slides资源（6.3.4.8 LRU Cache, 7.4.7 Dynamic Memory Mgmt, 生产案例）
 
 ---
 

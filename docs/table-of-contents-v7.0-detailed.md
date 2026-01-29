@@ -1237,6 +1237,167 @@
     - KV Cache复用
     - 高吞吐量
 
+  **6.3.4.8 SGLang的LRU Cache管理**
+
+  > **💡 深度来源**：[SGLang v0.2 Slides](/Users/mac/Downloads/sglang_v0_2.pdf)
+  >
+  > **核心机制**：Radix Tree + LRU Eviction
+  >
+  > **关键优化**：Cache-Aware Scheduling
+
+  - **LRU Cache管理策略**：
+    ```python
+    class RadixTreeLRUManager:
+        """Radix Tree with LRU eviction policy"""
+
+        def __init__(self, max_cache_size_gb):
+            self.radix_tree = RadixTree()
+            self.max_cache_size = max_cache_size_gb * 1024**3
+            self.current_size = 0
+            self.access_order = doubly_linked_list()  # LRU tracking
+
+        def get(self, tokens):
+            """获取KV cache，更新LRU order"""
+            # 1. 在Radix Tree中查找最长匹配prefix
+            node = self.radix_tree.find_longest_prefix(tokens)
+
+            if node:
+                # 2. Cache hit：更新LRU order
+                self.access_order.move_to_front(node)
+                return node.kv_cache
+            else:
+                # 3. Cache miss：返回None
+                return None
+
+        def put(self, tokens, kv_cache):
+            """插入新的KV cache，必要时evict"""
+
+            # 1. 计算新cache的大小
+            cache_size = kv_cache.size_bytes
+
+            # 2. 如果超过容量，evict LRU entries
+            while self.current_size + cache_size > self.max_cache_size:
+                # Evict least recently used
+                lru_node = self.access_order.pop_back()
+                self.radix_tree.remove(lru_node.tokens)
+                self.current_size -= lru_node.size
+
+            # 3. 插入新cache
+            node = self.radix_tree.insert(tokens, kv_cache)
+            self.access_order.push_front(node)
+            self.current_size += cache_size
+
+        def evict(self, num_bytes_needed):
+            """Evict足够的cache空间"""
+            evicted = 0
+            while evicted < num_bytes_needed:
+                lru_node = self.access_order.pop_back()
+                self.radix_tree.remove(lru_node.tokens)
+                evicted += lru_node.size
+                self.current_size -= lru_node.size
+    ```
+
+  - **LRU vs 其他Eviction策略**：
+
+    | 策略 | 优点 | 缺点 | 适用场景 |
+    |------|------|------|----------|
+    | **LRU** | 实现简单，temporal locality好 | 无法识别future accesses | 通用场景 |
+    | **LFU** | 保留高频prefix | 需要维护访问计数 | 稳定工作负载 |
+    | **FIFO** | 最简单 | 可能evict useful entries | 简单部署 |
+    | **基于Token Length** | 保留长prefix（省计算） | 可能频繁evict短prefix | RAG场景 |
+
+    - **SGLang选择LRU的原因**：
+      - Temporal locality：最近使用的prefix很可能再次使用
+      - 实现简单：O(1) access and update
+      - 低开销：doubly linked list + hash map
+
+  - **Cache-Aware Scheduling**：
+    ```python
+    class CacheAwareScheduler:
+        """根据cache hit率排序请求队列"""
+
+        def schedule(self, pending_requests):
+            """1. 评估每个请求的cache hit率
+            2. 按hit率降序排序
+            3. 优先处理高hit率请求
+            """
+
+            # 1. 计算每个请求的matched prefix length
+            for req in pending_requests:
+                req.matched_length = self.radix_tree.match_length(req.tokens)
+
+            # 2. 按matched length降序排序
+            #    matched length越大 → cache hit率越高 → 优先处理
+            sorted_requests = sorted(
+                pending_requests,
+                key=lambda r: r.matched_length,
+                reverse=True
+            )
+
+            return sorted_requests
+    ```
+
+    - **为什么有效？**
+      - **最大化cache复用**：
+        ```
+        请求队列（未排序）：
+        Req A: "System + Doc X + User Query 1"  (matched: 1000 tokens)
+        Req B: "System + Doc Y + User Query 2"  (matched: 1000 tokens)
+        Req C: "System + Doc X + User Query 3"  (matched: 2000 tokens!)
+        Req D: "System + Doc Z + User Query 4"  (matched: 1000 tokens)
+
+        Cache-Aware Scheduling排序后：
+        Req C (2000 tokens match) → 先处理
+        Req A (1000 tokens match)
+        Req B (1000 tokens match)
+        Req D (1000 tokens match)
+
+        结果：
+        - Req C处理完后，"System + Doc X"的cache仍在LRU list的front
+        - Req A和Req C可以共享更多cache
+        - 总cache hit率提升！
+        ```
+
+      - **减少cache thrashing**：
+        - 避免频繁evict即将使用的cache
+        - 提高cache的temporal locality
+
+  - **SGLang的完整RadixAttention技术栈**（来自v0.2 slides）：
+
+    1. **RadixAttention**（核心）
+       - Radix Tree structure
+       - LRU eviction
+       - Cache-aware scheduling
+
+    2. **Token Attention**（类似PagedAttention）
+       - Page size = 1（每个token一个page）
+       - 更灵活的memory management
+       - Fragmentation问题缓解
+
+    3. **Jump-forward JSON Decoding**
+       - Regex analysis
+       - FSM compression
+       - 3x faster latency, 2.5x higher throughput
+
+    4. **其他优化技术**
+       - Torch Compile
+       - Flashinfer Kernels
+       - Chunked Prefill
+       - Continuous Batching
+       - CUDA Graph
+       - Interleave window attention
+
+  - **性能数据**（SGLang v0.2）：
+    - 与vLLM对比：
+      - RAG场景：~5x throughput提升（大量共享prefix）
+      - Multi-turn chat：~3x throughput提升
+      - General chat：~1.5x throughput提升（部分共享prefix）
+
+    - Cache hit率：
+      - RAG with 1000 docs：~90% hit rate
+      - Multi-turn chat：~70% hit rate
+      - General chat：~30% hit rate
+
 #### 6.4 KV Cache优化技术
 - 6.4.1 Multi-Query Attention vs Multi-Head Attention
 - 6.4.2 Grouped-Query Attention (GQA)
@@ -2382,6 +2543,242 @@
       --backend-url http://localhost:8002 \
       --backend-url http://localhost:8003
     ```
+
+- 7.4.7 Dynamic Memory Management (SGLang)
+
+  > **💡 深度来源**：[SGLang v0.2 Slides](/Users/mac/Downloads/sglang_v0_2.pdf)
+  >
+  > **核心问题**：max_new_tokens预留空间浪费
+  >
+  > **解决**：动态调整β系数，不保留所有max_new_tokens
+
+  **7.4.7.1 问题：max_new_tokens的内存浪费**
+
+  - **背景**：
+    ```
+    典型请求配置：
+    - prompt_length: 1000 tokens
+    - max_new_tokens: 2048 tokens
+    - 总内存需求：1000 + 2048 = 3048 tokens的KV Cache
+
+    传统做法：
+    - 预先分配3048 tokens的KV Cache
+    - 问题：大多数请求不会生成2048个tokens！
+    ```
+
+  - **内存浪费的来源**：
+    1. **EOS提前到达**：
+       - 请求生成500个tokens后遇到EOS（End of Sequence）
+       - 但已经预留了2048个tokens的空间
+       - 浪费：1548 tokens的KV Cache
+
+    2. **请求完成释放内存**：
+       - 随着请求完成，释放的内存可以复用
+       - 但如果一直预留max_new_tokens，无法复用
+
+    3. **GPU内存利用率低**：
+       - 大量内存被"预留"但未实际使用
+       - 导致batch size受限，吞吐量下降
+
+  **7.4.7.2 Dynamic Memory Management设计**
+
+  - **核心思想**：
+    ```
+    不是预留所有 max_new_tokens
+    而是动态调整预留比例 β × max_new_tokens
+
+    β 初始值：0.5（预留50%）
+    β 动态调整：根据实际使用情况
+    ```
+
+  - **为什么可以动态调整？**
+    1. **EOS通常提前到达**：
+       - 实际生成token数量 << max_new_tokens
+       - 平均生成长度通常只有max_new_tokens的30-50%
+
+    2. **请求完成释放内存**：
+       - 每个请求完成后，释放所有预留内存
+       - 这些内存可以立即用于其他请求
+
+    3. **Batch中总是有完成的请求**：
+       - Continuous Batching确保batch中总有请求完成
+       - 持续释放内存，可以复用
+
+  **7.4.7.3 实现机制**
+
+  ```python
+  class DynamicMemoryManager:
+      """动态调整KV Cache预留比例"""
+
+      def __init__(self, initial_beta=0.5):
+          self.beta = initial_beta  # 预留比例
+          self.actual_usage_history = []  # 实际使用率历史
+
+      def reserve_memory(self, max_new_tokens):
+          """计算应该预留的token数量"""
+
+          # 1. 动态调整β
+          if self.actual_usage_history:
+              # 使用历史平均使用率
+              avg_usage = sum(self.actual_usage_history) / len(self.actual_usage_history)
+              self.beta = min(avg_usage * 1.2, 0.8)  # 留20% buffer，但不超过0.8
+
+          # 2. 计算预留tokens
+          reserved_tokens = int(self.beta * max_new_tokens)
+
+          return reserved_tokens
+
+      def on_request_complete(self, actual_tokens_generated, max_new_tokens):
+          """请求完成时记录实际使用率"""
+
+          usage_ratio = actual_tokens_generated / max_new_tokens
+          self.actual_usage_history.append(usage_ratio)
+
+          # 只保留最近100个请求的历史
+          if len(self.actual_usage_history) > 100:
+              self.actual_usage_history.pop(0)
+
+      def get_stats(self):
+          """获取统计信息"""
+          if not self.actual_usage_history:
+              return {}
+
+          return {
+              'beta': self.beta,
+              'avg_usage_ratio': sum(self.actual_usage_history) / len(self.actual_usage_history),
+              'memory_saved_pct': (1 - self.beta) * 100
+          }
+  ```
+
+  **7.4.7.4 工作流程**
+
+  - **请求到来时**：
+    ```
+    1. 用户请求：prompt=1000 tokens, max_new_tokens=2048
+
+    2. 传统做法：
+       预留：1000 + 2048 = 3048 tokens的KV Cache
+
+    3. Dynamic Memory Management：
+       预留：1000 + (β × 2048) = 1000 + 1024 = 2024 tokens
+       （β=0.5，节省33%内存）
+    ```
+
+  - **请求进行中**：
+    ```
+    1. 请求已生成600 tokens
+    2. 发现即将到达max_new_tokens的30%
+    3. 动态扩展预留：1024 → 1433 tokens
+    4. 如果GPU内存不足，等待其他请求完成
+    ```
+
+  - **请求完成时**：
+    ```
+    1. 请求在600 tokens时遇到EOS
+    2. 释放所有KV Cache（1000 + 600 = 1600 tokens）
+    3. 记录实际使用率：600 / 2048 = 29.3%
+    4. 更新β：0.5 → 0.35（根据历史平均）
+    5. 下次请求只预留：1000 + (0.35 × 2048) = 1716 tokens
+    ```
+
+  **7.4.7.5 性能提升**
+
+  - **内存节省**：
+    | 场景 | 传统做法 | 动态管理 | 节省 |
+    |------|----------|----------|------|
+    | Chat (avg 500 tokens) | 3048 | 2024 | **33%** |
+    | RAG (avg 800 tokens) | 3048 | 2240 | **27%** |
+    | Code gen (avg 1200 tokens) | 3048 | 2640 | **13%** |
+
+  - **吞吐量提升**：
+    - 更大的batch size（因为内存节省）
+    - 实测：1.5-2x throughput提升（SGLang v0.2数据）
+
+  - **β调整示例**：
+    ```
+    初始：β = 0.5（保守估计）
+
+    100个请求后：
+    - 平均使用率：30%
+    - β调整：0.5 → 0.36
+
+    1000个请求后：
+    - 平均使用率：28%
+    - β调整：0.36 → 0.34
+    - 内存节省：66%
+
+    突发长请求（1500 tokens）：
+    - 临时扩展预留
+    - β暂时调高：0.34 → 0.5
+    - 逐渐回落到正常水平
+    ```
+
+  **7.4.7.6 与其他技术的对比**
+
+  | 技术 | 解决的问题 | 适用场景 |
+  |------|------------|----------|
+  | **Dynamic Memory Mgmt** | max_new_tokens预留浪费 | 通用场景 |
+  | **PagedAttention** | 内存碎片化 | 长context |
+  | **Continuous Batching** | Static batching浪费 | 动态workload |
+  | **Prefix Caching** | 重复prompt计算 | 共享prefix场景 |
+
+  - **可以同时使用**：
+    - Dynamic Memory Management + PagedAttention（vLLM）
+    - Dynamic Memory Management + RadixAttention（SGLang）
+    - 互不冲突，协同优化
+
+  **7.4.7.7 实战配置**
+
+  - **SGLang启用动态内存管理**（默认开启）：
+    ```bash
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --context-length 4096 \
+      --max-running-requests 100
+
+    # 动态内存管理自动启用
+    # β初始值：0.5
+    # 自动调整：每100个请求更新一次
+    ```
+
+  - **监控和调试**：
+    ```python
+    # 查看内存管理统计
+    import requests
+
+    response = requests.get("http://localhost:8000/stats")
+    stats = response.json()
+
+    print(f"Beta: {stats['memory_manager']['beta']}")
+    print(f"Avg usage ratio: {stats['memory_manager']['avg_usage_ratio']}")
+    print(f"Memory saved: {stats['memory_manager']['memory_saved_pct']}%")
+    ```
+
+  - **手动调整β**（不推荐）：
+    ```bash
+    # 如果知道workload特征，可以手动设置
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --memory-reserve-ratio 0.3  # 固定β=0.3
+    ```
+
+  **7.4.7.8 最佳实践**
+
+  - **推荐使用场景**：
+    - ✅ 通用Chatbot（平均生成长度 << max_new_tokens）
+    - ✅ RAG系统（prompt长，生成短）
+    - ✅ 任何不确定生成长度的场景
+
+  - **不推荐场景**：
+    - ❌ Code generation（可能达到max_new_tokens）
+    - ❌ Long-form writing（生成较长内容）
+    - ❌ 固定生成长度场景（β=1更合适）
+
+  - **调优建议**：
+    1. 从β=0.5开始（SGLang默认值）
+    2. 监控实际使用率和内存节省
+    3. 根据workload特征调整
+    4. 谨慎设置β<0.3（可能导致频繁扩展）
 
 #### 7.5 高级调度策略
 - 7.5.1 优先级调度

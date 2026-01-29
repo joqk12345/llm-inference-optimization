@@ -254,6 +254,7 @@
   - 6.3.4.5 Mini-SGLang 5k行实现精要
   - 6.3.4.6 实战：Mini-SGLang vs vLLM对比
   - 6.3.4.7 总结：何时选择Radix Cache？
+  - 6.3.4.8 SGLang的LRU Cache管理
 
 #### 6.4 KV Cache优化技术
 - 6.4.1 Multi-Query Attention vs Multi-Head Attention
@@ -329,6 +330,15 @@
   - 7.4.6.5 sglang-router: Rust实现
   - 7.4.6.6 实战案例
   - 7.4.6.7 总结与最佳实践
+- 7.4.7 Dynamic Memory Management (SGLang)
+  - 7.4.7.1 问题：max_new_tokens的内存浪费
+  - 7.4.7.2 Dynamic Memory Management设计
+  - 7.4.7.3 实现机制
+  - 7.4.7.4 工作流程
+  - 7.4.7.5 性能提升
+  - 7.4.7.6 与其他技术的对比
+  - 7.4.7.7 实战配置
+  - 7.4.7.8 最佳实践
 
 #### 7.5 高级调度策略
 - 7.5.1 优先级调度
