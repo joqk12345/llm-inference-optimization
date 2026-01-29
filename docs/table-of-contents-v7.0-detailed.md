@@ -475,6 +475,201 @@
 - 练习5.3：对比static batching和continuous batching的padding数量
 - 练习5.4：（进阶）实现一个简单的continuous batching调度器
 
+#### 5.7 vLLM架构全景 ⭐⭐⭐ 2025新增
+
+> **💡 来源**：[Berkeley EECS-2025-192 - Deconstructing vLLM](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
+>
+> **核心价值**：系统性理解vLLM的三层架构——Interface、Model Authoring、Runtime，为后续章节铺垫架构知识。
+>
+> **为什么重要**：
+> - 从"会用vLLM"到"理解vLLM"的关键转变
+> - 调试问题、性能优化、扩展开发的基础
+> - 为第6章（KV Cache）、第7章（调度）、第10章（部署）铺垫
+
+**5.7.1 vLLM的三层架构**
+
+- **Layer 1: Interfaces** （用户交互层）
+  ```
+  User Request → OpenAI Server → API Server → LLMEngine
+  ```
+
+  - **LLMEngine**: 核心引擎
+    - 作用：协调所有组件
+    - 职责：请求管理、资源分配、结果返回
+    - 接口：`generate()`, `encode()`
+
+  - **API Server**: HTTP服务
+    - 作用：提供REST API
+    - 职责：请求路由、认证、限流
+    - 协议：HTTP/REST
+
+  - **OpenAI-Compatible Server**: 标准接口
+    - 作用：兼容OpenAI API
+    - 职责：`/v1/chat/completions`等接口
+    - 价值：零代码迁移
+
+- **Layer 2: Model Authoring** （模型抽象层）
+  ```
+  LLMEngine → ModelExecutor → BlockManager + Scheduler
+  ```
+
+  - **ModelExecutor**: 模型执行器
+    - 作用：执行模型forward pass
+    - 抽象：支持不同模型架构
+    - 接口：`execute_model()`, `profile()`
+    - 详见：10.6 Model Authoring
+
+  - **BlockManager**: 内存块管理
+    - 作用：管理KV Cache的physical blocks
+    - 职责：分配、释放、迁移blocks
+    - 抽象：Physical vs Logical blocks
+    - 详见：6.3.2 PagedAttention原理
+
+  - **Scheduler**: 请求调度器
+    - 作用：决定哪些请求可以执行
+    - 策略：FIFO、Priority、SJF
+    - 输出：Scheduled requests
+    - 详见：7.4 vLLM的调度器实现
+
+- **Layer 3: Runtime** （运行时层）
+  ```
+  Scheduler → CacheEngine → Worker (GPU)
+  ```
+
+  - **CacheEngine**: KV缓存引擎
+    - 作用：管理KV Cache的物理存储
+    - 数据结构：Block table
+    - 功能：Hash-based lookup
+    - 详见：6.3.3 内存管理深度剖析
+
+  - **Worker**: 工作进程
+    - 作用：在GPU上执行计算
+    - 职责：模型推理、kernel执行
+    - 通信：与主进程通信
+
+**5.7.2 用户请求的完整流程**
+
+- **步骤1：用户发送请求**
+  ```bash
+  curl http://localhost:8000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{"model": "llama2", "messages": [...]}'
+  ```
+
+- **步骤2：OpenAI Server接收**
+  - 解析请求
+  - 验证参数
+  - 转发给API Server
+
+- **步骤3：API Server处理**
+  - 请求路由
+  - 限流检查
+  - 调用LLMEngine.generate()
+
+- **步骤4：LLMEngine调度**
+  - 创建请求对象
+  - 提交给Scheduler
+  - 等待调度结果
+
+- **步骤5：Scheduler决策**
+  - 检查资源（GPU memory、compute）
+  - 选择可执行的请求
+  - 返回scheduled requests
+
+- **步骤6：ModelExecutor执行**
+  - 准备input data
+  - 调用Worker.execute_model()
+  - 等待GPU返回结果
+
+- **步骤7：Worker在GPU上执行**
+  - 加载模型weights
+  - 执行PagedAttention kernels
+  - 返回generated tokens
+
+- **步骤8：结果返回**
+  - Worker → ModelExecutor → LLMEngine
+  - LLMEngine → API Server → OpenAI Server
+  - OpenAI Server → 用户
+
+**5.7.3 架构图**
+
+```
+┌─────────────────────────────────────────────────┐
+│              Layer 1: Interfaces               │
+├─────────────────────────────────────────────────┤
+│  OpenAI Server  →  API Server  →  LLMEngine    │
+│  (HTTP)            (REST)         (Core)        │
+└─────────────────────────────────────────────────┘
+                        │
+┌─────────────────────────────────────────────────┐
+│           Layer 2: Model Authoring             │
+├─────────────────────────────────────────────────┤
+│  ModelExecutor  ←  Scheduler  ←  BlockManager   │
+│  (Execution)      (Policy)       (Memory)       │
+└─────────────────────────────────────────────────┘
+                        │
+┌─────────────────────────────────────────────────┐
+│             Layer 3: Runtime                    │
+├─────────────────────────────────────────────────┤
+│  CacheEngine  →  Worker  →  GPU Kernels         │
+│  (KV Cache)      (Compute)    (CUDA)            │
+└─────────────────────────────────────────────────┘
+```
+
+**5.7.4 与后续章节的关联**
+
+- **第6章 KV Cache优化**：
+  - BlockManager的详细实现（6.3.2）
+  - CacheEngine的内存管理（6.3.3）
+  - PagedAttention的核心创新（6.3.2）
+
+- **第7章 请求调度策略**：
+  - Scheduler的调度算法（7.4）
+  - Iteration-level scheduling（7.4.2）
+  - CPU overheads分析（7.4.3）
+
+- **第10章 生产环境部署**：
+  - Interface层部署模式（10.2-10.4）
+  - Model Authoring实战（10.6）
+  - 性能分析与调优（10.5）
+
+**5.7.5 实战：启动vLLM并观察架构**
+
+- **启动vLLM server**：
+  ```bash
+  vllm serve meta-llama/Llama-2-7b-hf \
+    --port 8000 \
+    --host 0.0.0.0
+  ```
+
+- **查看启动过程**：
+  ```
+  INFO:     Started server process
+  INFO:     Waiting for vLLM engine to initialize
+  INFO:     Initializing an LLM engine with config
+  INFO:     Loading model weights
+  INFO:     GPU memory: 15.50 GB
+  INFO:     Model loaded
+  ```
+
+- **发送请求**：
+  ```bash
+  curl http://localhost:8000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "meta-llama/Llama-2-7b-hf",
+      "messages": [{"role": "user", "content": "Hello!"}]
+    }'
+  ```
+
+**5.7.6 架构理解检查点**
+
+- [ ] 能解释vLLM的三层架构
+- [ ] 能描述用户请求的完整流程（8步骤）
+- [ ] 理解LLMEngine、ModelExecutor、Worker的职责
+- [ ] 知道BlockManager和Scheduler的作用
+- [ ] 理解PagedAttention在架构中的位置
+
 ---
 
 ## 第三部分：核心技术篇 (Part 3: Core Techniques)
@@ -499,7 +694,347 @@
 
 #### 6.3 KV Cache实现
 - 6.3.1 朴素实现方式
-- 6.3.2 PagedAttention原理（vLLM的核心）
+- 6.3.2 PagedAttention原理（vLLM的核心）⚡️ 2025深度扩展
+
+  > **💡 深度来源**：[Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
+  >
+  > **核心洞察**：PagedAttention借鉴操作系统的虚拟内存机制，将KV Cache分成固定大小的pages，实现高效的内存管理。
+  >
+  > **为什么重要**：
+  > - vLLM最核心的创新（论文引用2000+）
+  > - 内存利用率从60-70%提升到90-95%
+  > - Prefix Caching的底层基础
+
+  **6.3.2.1 传统KV Cache的问题**
+
+  - **连续内存分配的缺陷**：
+    ```
+    Request 1: [████████] 1000 tokens → 连续分配1000 token空间
+    Request 2: [████] 500 tokens → 连续分配500 token空间
+    Request 1完成 → 释放1000 tokens
+    Request 3需要800 tokens → 无法使用Request 1的空间（碎片化！）
+    ```
+
+  - **内存碎片化**：
+    - **External fragmentation**: 请求之间的小空隙无法利用
+      ```
+      GPU Memory: [Req1: 1000][空隙: 200][Req2: 500][空隙: 300]
+      Request 3需要800 tokens → 失败！（空隙不够大）
+      ```
+    - **Internal fragmentation**: 预分配的固定大小可能浪费
+      ```
+      预分配2048 tokens → 实际使用1000 tokens → 浪费1048 tokens
+      ```
+
+  - **静态内存分配的问题**：
+    - 必须预先知道最大batch size和最大序列长度
+    - 无法动态调整内存使用
+    - GPU利用率低（大量内存浪费）
+
+  **6.3.2.2 PagedAttention的设计思想**
+
+  - **灵感来源：OS虚拟内存**
+    ```
+    OS Virtual Memory:  Pages (4KB) + Page Table
+    vLLM KV Cache:      Blocks (16 tokens) + Block Table
+    ```
+
+  - **核心概念**：
+    - **Logical blocks**: 逻辑上的连续序列（用户视角）
+    - **Physical blocks**: GPU内存中的实际块（系统视角）
+    - **Block table**: 映射关系（logical → physical）
+
+  - **工作原理**：
+    ```
+    Request: [token1-16][token17-32][token33-48][...]
+    Logical:  Block 0      Block 1       Block 2
+    Physical: Block 15     Block 7       Block 23
+             (分散在物理内存中，但逻辑上连续)
+    ```
+
+  - **关键优势**：
+    - 不需要连续内存
+    - 物理blocks可以分散在GPU内存任意位置
+    - 逻辑上连续，物理上分散
+
+  **6.3.2.3 Block Allocation策略**
+
+  - **预分配策略**：
+    ```python
+    # vLLM的启动时分配
+    def allocate_at_startup():
+        # 计算可用GPU内存
+        gpu_memory = get_gpu_memory()
+        # 预分配90%给KV Cache（保留10%给模型weights）
+        num_blocks = (gpu_memory * 0.9) / BLOCK_SIZE
+        # 创建block pool
+        block_pool = BlockPool(num_blocks)
+        return block_pool
+    ```
+
+  - **动态分配算法**：
+    ```python
+    def allocate_blocks(request, num_tokens):
+        num_blocks = ceil(num_tokens / BLOCK_SIZE)  # 16 tokens/block
+        for i in range(num_blocks):
+            block = find_free_block()
+            if block is None:
+                # 内存不足，触发eviction
+                trigger_eviction_policy()
+                block = find_free_block()
+            request.blocks.append(block)
+        return request.blocks
+    ```
+
+  - **Block的大小选择**：
+    - 默认：16 tokens/block
+    - 为什么是16？
+      - 太小（如8）：block table太大，管理开销高
+      - 太大（如32）：internal fragmentation严重
+      - 16是经验最优值（平衡开销和浪费）
+
+  **6.3.2.4 Block Eviction策略**
+
+  - **LRU (Least Recently Used)**：
+    ```python
+    class LRU_Eviction:
+        def __init__(self):
+            self.access_time = {}  # block_id → timestamp
+
+        def evict(self, num_blocks):
+            # 按访问时间排序
+            sorted_blocks = sorted(
+                self.access_time.items(),
+                key=lambda x: x[1]  # 按时间升序
+            )
+            # 驱逐最久未使用的blocks
+            return [block[0] for block in sorted_blocks[:num_blocks]]
+    ```
+    - 适用场景：大多数请求具有时间局部性
+    - 优势：简单，有效
+    - 劣势：不考虑访问频率
+
+  - **LFU (Least Frequently Used)**：
+    ```python
+    class LFU_Eviction:
+        def __init__(self):
+            self.access_count = {}  # block_id → count
+
+        def evict(self, num_blocks):
+            # 按访问频率排序
+            sorted_blocks = sorted(
+                self.access_count.items(),
+                key=lambda x: x[1]  # 按频率升序
+            )
+            # 驱逐访问频率最低的blocks
+            return [block[0] for block in sorted_blocks[:num_blocks]]
+    ```
+    - 适用场景：某些prefix被频繁复用（如系统提示词）
+    - 优势：保留热点数据
+    - 劣势：冷启动时效果差
+
+  - **vLLM的混合策略**：
+    ```python
+    class HybridEviction:
+        def evict(self, num_blocks):
+            # Prefix cache blocks: 使用LFU
+            # （系统提示词等，被频繁复用）
+            prefix_blocks = self.get_prefix_blocks()
+            prefix_evict = lfu_evict(prefix_blocks, num_blocks // 2)
+
+            # Decode blocks: 使用LRU
+            # （新生成的tokens，时间局部性）
+            decode_blocks = self.get_decode_blocks()
+            decode_evict = lru_evict(decode_blocks, num_blocks // 2)
+
+            return prefix_evict + decode_evict
+    ```
+    - 优势：兼顾cache hit rate和内存效率
+    - 结果：优于单一策略
+
+  **6.3.2.5 Memory Manager实现**
+
+  - **CacheEngine的核心职责**：
+    ```python
+    class CacheEngine:
+        def __init__(self, block_size, num_gpu_blocks):
+            self.block_size = block_size  # 16 tokens
+            self.num_gpu_blocks = num_gpu_blocks
+            self.free_blocks = set(range(num_gpu_blocks))
+            self.block_table = {}  # {request_id: [block_ids]}
+            self.hash_table = {}  # {block_hash: block_id}  # For prefix caching
+
+        def allocate(self, request_id, num_blocks):
+            """分配blocks给请求"""
+            if len(self.free_blocks) < num_blocks:
+                raise OutOfMemory(f"Need {num_blocks}, "
+                                f"only {len(self.free_blocks)} free")
+            blocks = list(self.free_blocks)[:num_blocks]
+            self.free_blocks.difference_update(blocks)
+            self.block_table[request_id] = blocks
+            return blocks
+
+        def free(self, request_id):
+            """释放请求的blocks"""
+            blocks = self.block_table.pop(request_id)
+            self.free_blocks.update(blocks)
+
+        def get_block_hash(self, block_id):
+            """计算block的hash（用于prefix caching）"""
+            block_data = self.get_block_data(block_id)
+            # 使用SHA256或自定义快速hash
+            return hash(block_data.tobytes())
+
+        def check_prefix_cache(self, request_id, block_hashes):
+            """检查prefix cache hit"""
+            cached_blocks = []
+            for h in block_hashes:
+                if h in self.hash_table:
+                    cached_blocks.append(self.hash_table[h])
+                else:
+                    break  # 第一个miss，后续无法使用
+            return cached_blocks
+    ```
+
+  **6.3.2.6 PagedAttention vs 传统方案对比**
+
+  | 维度 | 连续内存 | PagedAttention |
+  |------|---------|----------------|
+  | **内存利用率** | 60-70% | 90-95% |
+  | **碎片化** | 严重 | 轻微 |
+  | **Prefix Caching** | 困难 | 容易（hash-based） |
+  | **实现复杂度** | 简单 | 中等 |
+  | **性能开销** | 无 | 轻微（block table lookup） |
+  | **适用场景** | 单请求、短序列 | 多请求、长序列、生产环境 |
+
+  - **性能开销分析**：
+    - Block table lookup: O(1) hash table
+    - 额外内存: block_table (每个请求~1KB)
+    - 相比收益（+30%内存利用率），开销可忽略
+
+  **6.3.2.7 真实案例分析**
+
+  - **案例1：ChatGPT风格对话**
+    ```
+    系统提示词：500 tokens（"You are a helpful assistant..."）
+    用户输入：50 tokens
+    模型输出：100 tokens
+
+    传统方法：
+      - 每个请求需要650 tokens连续空间
+      - 系统提示词每次重新计算
+      - 内存利用率：~65%
+
+    PagedAttention + Prefix Caching：
+      - 系统提示词：32 blocks (cached)
+      - 100个请求共享这32个blocks
+      - 每个请求只需要: 用户输入4 blocks + 输出7 blocks
+      - 内存利用率：~92%
+    ```
+
+  - **案例2：长文档摘要**
+    ```
+    输入文档：100K tokens
+    Block数量：100000 / 16 = 6250 blocks
+
+    传统方法：
+      - 需要连续100K token空间（~200MB）
+      - 很难分配（GPU碎片化）
+      - 结果：Out of Memory
+
+    PagedAttention：
+      - 动态分配6250个blocks
+      - 不需要连续内存
+      - 可以分散在GPU各处
+      - 结果：成功执行
+    ```
+
+  - **案例3：RAG场景**
+    ```
+    固定知识库prefix：2000 tokens（125 blocks）
+    用户问题：50 tokens（4 blocks）
+
+    Cache hit rate分析：
+      - 100个请求，99个共享知识库blocks
+      - Hit rate: 99 / 100 = 99%
+      - 节省计算: 99 * 125 blocks = 12375 blocks
+      - 加速比: (2000+50) / 50 = 41倍
+    ```
+
+  **6.3.2.8 实战配置**
+
+  ```python
+  from vllm import LLM, SamplingParams
+
+  llm = LLM(
+      model="meta-llama/Llama-2-7b-hf",
+
+      # === Block相关配置 ===
+      block_size=16,  # 每个block的token数（默认16，通常不需修改）
+
+      # === Memory相关配置 ===
+      gpu_memory_utilization=0.9,  # GPU显存利用率（0.9 = 90%）
+      # 10%留给模型weights和CUDA kernels
+      # 90%用于KV Cache blocks
+
+      # === Prefix Caching ===
+      enable_prefix_caching=True,  # 启用prefix caching（重要！）
+
+      # === 自动计算 ===
+      # vLLM会自动计算：
+      # num_gpu_blocks = (gpu_memory * 0.9) / block_size
+  )
+
+  # 生成
+  prompts = ["Hello, my name is", "Hello, my name is Bob"]
+  sampling_params = SamplingParams(temperature=0.7, max_tokens=20)
+  outputs = llm.generate(prompts, sampling_params)
+
+  # 第二个请求会复用第一个请求的prefix cache！
+  ```
+
+  **6.3.2.9 性能监控**
+
+  ```python
+  # 查看block使用情况
+  from vllm import LLM
+
+  llm = LLM(model="...")
+
+  # 获取Cache Engine
+  cache_engine = llm.llm_engine.cache_engine
+
+  # 查看统计信息
+  print(f"Total blocks: {cache_engine.num_gpu_blocks}")
+  print(f"Free blocks: {len(cache_engine.free_blocks)}")
+  print(f"Used blocks: {cache_engine.num_gpu_blocks - len(cache_engine.free_blocks)}")
+  print(f"Utilization: {(cache_engine.num_gpu_blocks - len(cache_engine.free_blocks)) / cache_engine.num_gpu_blocks * 100:.1f}%")
+
+  # 查看prefix cache统计
+  if hasattr(cache_engine, 'cache_hash'):
+      print(f"Prefix cache hits: {cache_engine.cache_hits}")
+      print(f"Prefix cache misses: {cache_engine.cache_misses}")
+      print(f"Hit rate: {cache_engine.cache_hits / (cache_engine.cache_hits + cache_engine.cache_misses) * 100:.1f}%")
+  ```
+
+  **6.3.2.10 总结：PagedAttention的核心价值**
+
+  - **解决了什么问题**：
+    - ✅ 内存碎片化
+    - ✅ 静态内存分配的灵活性
+    - ✅ Prefix caching的实现基础
+
+  - **关键指标**：
+    - 内存利用率：60-70% → 90-95% (+30%)
+    - Prefix cache hit rate: 可达99% (RAG场景)
+    - 吞吐量提升：2-5倍 (ChatGPT风格对话)
+
+  - **适用场景**：
+    - ✅ 多用户并发
+    - ✅ 长序列
+    - ✅ 重复prefix（系统提示词、RAG）
+    - ✅ 生产环境
+
 - 6.3.3 内存管理策略
 - 6.3.4 代码示例：手动实现简单KV Cache
 

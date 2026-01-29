@@ -207,6 +207,14 @@
 - 练习5.3：对比static batching和continuous batching的padding数量
 - 练习5.4：（进阶）实现一个简单的continuous batching调度器
 
+#### 5.7 vLLM架构全景
+- 5.7.1 vLLM的三层架构
+- 5.7.2 用户请求的完整流程
+- 5.7.3 架构图
+- 5.7.4 与后续章节的关联
+- 5.7.5 实战：启动vLLM并观察架构
+- 5.7.6 架构理解检查点
+
 ---
 
 ## 第三部分：核心技术篇
@@ -227,6 +235,16 @@
 #### 6.3 KV Cache实现
 - 6.3.1 朴素实现方式
 - 6.3.2 PagedAttention原理（vLLM的核心）
+  - 6.3.2.1 传统KV Cache的问题
+  - 6.3.2.2 PagedAttention的设计思想
+  - 6.3.2.3 Block Allocation策略
+  - 6.3.2.4 Block Eviction策略
+  - 6.3.2.5 Memory Manager实现
+  - 6.3.2.6 PagedAttention vs 传统方案对比
+  - 6.3.2.7 真实案例分析
+  - 6.3.2.8 实战配置
+  - 6.3.2.9 性能监控
+  - 6.3.2.10 总结：PagedAttention的核心价值
 - 6.3.3 内存管理策略
 - 6.3.4 代码示例：手动实现简单KV Cache
 

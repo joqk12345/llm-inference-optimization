@@ -39,6 +39,18 @@
   - 核心内容： disaggregated架构
   - 引用章节：11.8.4
 
+#### vLLM架构与实现
+- **Berkeley EECS-2025-192**: Deconstructing vLLM
+  - 作者：UC Berkeley Research Team
+  - 发布日期：2025年1月
+  - 核心内容：
+    - vLLM三层架构（Interfaces, Model Authoring, Runtime）
+    - PagedAttention深度剖析（Block allocation, eviction策略）
+    - CPU overheads首次系统性分析
+    - Scheduler和ModelExecutor接口设计
+  - 引用章节：5.7, 6.3.2, 6.3.3, 7.4, 10.6
+  - URL: https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf
+
 #### 性能分析
 - **vLLM Profiling Documentation**
   - 维护者：vLLM Community
@@ -142,11 +154,24 @@
 
 ## 按章节索引
 
+### 第5章 - LLM推理基础
+- **5.7** vLLM架构全景
+  - Berkeley EECS-2025-192 - Deconstructing vLLM
+
 ### 第6章 - KV Cache优化
+- **6.3.2** PagedAttention原理（vLLM的核心）
+  - Berkeley EECS-2025-192 - Block allocation, eviction策略
+
+- **6.3.3** 内存管理深度剖析
+  - Berkeley EECS-2025-192 - BlockManager, CacheEngine实现
+
 - **6.7.8** Agent系统的KV Cache优化实战
   - Manus Blog - Context Engineering
 
 ### 第7章 - 请求调度策略
+- **7.4** vLLM的调度器实现
+  - Berkeley EECS-2025-192 - CPU overheads, Iteration-level scheduling
+
 - **7.7** Prefill-Decode分离（PD分离）
   - vLLM、SGLang社区合作
 
@@ -168,6 +193,9 @@
   - NVIDIA Nsight Systems
   - NVIDIA Nsight Compute
   - 阿里云性能分析案例
+
+- **10.6** vLLM Model Authoring
+  - Berkeley EECS-2025-192 - ModelExecutor, Worker接口
 
 - **10.6.5** Agent系统的成本优化策略
   - Manus Blog - Claude Sonnet定价
@@ -210,6 +238,7 @@
 
 ## 添加日期记录
 
+- **2025-01-29**: 添加Berkeley EECS-2025-192 vLLM架构论文资源（5.7, 6.3.2, 6.3.3, 7.4, 10.6）
 - **2025-01-29**: 添加Manus Blog资源（6.7.8, 10.6.5, 11.1.7）
 - **2025-01-29**: 添加性能分析资源（10.5.5）
 - **2025-01-29**: 添加2025"青稞"AI嘉年华专家观点
