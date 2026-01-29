@@ -139,6 +139,36 @@
 - **NVIDIA Nsight Compute**: https://developer.nvidia.com/nsight-compute
   - GPU kernel级深度分析工具
 
+#### LLM性能测试工具
+- **GuideLLM** (Intel)
+  - 项目地址：https://github.com/intel/guidellm
+  - 核心功能：
+    - 端到端LLM推理性能测试
+    - 支持多种硬件：Intel Gaudi2、Habana、Xeon、NVIDIA GPU
+    - 标准化benchmark：MMLU、GSM8K、HumanEval等
+  - 引用章节：10.5.5.6
+  - 使用场景：硬件性能评估、推理框架对比、优化效果验证
+
+- **EvalScope** (ModelScope / 阿里达摩院)
+  - 项目地址：https://github.com/modelscope/evalscope
+  - 核心功能：
+    - 阿里达摩院开源的LLM评估框架
+    - 支持全面的模型评估：性能、精度、安全性
+    - 内置100+ benchmark datasets
+    - 性能测试：推理速度、并发性能、显存监控
+  - 引用章节：10.5.5.6
+  - 使用场景：模型选型评估、优化效果对比、生产环境性能验证
+
+- **llm-bench** (Hugging Face)
+  - 项目地址：https://github.com/huggingface/optimum-benchmark
+  - 核心功能：
+    - Hugging Face官方benchmark工具
+    - 支持transformers、peft、accelerate等库
+    - 可定制化benchmark配置
+    - 性能测试：Latency (TTFT、TPOT)、Throughput、显存、能耗
+  - 引用章节：10.5.5.6
+  - 使用场景：学术研究benchmarking、模型性能对比、硬件性能评估
+
 ### 云厂商资源
 
 #### 阿里云
@@ -350,6 +380,7 @@
 - **2025-01-29**: 添加SGLang原始博客资源（6.3.4 RadixAttention原始设计）
 - **2025-01-29**: 添加SGLang v0.2 Slides资源（6.3.4.8 LRU Cache, 7.4.7 Dynamic Memory Mgmt, 生产案例）
 - **2025-01-29**: 添加Chris Fregly - AI Systems Performance Engineering（3.2 GPU架构, 3.7 NVIDIA架构演进）
+- **2025-01-29**: 添加LLM性能测试工具（GuideLLM、EvalScope、llm-bench）到10.5.5.6
 
 ---
 

@@ -4373,6 +4373,109 @@ Ampere     Hopper     Hopper     Blackwell
   - Nsight Systems中查看NCCL all-reduce时间占比
   - 检查是否有GPU load imbalance
 
+**10.5.5.6 LLM性能测试工具 ⭐ 新增**
+
+> **💡 工具定位**：除了profiling工具，还需要端到端的benchmark工具来评估LLM推理性能。
+
+- **GuideLLM** (Intel)
+  - **项目地址**：https://github.com/intel/guidellm
+  - **核心功能**：
+    - 端到端LLM推理性能测试
+    - 支持多种硬件：Intel Gaudi2、Habana、Xeon、NVIDIA GPU
+    - 标准化benchmark：MMLU、GSM8K、HumanEval等
+  - **关键特性**：
+    - 自动化测试流程
+    - 详细的性能指标（TTFT、TPOT、throughput）
+    - 支持batch size和concurrency测试
+  - **使用场景**：
+    - 硬件性能评估
+    - 不同推理框架对比（vLLM vs TGI vs SGLang）
+    - 优化效果验证
+
+- **EvalScope** (ModelScope)
+  - **项目地址**：https://github.com/modelscope/evalscope
+  - **核心功能**：
+    - 阿里达摩院开源的LLM评估框架
+    - 支持全面的模型评估：性能、精度、安全性
+    - 内置100+ benchmark datasets
+  - **性能测试特性**：
+    - 推理速度测试（tokens/s）
+    - 并发性能测试
+    - 显存占用监控
+    - 多硬件平台支持
+  - **典型工作流**：
+    ```bash
+    # 安装
+    pip install evalscope
+
+    # 运行性能测试
+    python evalscope/benchmark.py \
+      --model meta-llama/Llama-2-7b-hf \
+      --dataset mmlu \
+      --batch-size 32 \
+      --num-gpus 1
+    ```
+  - **使用场景**：
+    - 模型选型评估
+    - 优化效果对比
+    - 生产环境性能验证
+
+- **llm-bench** (Hugging Face)
+  - **项目地址**：https://github.com/huggingface/optimum-benchmark
+  - **核心功能**：
+    - Hugging Face官方benchmark工具
+    - 支持transformers、peft、accelerate等库
+    - 可定制化benchmark配置
+  - **性能测试特性**：
+    - Latency测试（TTFT、TPOT）
+    - Throughput测试（tokens/s、requests/s）
+    - 显存使用监控
+    - 能耗测试（Power consumption）
+  - **使用示例**：
+    ```bash
+    # 安装
+    pip install optimum-benchmark
+
+    # 运行inference benchmark
+    optimum-benchmark \
+      --model-name meta-llama/Llama-2-7b-hf \
+      --device cuda \
+      --batch-size 8 \
+      --sequence-length 512 \
+      --benchmark inference_latency
+    ```
+  - **使用场景**：
+    - 学术研究benchmarking
+    - 模型性能对比
+    - 硬件性能评估
+
+- **工具对比**：
+  | 工具 | 维护者 | 主要优势 | 适用场景 |
+  |------|--------|----------|----------|
+  | **GuideLLM** | Intel | 多硬件支持 | 硬件评估、框架对比 |
+  | **EvalScope** | 阿里达摩院 | 全面评估 | 模型选型、性能验证 |
+  | **llm-bench** | Hugging Face | 学术友好 | 研究、论文benchmark |
+  | **vLLM benchmark** | vLLM | 专注vLLM | vLLM优化验证 |
+
+- **推荐使用流程**：
+  ```
+  Step 1: 快速验证（llm-bench）
+  → 单模型、单场景快速测试
+  → 获取baseline性能数据
+
+  Step 2: 全面评估（EvalScope）
+  → 多维度评估：性能+精度
+  → 生产环境模拟
+
+  Step 3: 硬件对比（GuideLLM）
+  → 不同GPU性能对比
+  → 推理框架选型
+
+  Step 4: vLLM专用优化
+  → 使用vLLM内置benchmark_serving.py
+  → 验证特定优化效果
+  ```
+
 #### 10.6 成本优化
 - 10.6.1 云GPU选择策略
 - 10.6.2 Spot实例使用

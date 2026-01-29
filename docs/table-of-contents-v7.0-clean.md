@@ -521,6 +521,13 @@
 - 10.5.2 瓶颈定位方法
 - 10.5.3 常见性能问题
 - 10.5.4 真实案例：从50 tps到200 tps
+- 10.5.5 性能分析工具与实战
+  - 10.5.5.1 PyTorch Profiler基础
+  - 10.5.5.2 NVIDIA Nsight Systems - 系统级分析
+  - 10.5.5.3 NVIDIA Nsight Compute - Kernel级深度分析
+  - 10.5.5.4 性能优化checklist
+  - 10.5.5.5 vLLM特定profiling建议
+  - 10.5.5.6 LLM性能测试工具（GuideLLM、EvalScope、llm-bench）
 
 #### 10.6 成本优化
 - 10.6.1 云GPU选择策略
