@@ -6,6 +6,20 @@
 
 ## Reference materials (books, papers, reports)
 
+### 书籍与课程
+
+#### AI Systems Performance Engineering
+- **AI Systems Performance Engineering** - Chris Fregly
+  - 文件路径：/Users/mac/Documents/workspace/Data/01_Work/Projects/Vibe-Coding/2025-12-18-AI Systems Performance Engineering (Chris Fregly)_chapters/
+  - 核心内容：
+    - Chapter 2: AI System Hardware (Grace CPU, Blackwell GPU, NVLink-C2C)
+    - Chapter 6: GPU Architecture, CUDA Programming, Occupancy
+    - Tensor Cores和Transformer Engine详解
+    - FP8/FP4精度优化
+    - SIMT执行模型和Warp调度
+  - 引用章节：3.2 (GPU架构), 3.7 (NVIDIA架构演进)
+  - GitHub：https://github.com/futurepaul/AI-Systems-Performance-Engineering
+
 ### 学术论文与报告
 
 #### AI Agent系统
@@ -204,6 +218,25 @@
 
 ## 按章节索引
 
+### 第3章 - GPU基础
+- **3.2** GPU架构详解
+  - Chris Fregly - AI Systems Performance Engineering (Chapter 6)
+  - SM组成、Tensor Cores、SIMT执行模型
+  - 内存层次结构、Roofline模型
+
+- **3.6** 常见GPU规格对比
+  - A100、H100数据中心GPU对比
+
+- **3.7** NVIDIA架构演进：从A100到B200
+  - Chris Fregly - AI Systems Performance Engineering (Chapter 2)
+  - A100 (Ampere) → H100/H200 (Hopper) → B200 (Blackwell)
+  - Grace Hopper (GH200) 和 Grace Blackwell (GB200) Superchip
+  - 架构对比表与选型建议
+
+### 第4章 - 环境搭建
+- **4.2** 基础环境安装
+  - NVIDIA驱动、CUDA Toolkit、Docker
+
 ### 第5章 - LLM推理基础
 - **5.7** vLLM架构全景
   - Berkeley EECS-2025-192 - Deconstructing vLLM
@@ -316,6 +349,7 @@
 - **2025-01-29**: 添加SGLang v0.4博客资源（7.4.4.8 Zero-Overhead Scheduler, 7.4.6 Cache-Aware Load Balancer）
 - **2025-01-29**: 添加SGLang原始博客资源（6.3.4 RadixAttention原始设计）
 - **2025-01-29**: 添加SGLang v0.2 Slides资源（6.3.4.8 LRU Cache, 7.4.7 Dynamic Memory Mgmt, 生产案例）
+- **2025-01-29**: 添加Chris Fregly - AI Systems Performance Engineering（3.2 GPU架构, 3.7 NVIDIA架构演进）
 
 ---
 

@@ -71,6 +71,8 @@
 - 3.2.3 内存层次结构：L1/L2 cache
 - 3.2.4 带宽：推理的真正瓶颈
 - 3.2.5 PCIe通道：GPU与CPU的桥梁
+- 3.2.6 Tensor Cores和Transformer Engine
+- 3.2.7 SIMT执行模型
 
 #### 3.3 显存计算公式
 - 3.3.1 模型权重计算
@@ -96,6 +98,15 @@
 - 3.6.2 数据中心GPU：A100、H100
 - 3.6.3 云GPU选择指南
 - 3.6.4 性价比分析
+- 3.7 NVIDIA架构演进：从A100到B200
+  - 3.7.1 架构演进路线图
+  - 3.7.2 A100 (Ampere架构)
+  - 3.7.3 H100 (Hopper架构)
+  - 3.7.4 H200 (Hopper架构增强)
+  - 3.7.5 B200 (Blackwell架构)
+  - 3.7.6 Grace Hopper (GH200) Superchip
+  - 3.7.7 Grace Blackwell (GB200) Superchip
+  - 3.7.8 架构对比表与选型建议
 
 #### 常见误区专栏
 #### 实战检查清单
