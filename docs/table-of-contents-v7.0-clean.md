@@ -71,6 +71,8 @@
 - 3.2.3 内存层次结构：L1/L2 cache
 - 3.2.4 带宽：推理的真正瓶颈
 - 3.2.5 PCIe通道：GPU与CPU的桥梁
+- 3.2.6 Tensor Cores和Transformer Engine
+- 3.2.7 SIMT执行模型
 
 #### 3.3 显存计算公式
 - 3.3.1 模型权重计算
@@ -96,6 +98,15 @@
 - 3.6.2 数据中心GPU：A100、H100
 - 3.6.3 云GPU选择指南
 - 3.6.4 性价比分析
+- 3.7 NVIDIA架构演进：从A100到B200
+  - 3.7.1 架构演进路线图
+  - 3.7.2 A100 (Ampere架构)
+  - 3.7.3 H100 (Hopper架构)
+  - 3.7.4 H200 (Hopper架构增强)
+  - 3.7.5 B200 (Blackwell架构)
+  - 3.7.6 Grace Hopper (GH200) Superchip
+  - 3.7.7 Grace Blackwell (GB200) Superchip
+  - 3.7.8 架构对比表与选型建议
 
 #### 常见误区专栏
 #### 实战检查清单
@@ -207,6 +218,14 @@
 - 练习5.3：对比static batching和continuous batching的padding数量
 - 练习5.4：（进阶）实现一个简单的continuous batching调度器
 
+#### 5.7 vLLM架构全景
+- 5.7.1 vLLM的三层架构
+- 5.7.2 用户请求的完整流程
+- 5.7.3 架构图
+- 5.7.4 与后续章节的关联
+- 5.7.5 实战：启动vLLM并观察架构
+- 5.7.6 架构理解检查点
+
 ---
 
 ## 第三部分：核心技术篇
@@ -227,8 +246,26 @@
 #### 6.3 KV Cache实现
 - 6.3.1 朴素实现方式
 - 6.3.2 PagedAttention原理（vLLM的核心）
+  - 6.3.2.1 传统KV Cache的问题
+  - 6.3.2.2 PagedAttention的设计思想
+  - 6.3.2.3 Block Allocation策略
+  - 6.3.2.4 Block Eviction策略
+  - 6.3.2.5 Memory Manager实现
+  - 6.3.2.6 PagedAttention vs 传统方案对比
+  - 6.3.2.7 真实案例分析
+  - 6.3.2.8 实战配置
+  - 6.3.2.9 性能监控
+  - 6.3.2.10 总结：PagedAttention的核心价值
 - 6.3.3 内存管理策略
-- 6.3.4 代码示例：手动实现简单KV Cache
+- 6.3.4 Radix Attention (SGLang/Mini-SGLang)
+  - 6.3.4.1 Radix Cache vs PagedAttention
+  - 6.3.4.2 Radix Tree结构
+  - 6.3.4.3 共享前缀检测算法
+  - 6.3.4.4 性能对比（实战数据）
+  - 6.3.4.5 Mini-SGLang 5k行实现精要
+  - 6.3.4.6 实战：Mini-SGLang vs vLLM对比
+  - 6.3.4.7 总结：何时选择Radix Cache？
+  - 6.3.4.8 SGLang的LRU Cache管理
 
 #### 6.4 KV Cache优化技术
 - 6.4.1 Multi-Query Attention vs Multi-Head Attention
@@ -286,7 +323,33 @@
 - 7.4.1 请求生命周期管理
 - 7.4.2 预分配vs动态分配
 - 7.4.3 迭代级调度 (Iteration-level Scheduling)
-- 7.4.4 优先级队列
+- 7.4.4 Overlap Scheduling (Mini-SGLang)
+  - 7.4.4.1 CPU开销导致GPU闲置问题
+  - 7.4.4.2 Overlap Scheduling设计思想
+  - 7.4.4.3 实现机制
+  - 7.4.4.4 性能分析（Nsight Systems）
+  - 7.4.4.5 实战：启用/禁用Overlap Scheduling
+  - 7.4.4.6 与vLLM调度器的对比
+  - 7.4.4.7 适用场景与选择建议
+  - 7.4.4.8 SGLang v0.4: Zero-Overhead Batch Scheduler
+- 7.4.5 优先级队列
+- 7.4.6 Cache-Aware Load Balancer (SGLang)
+  - 7.4.6.1 Multi-Worker Cache Hit率问题
+  - 7.4.6.2 Cache-Aware Load Balancer设计
+  - 7.4.6.3 智能路由策略
+  - 7.4.6.4 性能提升
+  - 7.4.6.5 sglang-router: Rust实现
+  - 7.4.6.6 实战案例
+  - 7.4.6.7 总结与最佳实践
+- 7.4.7 Dynamic Memory Management (SGLang)
+  - 7.4.7.1 问题：max_new_tokens的内存浪费
+  - 7.4.7.2 Dynamic Memory Management设计
+  - 7.4.7.3 实现机制
+  - 7.4.7.4 工作流程
+  - 7.4.7.5 性能提升
+  - 7.4.7.6 与其他技术的对比
+  - 7.4.7.7 实战配置
+  - 7.4.7.8 最佳实践
 
 #### 7.5 高级调度策略
 - 7.5.1 优先级调度
@@ -458,6 +521,13 @@
 - 10.5.2 瓶颈定位方法
 - 10.5.3 常见性能问题
 - 10.5.4 真实案例：从50 tps到200 tps
+- 10.5.5 性能分析工具与实战
+  - 10.5.5.1 PyTorch Profiler基础
+  - 10.5.5.2 NVIDIA Nsight Systems - 系统级分析
+  - 10.5.5.3 NVIDIA Nsight Compute - Kernel级深度分析
+  - 10.5.5.4 性能优化checklist
+  - 10.5.5.5 vLLM特定profiling建议
+  - 10.5.5.6 LLM性能测试工具（GuideLLM、EvalScope、llm-bench）
 
 #### 10.6 成本优化
 - 10.6.1 云GPU选择策略
@@ -465,6 +535,15 @@
 - 10.6.3 自动伸缩
 - 10.6.4 成本监控工具
 - 10.6.5 Agent系统的成本优化策略
+- 10.6.6 轻量级参考实现：Mini-SGLang
+  - 10.6.6.1 为什么需要轻量级实现？
+  - 10.6.6.2 5k行代码实现的核心功能
+  - 10.6.6.3 研究原型最佳实践
+  - 10.6.6.4 OpenAI兼容API设计
+  - 10.6.6.5 使用Mini-SGLang学习LLM推理
+  - 10.6.6.6 性能对比
+  - 10.6.6.7 何时选择Mini-SGLang？
+  - 10.6.6.8 资源链接
 
 #### 10.7 ROI监控与成本追踪
 - 10.7.1 如何追踪推理成本

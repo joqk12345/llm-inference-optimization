@@ -95,12 +95,338 @@
 - 3.1.3 为什么GPU适合矩阵运算
 - 3.1.4 GPU不适合的任务类型
 
-#### 3.2 GPU架构详解
+#### 3.2 GPU架构详解 ⭐ 2025深度扩展
+
+> **💡 深度来源**：[AI Systems Performance Engineering](https://github.com/futurepaul/AI-Systems-Performance-Engineering) - Chris Fregly
+>
+> **核心洞察**：现代GPU架构演进（Ampere→Hopper→Blackwell）带来数量级的性能提升。理解架构演进是硬件选型和性能优化的基础。
+
 - 3.2.1 流式多处理器(SM)：GPU的核心单元
 - 3.2.2 显存(VRAM)：容量vs带宽
+  - HBM3 vs HBM3e
+  - HBM3e带宽：8 TB/s (Blackwell) vs 3.35 TB/s (Hopper)
 - 3.2.3 内存层次结构：L1/L2 cache
+  - Blackwell L2 cache: 126 MB (vs Hopper 50 MB)
+  - 2.5×增长，减少HBM访问
 - 3.2.4 带宽：推理的真正瓶颈
+  - Memory-bound vs Compute-bound kernels
+  - Roofline模型分析
 - 3.2.5 PCIe通道：GPU与CPU的桥梁
+  - PCIe Gen5 x16: 64 GB/s
+  - NVLink-C2C: 900 GB/s (14× faster!)
+- 3.2.6 Tensor Cores和Transformer Engine ⭐ 新增
+  - FP8和FP4 (NVFP4)支持
+  - Transformer Engine自动混合精度
+  - FP4理论吞吐: 1.4 exaFLOPS (NVL72 rack)
+- 3.2.7 SIMT执行模型 ⭐ 新增
+  - Warp (32 threads)
+  - Thread Block和Grid
+  - Warp调度器和Occupancy
+
+**详细内容**：
+
+**3.2.1 流式多处理器(SM)：GPU的核心单元**
+
+- **SM的组成**：
+  ```
+  Streaming Multiprocessor (SM)
+  ├── CUDA Cores (FP32/INT32)
+  ├── Tensor Cores (矩阵加速)
+  ├── Register File (寄存器)
+  ├── Shared Memory / L1 Cache
+  ├── Warp Scheduler
+  └── SFU (Special Function Units)
+  ```
+
+- **CUDA Cores vs Tensor Cores**：
+  | 单元类型 | 功能 | 精度 | 吞吐量 | 适用场景 |
+  |---------|------|------|--------|----------|
+  | CUDA Cores | 通用计算 | FP32/INT32 | 1× base | 非矩阵运算 |
+  | Tensor Cores | 矩阵乘法 | FP16/BF16/FP8/FP4 | 16-64× base | GEMM, Attention |
+
+- **SM数量与GPU性能**：
+  - H100: 132 SMs
+  - H200: 132 SMs (same as H100)
+  - B200: 168 SMs (2 dies × 84)
+  - 更多SM = 更多并行线程 = 更高吞吐
+
+**3.2.2 显存(VRAM)：容量vs带宽**
+
+- **HBM演进**：
+  | GPU | HBM版本 | 容量 | 带宽 | 每stack带宽 |
+  |-----|---------|------|------|------------|
+  | A100 | HBM2e | 80 GB | 2.0 TB/s | 460 GB/s |
+  | H100 | HBM3 | 80 GB | 3.35 TB/s | 840 GB/s |
+  | H200 | HBM3e | 141 GB | 4.8 TB/s | 1200 GB/s |
+  | B200 | HBM3e | 192 GB (180 usable) | 8 TB/s | 1000 GB/s |
+
+- **HBM3e vs HBM3**：
+  - **容量**：141 GB (H200) vs 80 GB (H100) = **1.76×**
+  - **带宽**：4.8 TB/s (H200) vs 3.35 TB/s (H100) = **1.43×**
+  - **B200**：192 GB at 8 TB/s = **2.4×容量，2.4×带宽** (vs H100)
+
+- **带宽为什么重要？**
+  ```
+  LLM推理 = Memory-bound operation
+
+  每1个token生成：
+  - 读取模型权重: 80 GB (Llama-3-70B @ FP16)
+  - 读取KV Cache: 数MB到数GB
+  - 写入新token: ~1 KB
+
+  如果带宽 = 3.35 TB/s (H100):
+  - 读取80 GB需要: 80 GB / 3.35 TB/s = 23.9 ms
+  - 这是理论下限！(实际会更慢)
+  ```
+
+**3.2.3 内存层次结构：L1/L2 cache**
+
+- **GPU内存层次**：
+  ```
+  Register File
+  ├── 最快: ~1 PB/s (10^15 bytes/s)
+  ├── 最小: 每thread 255 regs (64 KB per SM)
+  └── 用途: 线程本地变量，临时变量
+
+  Shared Memory / L1 Cache
+  ├── 很快: ~几十TB/s
+  ├── 大小: 228 KB per SM (H100)
+  └── 用途: block内共享数据，kernel优化关键
+
+  L2 Cache
+  ├── 快: ~几TB/s
+  ├── 大小: 50 MB (H100) → 126 MB (B200, 2.5×)
+  └── 用途: 跨SM数据共享，减少HBM访问
+
+  HBM (High Bandwidth Memory)
+  ├── 慢(相对): 3.35-8 TB/s
+  ├── 最大: 80-192 GB
+  └── 用途: 模型权重，KV Cache，大量数据
+  ```
+
+- **L2 Cache扩大的影响**：
+  - **H100**: 50 MB L2 cache
+  - **B200**: 126 MB L2 cache (2.5×增长)
+  - **好处**：
+    - 更多权重和KV Cache保持在GPU上
+    - 减少访问HBM次数（HBM延迟更高）
+    - 实测：5-10%性能提升（某些workloads）
+
+**3.2.4 带宽：推理的真正瓶颈**
+
+- **Roofline模型分析**：
+  ```
+  Roofline Model: 描述硬件性能上限
+
+          |
+  Perf  |        _________ (Compute-bound)
+  (FLOPS|       /         ╲
+  /s)   |      /           ╲ (Memory-bound)
+         |_____/             ╲_______
+          |__________________________
+                Arithmetic Intensity
+                (FLOPs per byte)
+  ```
+
+- **LLM推理在哪里？**
+  - **Prefill阶段**: Compute-bound（矩阵计算密集）
+  - **Decode阶段**: **Memory-bound**（每次只读1行KV Cache）
+
+- **Decode阶段的带宽限制**：
+  ```
+  每生成1个token:
+  - 读取: Q (1 token) + K (所有历史) + V (所有历史)
+  - 假设已生成1000 tokens, hidden_dim=4096:
+    - Q: 1 × 4096 × 2 bytes (BF16) = 8 KB
+    - K: 1000 × 4096 × 2 = 8 MB
+    - V: 1000 × 4096 × 2 = 8 MB
+    - 总计: ~16 MB (每次decode)
+
+  H100 (3.35 TB/s): 16 MB / 3.35 TB/s = 4.8 μs (理论下限)
+  B200 (8 TB/s): 16 MB / 8 TB/s = 2.0 μs (2.4× faster!)
+  ```
+
+**3.2.5 PCIe vs NVLink-C2C**
+
+- **PCIe Gen5 (Blackwell B200)**：
+  - 带宽: 64 GB/s (per direction)
+  - 延迟: ~1-2 μs
+  - 用途: 连接CPU和传统GPU
+
+- **NVLink-C2C (Grace Blackwell)**：
+  - 带宽: **900 GB/s** (14× faster than PCIe!)
+  - 延迟: ~100-200 ns (10× lower)
+  - Cache-coherent: CPU和GPU共享统一内存
+
+- **统一内存的影响**：
+  ```
+  传统系统 (PCIe):
+  CPU Memory [500 GB] -- PCIe 64 GB/s --> GPU Memory [80 GB]
+  数据需要显式拷贝: cudaMemcpy(cpu_ptr, gpu_ptr, size)
+
+  Grace Blackwell (NVLink-C2C):
+  Unified Memory [900 GB]
+  ├── CPU Memory: 480 GB LPDDR5X @ 500 GB/s
+  ├── GPU Memory: 180 GB HBM3e @ 8 TB/s
+  └── CPU-GPU Link: 900 GB/s (cache-coherent!)
+
+  GPU可以直接访问CPU内存:
+  gpu_ptr = cpu_ptr;  // 无需拷贝！
+  ```
+
+- **对大模型的意义**：
+  ```
+  500 GB模型 (如GPT-4级别):
+
+  传统系统:
+  - 需要8× H100 (80 GB each)
+  - 模型分片在8个GPU
+  - GPU间通信开销大
+
+  Grace Blackwell (1个superchip):
+  - 模型放在统一内存 (900 GB)
+  - GPU透明访问CPU内存 (900 GB/s)
+  - 无需多GPU通信
+  ```
+
+**3.2.6 Tensor Cores和Transformer Engine**
+
+- **Tensor Cores演进**：
+  | GPU架构 | Tensor Core版本 | 支持精度 | 吞吐量提升 |
+  |---------|----------------|---------|-----------|
+  | Ampere (A100) | TF32 | FP32/TF32/FP16/BF16/INT8 | - |
+  | Hopper (H100) | TF32+FP8 | FP32/TF32/FP16/BF16/FP8/INT8 | 2× (FP8 vs FP16) |
+  | Blackwell (B200) | TF32+FP8+FP4 | FP32/TF32/FP16/BF16/FP8/**FP4** | 4× (FP4 vs FP16) |
+
+- **Transformer Engine (TE)**：
+  ```python
+  # Hopper引入Transformer Engine
+  # 自动混合精度优化
+
+  from transformer_engine.pytorch import fp8_autocast
+
+  with fp8_autocast():
+      # 自动切换精度:
+      # - 关键层: FP16/BF16 (保持精度)
+      # - 非关键层: FP8 (2× throughput)
+      output = transformer_block(input)
+
+  # Blackwell进一步支持FP4:
+  with fp4_autocast():
+      # 4× throughput vs FP16
+      output = transformer_block(input)
+  ```
+
+- **精度权衡**：
+  | 精度 | 每元素字节数 | 相对吞吐 | 精度损失 | 适用场景 |
+  |------|-------------|---------|---------|----------|
+  | FP32 | 4 bytes | 1× | 无 | 数值敏感计算 |
+  | FP16 | 2 bytes | 2× | 可忽略 | 推理标准 |
+  | BF16 | 2 bytes | 2× | 可忽略 | 训练+推理 |
+  | FP8 | 1 byte | 4× | <1% | 推理优化 |
+  | **FP4** | 0.5 byte | 8× | 1-2% | 激进压缩 |
+
+- **FP4的实际吞吐**：
+  ```
+  单个B200 GPU (FP4):
+  - Tensor Core吞吐: ~2000 TFLOPS
+  - 72 GPU rack (NVL72): ~144,000 TFLOPS = **144 exaFLOPS**
+
+  对比:
+  - Frontier超级计算机: 1.1 exaFLOPS (FP64)
+  - NVL72在FP4精度下是Frontier的100×！
+  ```
+
+**3.2.7 SIMT执行模型**
+
+- **SIMT (Single Instruction, Multiple Threads)**：
+  ```
+  SIMT vs SIMD:
+
+  CPU (SIMD):
+  - 1条指令处理多个数据 (如AVX: 8 floats)
+  - 硬件自动vectorization
+
+  GPU (SIMT):
+  - 1条指令由32个线程同时执行 (WARP)
+  - 每个thread有独立寄存器状态
+  - Software-controlled parallelism
+  ```
+
+- **Warp (32 threads)**：
+  ```python
+  # CUDA kernel概念
+  __global__ void kernel(float* data) {
+      // blockIdx.x: thread block索引
+      // threadIdx.x: block内thread索引
+
+      int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+      data[thread_id] *= 2.0f;
+  }
+
+  # 启动配置:
+  # 1024 threads, 32 threads per block
+  # → 32 blocks, 每32个threads组成1个warp
+  # → 总共32 warps同时执行
+  ```
+
+- **Thread Block、Grid和SM的映射**：
+  ```
+  GPU Device
+  ├── SM 0
+  │   ├── Warp 0 (32 threads)
+  │   ├── Warp 1 (32 threads)
+  │   └── ...
+  ├── SM 1
+  │   └── ...
+  └── ...
+
+  Launch: kernel<<<grid_dim, block_dim>>>()
+  - grid_dim: (num_blocks,)  // 多少个blocks
+  - block_dim: (threads_per_block,)  // 每个block多少threads
+
+  Scheduler分配:
+  - 每个SM可以执行多个blocks (取决于resource usage)
+  - 每个block内的warps在SM上时间片轮转
+  ```
+
+- **Occupancy（核心指标）**：
+  ```python
+  # Occupancy = Active Warps / Max Warps per SM
+
+  # H100限制:
+  max_warps_per_sm = 64
+  max_blocks_per_sm = 32
+  max_threads_per_sm = 2048
+
+  # 如果每个block使用1024 threads:
+  threads_per_block = 1024
+  warps_per_block = 1024 / 32 = 32
+
+  # SM只能同时执行: 64 / 32 = 2 blocks
+  # Occupancy = (2 blocks × 32 warps) / 64 = 100%
+
+  # 如果每个block使用512 threads:
+  warps_per_block = 512 / 32 = 16
+  # SM可以执行: 64 / 16 = 4 blocks
+  # Occupancy = (4 blocks × 16 warps) / 64 = 100%
+  ```
+
+- **Occupancy的重要性**：
+  ```
+  低Occupancy → GPU cores闲置 → 性能下降
+
+  例:
+  Occupancy 25% (H100):
+  - 只有16/64 warps在运行
+  - 其他48 warps空闲
+  - 实际吞吐只有峰值的25%
+
+  优化Occupancy:
+  - 减少每个block的register使用
+  - 减少shared memory使用
+  - 增加block数量 (更多warps可以调度)
+  ```
 
 #### 3.3 显存计算公式
 - 3.3.1 模型权重计算
@@ -126,6 +452,440 @@
 - 3.6.2 数据中心GPU：A100、H100
 - 3.6.3 云GPU选择指南
 - 3.6.4 性价比分析
+
+#### 3.7 NVIDIA架构演进：从A100到B200 ⭐ 新增
+
+> **💡 深度来源**：[AI Systems Performance Engineering](https://github.com/futurepaul/AI-Systems-Performance-Engineering) - Chris Fregly
+>
+> **核心洞察**：NVIDIA GPU架构每代演进带来2-4倍性能提升。理解架构演进路线图，有助于制定硬件采购和模型部署策略。
+
+- 3.7.1 架构演进路线图
+  - Ampere (A100) → Hopper (H100/H200) → Blackwell (B200)
+  - 每代性能提升：2-4×
+  - 关键创新：Tensor Cores, HBM演进, NVLink-C2C
+
+- 3.7.2 A100 (Ampere架构)
+  - 发布时间：2020年
+  - HBM2e: 80 GB @ 2.0 TB/s
+  - Tensor Cores: TF32/FP16/BF16/INT8
+  - SM数量: 108
+  - 典型应用：GPT-3训练、早期大模型
+
+- 3.7.3 H100 (Hopper架构)
+  - 发布时间：2022年
+  - HBM3: 80 GB @ 3.35 TB/s (1.67× vs A100)
+  - FP8支持: 2×吞吐 vs FP16
+  - Transformer Engine: 自动混合精度
+  - SM数量: 132 (22% more than A100)
+  - 典型应用：Llama-2/3训练、70B模型推理
+
+- 3.7.4 H200 (Hopper架构增强)
+  - 发布时间：2024年
+  - HBM3e: 141 GB @ 4.8 TB/s
+    - 容量: 1.76× vs H100
+    - 带宽: 1.43× vs H100
+  - 其他规格与H100相同
+  - 典型应用：超大模型（200B+参数）
+
+- 3.7.5 B200 (Blackwell架构)
+  - 发布时间：2024年
+  - Dual-die MCM设计:
+    - 2 GPU dies per module
+    - 208B transistors (2.6× vs H100)
+    - NV-HBI: 10 TB/s die-to-die interconnect
+  - HBM3e: 192 GB (180 usable) @ 8 TB/s
+    - 容量: 2.4× vs H100
+    - 带宽: 2.4× vs H100
+  - FP4 (NVFP4)支持: 4× throughput vs FP16
+  - L2 cache: 126 MB (2.5× vs H100)
+  - SM数量: 168 (2 dies × 84)
+
+- 3.7.6 Grace Hopper (GH200) Superchip
+  - 架构: 1 Grace CPU + 1 Hopper GPU
+  - 统一内存: 480 GB (CPU) + 80 GB (GPU) = 560 GB
+  - NVLink-C2C: 900 GB/s CPU-GPU互连
+  - Cache-coherent统一内存架构
+
+- 3.7.7 Grace Blackwell (GB200) Superchip
+  - 架构: 1 Grace CPU + 2 Blackwell GPUs
+  - 统一内存: ~900 GB total
+    - CPU: 480 GB LPDDR5X @ 500 GB/s
+    - GPUs: 180 GB HBM3e @ 8 TB/s per GPU
+  - NVLink-C2C: 900 GB/s CPU-GPU互连
+  - 适用场景: 500GB-1TB级别模型
+
+- 3.7.8 架构对比表与选型建议
+  - 性能对比表（详细）
+  - 成本对比表（$/TFLOPS, $/GB）
+  - 选型决策树
+  - 推理场景推荐
+  - 训练场景推荐
+
+**详细内容**：
+
+**3.7.1 架构演进路线图**
+
+```
+NVIDIA数据中心GPU演进时间线：
+
+2020 ────── 2022 ────── 2024 ────── 2025
+│           │           │           │
+Ampere     Hopper     Hopper     Blackwell
+(A100)     (H100)     (H200)     (B200)
+           │           │           │
+         FP8        HBM3e       FP4 + MCM
+         TE        +1.76×      +2.4× BW
+        +1.67×     +1.43×       统一内存
+         BW
+```
+
+**3.7.2 A100 (Ampere架构，2020)**
+
+- **关键规格**：
+  | 参数 | 数值 |
+  |------|------|
+  | 架构 | Ampere (GA100) |
+  | 工艺 | TSMC 7nm |
+  | Transistors | 54.2 billion |
+  | SM数量 | 108 |
+  | HBM | HBM2e 80 GB |
+  | 带宽 | 2.0 TB/s |
+  | FP32吞吐 | 19.5 TFLOPS |
+  | FP16吞吐 | 312 TFLOPS (with sparsity) |
+  | TDP | 400W |
+
+- **创新点**：
+  - TF32数据格式（训练精度接近FP32，速度FP16）
+  - Sparsity支持（2×吞吐）
+  - Multi-Instance GPU (MIG)
+
+- **历史意义**：
+  - 第一个广泛用于大模型训练的GPU
+  - GPT-3训练的主力硬件
+  - 推动了2020-2022年AI大模型爆发
+
+**3.7.3 H100 (Hopper架构，2022)**
+
+- **关键规格**：
+  | 参数 | 数值 vs A100 |
+  |------|-------------|
+  | 架构 | Hopper (GH100) |
+  | 工艺 | TSMC 4N |
+  | Transistors | 80B (+48%) |
+  | SM数量 | 132 (+22%) |
+  | HBM | HBM3 80 GB |
+  | 带宽 | 3.35 TB/s (+67%) |
+  | FP32吞吐 | 34 TFLOPS (+74%) |
+  | FP8吞吐 | 4 PFLOPS (4× vs FP16) |
+  | TDP | 700W |
+
+- **创新点**：
+  - **FP8支持**: Transformer Engine自动混合精度
+  - **HBM3**: 更高带宽（3.35 TB/s）
+  - **DPX指令**: 加速动态规划算法
+
+- **推理性能提升**：
+  ```
+  Llama-3-70B推理 (FP16):
+  A100: ~25 tokens/s
+  H100: ~45 tokens/s (1.8× faster)
+
+  原因:
+  - 更高带宽 (3.35 vs 2.0 TB/s)
+  - 更多SMs (132 vs 108)
+  - FP8量化支持
+  ```
+
+**3.7.4 H200 (Hopper架构增强，2024)**
+
+- **关键规格**：
+  | 参数 | H100 | H200 | 提升 |
+  |------|------|------|------|
+  | HBM | HBM3 80 GB | HBM3e 141 GB | +76% |
+  | 带宽 | 3.35 TB/s | 4.8 TB/s | +43% |
+  | SM数量 | 132 | 132 | same |
+  | FP32吞吐 | 34 TFLOPS | 34 TFLOPS | same |
+  | TDP | 700W | 700W | same |
+
+- **为什么重要？**
+  - **大模型友好**：141 GB可容纳：
+    - Llama-3-70B (FP16): 140 GB (刚好！)
+    - Llama-3-70B + 大量KV Cache
+  - **更高带宽**：4.8 TB/s缓解memory-bound瓶颈
+
+- **选型建议**：
+  - 选择H200而非H100，如果：
+    - 模型> 80 GB
+    - 需要更大KV Cache
+    - Memory-bound workload
+
+**3.7.5 B200 (Blackwell架构，2024)**
+
+- **Dual-die MCM设计**：
+  ```
+  Blackwell B200结构:
+  ┌─────────────────────────────────┐
+  │                                 │
+  │  ┌──────────┐  NV-HBI  ┌───────┐│
+  │  │ GPU Die 1 ╞═════════╡ GPU   ││
+  │  │ 84 SMs   ╞ 10 TB/s  ╡ Die 2 ││
+  │  │ 96 GB    ╞═════════╡ 84 SMs ││
+  │  │ HBM3e    │           │ 96 GB││
+  │  └──────────┘           └───────┘│
+  │                                 │
+  │  Total: 168 SMs, 192 GB HBM3e  │
+  │  208B transistors              │
+  └─────────────────────────────────┘
+  ```
+
+- **关键规格**：
+  | 参数 | H100 | B200 | 提升 |
+  |------|------|------|------|
+  | 架构 | Single-die | **Dual-die MCM** |
+  | Transistors | 80B | 208B | **2.6×** |
+  | SM数量 | 132 | 168 | 1.27× |
+  | HBM | 80 GB HBM3 | 192 GB HBM3e | **2.4×** |
+  | 带宽 | 3.35 TB/s | 8 TB/s | **2.4×** |
+  | L2 cache | 50 MB | 126 MB | **2.5×** |
+  | FP8吞吐 | 4 PFLOPS | 10 PFLOPS | **2.5×** |
+  | FP4吞吐 | N/A | **20 PFLOPS** | **5× vs FP8** |
+
+- **关键创新**：
+  1. **Dual-die MCM**:
+     - 突破单晶圆尺寸限制
+     - NV-HBI: 10 TB/s die-to-die (几乎无性能损失)
+     - Software视为单一GPU
+
+  2. **FP4 (NVFP4)**:
+     - 4-bit floating point
+     - 2× vs FP8, 4× vs FP16
+     - 理论峰值: 20 PFLOPS per GPU
+
+  3. **第二代Transformer Engine**:
+     - 更精确的FP4/FP8 calibration
+     - 更好的accuracy preservation
+
+- **实际推理性能**：
+  ```
+  Llama-3-405B (超大模型):
+
+  H100 (需要8× GPUs for TP=8):
+  - 每GPU: 50 GB model weight (FP16)
+  - Inter-GPU通信开销
+  - 总吞吐: ~20 tokens/s (8× H100)
+
+  B200 (1-2 GPUs):
+  - 单卡可容纳更多模型
+  - 更高带宽减少通信
+  - 预期吞吐: ~60 tokens/s (2× B200)
+  - 成本: 可能更低（更少GPU）
+  ```
+
+**3.7.6 Grace Hopper (GH200) Superchip**
+
+- **架构图**：
+  ```
+  GH200 Superchip:
+  ┌──────────────────────────────────┐
+  │                                  │
+  │  ┌──────────┐  NVLink-C2C  ┌────┐│
+  │  │ Grace    ╞═════════════╡ H100││
+  │  │ CPU      ╞ 900 GB/s    ╡    ││
+  │  │ 72 cores ╞═════════════╡    ││
+  │  │          │             │    ││
+  │  │ 480 GB   │             │80GB││
+  │  │ LPDDR5X  │             │HBM3││
+  │  └──────────┘             └────┘│
+  │                                  │
+  │  Unified Memory: 560 GB total   │
+  └──────────────────────────────────┘
+  ```
+
+- **关键规格**：
+  | 组件 | 规格 |
+  |------|------|
+  | CPU | Grace (ARM Neoverse V2) |
+  | CPU cores | 72 |
+  | CPU Memory | 480 GB LPDDR5X @ 500 GB/s |
+  | GPU | Hopper H100 |
+  | GPU Memory | 80 GB HBM3 @ 3.35 TB/s |
+  | CPU-GPU Link | NVLink-C2C @ 900 GB/s |
+  | 总内存 | 560 GB (unified) |
+
+- **为什么重要？**
+  - **统一内存架构**：
+    ```
+    传统系统 (PCIe):
+    CPU Memory ──PCIe 64 GB/s──> GPU Memory
+    数据需要显式拷贝，延迟高
+
+    GH200 (NVLink-C2C):
+    Unified Memory (560 GB)
+    CPU和GPU共享地址空间
+    GPU直接访问CPU内存: 900 GB/s!
+    ```
+
+  - **大模型单机部署**：
+    ```
+    300 GB模型:
+
+    传统系统 (8× H100):
+    - 模型分片在8个GPU
+    - GPU间通信 (NVLink) 开销
+    - 总内存: 8 × 80 = 640 GB
+
+    GH200 (1 superchip):
+    - 模型放在统一内存
+    - 480 GB (CPU) + 80 GB (GPU) = 560 GB
+    - GPU透明访问CPU内存
+    - 无需多GPU通信！
+    ```
+
+**3.7.7 Grace Blackwell (GB200) Superchip**
+
+- **架构图**：
+  ```
+  GB200 Superchip:
+  ┌─────────────────────────────────────────┐
+  │                                         │
+  │    ┌────────┐  ┌────────┐              │
+  │    │ B200   │  │ B200   │              │
+  │    │ Die 1  │  │ Die 2  │              │
+  │    └────────┘  └────────┘              │
+  │         │            │                 │
+  │         └────┬───────┘                 │
+  │              │                         │
+  │         NVLink-C2C                     │
+  │         900 GB/s                       │
+  │              │                         │
+  │        ┌──────┴──────┐                 │
+  │        │   Grace     │                 │
+  │        │   CPU       │                 │
+  │        │   72 cores  │                 │
+  │        │   480 GB    │                 │
+  │        └─────────────┘                 │
+  │                                         │
+  │  Unified Memory: ~900 GB total        │
+  └─────────────────────────────────────────┘
+  ```
+
+- **关键规格**：
+  | 组件 | 规格 |
+  |------|------|
+  | CPU | Grace (ARM Neoverse V2) |
+  | CPU cores | 72 |
+  | CPU Memory | 480 GB LPDDR5X @ 500 GB/s |
+  | GPUs | 2× Blackwell B200 |
+  | GPU Memory | 2× 180 GB HBM3e @ 8 TB/s |
+  | GPU-GPU Link | NVLink (未公开，推测>10 TB/s) |
+  | CPU-GPU Link | NVLink-C2C @ 900 GB/s |
+  | 总内存 | ~900 GB (unified) |
+  | FP4吞吐 | ~40 PFLOPS (2× GPUs) |
+
+- **为什么是革命性的？**
+  ```
+  GPT-4级别模型 (500 GB - 1 TB):
+
+  传统集群 (64× H100):
+  - 需要大规模分布式训练/推理
+  - 网络通信成为主要瓶颈
+  - 复杂的模型分片和同步
+  - 成本: 数百万美元
+
+  GB200 Rack (更少GPU):
+  - 统一内存简化模型部署
+  - NVLink-C2C提供高速CPU-GPU互连
+  - 预期成本: 显著降低
+  - 部署复杂度: 大幅降低
+  ```
+
+**3.7.8 架构对比表与选型建议**
+
+- **完整对比表**：
+  | GPU | A100 | H100 | H200 | B200 | GH200 | GB200 |
+  |-----|------|------|------|------|-------|-------|
+  | 发布年份 | 2020 | 2022 | 2024 | 2024 | 2023 | 2024 |
+  | 架构 | Ampere | Hopper | Hopper | Blackwell | Hopper | Blackwell |
+  | Transistors | 54B | 80B | 80B | 208B | - | - |
+  | SM数量 | 108 | 132 | 132 | 168 | 132 | 168 |
+  | GPU Memory | 80 GB HBM2e | 80 GB HBM3 | 141 GB HBM3e | 192 GB HBM3e | 80 GB HBM3 | 180 GB HBM3e |
+  | Memory BW | 2.0 TB/s | 3.35 TB/s | 4.8 TB/s | 8 TB/s | 3.35 TB/s | 8 TB/s |
+  | CPU | - | - | - | - | Grace 72c | Grace 72c |
+  | CPU Memory | - | - | - | - | 480 GB | 480 GB |
+  | CPU-GPU BW | - | - | - | - | 900 GB/s | 900 GB/s |
+  | Unified Mem | - | - | - | - | 560 GB | ~900 GB |
+  | FP16 TFLOPS | 312 | 500+ | 500+ | 1000+ | 500+ | 1000+ |
+  | FP8 TFLOPS | - | 4000 | 4000 | 10000 | 4000 | 10000 |
+  | FP4 TFLOPS | - | - | - | 20000 | - | 20000 |
+  | TDP | 400W | 700W | 700W | 1000W? | 1000W? | 1500W? |
+  | 典型价格 | $10-15K | $25-30K | $35-40K | $40-50K? | $50-60K? | $70-80K? |
+
+- **性价比分析** ($/TFLOPS, $/GB Memory):
+  ```
+  假设价格:
+  A100: $12,000
+  H100: $27,000
+  H200: $37,000
+  B200: $45,000
+  GH200: $55,000
+  GB200: $75,000
+
+  性价比 (FP16 TFLOPS):
+  A100: $12K / 312 = $38.5/TFLOPS
+  H100: $27K / 500 = $54/TFLOPS
+  H200: $37K / 500 = $74/TFLOPS (容量付费)
+  B200: $45K / 1000 = $45/TFLOPS (性价比最高！)
+
+  内存性价比 ($/GB):
+  A100: $12K / 80 = $150/GB
+  H100: $27K / 80 = $338/GB
+  H200: $37K / 141 = $262/GB
+  B200: $45K / 192 = $234/GB
+  GH200: $55K / 560 = $98/GB (统一内存优势！)
+  GB200: $75K / 900 = $83/GB (最优！)
+  ```
+
+- **推理场景选型建议**：
+  ```
+  场景1: < 70B模型，高并发
+  → 推荐: H100
+  → 理由: 性价比高，80 GB足够
+
+  场景2: 70B-200B模型
+  → 推荐: H200 或 B200
+  → 理由: 更大内存，更高带宽
+
+  场景3: > 200B模型 (500GB-1TB)
+  → 推荐: GB200
+  → 理由: 统一内存，单机部署
+
+  场景4: 多租户SaaS，高并发
+  → 推荐: H100 集群
+  → 理由: 成熟稳定，易扩展
+
+  场景5: 研究原型，频繁实验
+  → 推荐: A100 (二手) 或 H100
+  → 理由: 成本敏感
+
+  场景6: 边缘部署，功耗受限
+  → 推荐: 消费级 RTX 4090
+  → 理由: 低成本，低功耗
+  ```
+
+- **训练场景选型建议**：
+  ```
+  小模型训练 (< 10B):
+  → H100 或 A100 多卡
+  → 性价比优先
+
+  大模型训练 (10B-100B):
+  → H100 集群
+  → 成熟生态，易于调试
+
+  超大模型训练 (> 100B):
+  → GB200 集群
+  → 统一内存减少通信开销
+  ```
 
 #### 常见误区专栏
 #### 实战检查清单
@@ -475,6 +1235,201 @@
 - 练习5.3：对比static batching和continuous batching的padding数量
 - 练习5.4：（进阶）实现一个简单的continuous batching调度器
 
+#### 5.7 vLLM架构全景 ⭐⭐⭐ 2025新增
+
+> **💡 来源**：[Berkeley EECS-2025-192 - Deconstructing vLLM](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
+>
+> **核心价值**：系统性理解vLLM的三层架构——Interface、Model Authoring、Runtime，为后续章节铺垫架构知识。
+>
+> **为什么重要**：
+> - 从"会用vLLM"到"理解vLLM"的关键转变
+> - 调试问题、性能优化、扩展开发的基础
+> - 为第6章（KV Cache）、第7章（调度）、第10章（部署）铺垫
+
+**5.7.1 vLLM的三层架构**
+
+- **Layer 1: Interfaces** （用户交互层）
+  ```
+  User Request → OpenAI Server → API Server → LLMEngine
+  ```
+
+  - **LLMEngine**: 核心引擎
+    - 作用：协调所有组件
+    - 职责：请求管理、资源分配、结果返回
+    - 接口：`generate()`, `encode()`
+
+  - **API Server**: HTTP服务
+    - 作用：提供REST API
+    - 职责：请求路由、认证、限流
+    - 协议：HTTP/REST
+
+  - **OpenAI-Compatible Server**: 标准接口
+    - 作用：兼容OpenAI API
+    - 职责：`/v1/chat/completions`等接口
+    - 价值：零代码迁移
+
+- **Layer 2: Model Authoring** （模型抽象层）
+  ```
+  LLMEngine → ModelExecutor → BlockManager + Scheduler
+  ```
+
+  - **ModelExecutor**: 模型执行器
+    - 作用：执行模型forward pass
+    - 抽象：支持不同模型架构
+    - 接口：`execute_model()`, `profile()`
+    - 详见：10.6 Model Authoring
+
+  - **BlockManager**: 内存块管理
+    - 作用：管理KV Cache的physical blocks
+    - 职责：分配、释放、迁移blocks
+    - 抽象：Physical vs Logical blocks
+    - 详见：6.3.2 PagedAttention原理
+
+  - **Scheduler**: 请求调度器
+    - 作用：决定哪些请求可以执行
+    - 策略：FIFO、Priority、SJF
+    - 输出：Scheduled requests
+    - 详见：7.4 vLLM的调度器实现
+
+- **Layer 3: Runtime** （运行时层）
+  ```
+  Scheduler → CacheEngine → Worker (GPU)
+  ```
+
+  - **CacheEngine**: KV缓存引擎
+    - 作用：管理KV Cache的物理存储
+    - 数据结构：Block table
+    - 功能：Hash-based lookup
+    - 详见：6.3.3 内存管理深度剖析
+
+  - **Worker**: 工作进程
+    - 作用：在GPU上执行计算
+    - 职责：模型推理、kernel执行
+    - 通信：与主进程通信
+
+**5.7.2 用户请求的完整流程**
+
+- **步骤1：用户发送请求**
+  ```bash
+  curl http://localhost:8000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{"model": "llama2", "messages": [...]}'
+  ```
+
+- **步骤2：OpenAI Server接收**
+  - 解析请求
+  - 验证参数
+  - 转发给API Server
+
+- **步骤3：API Server处理**
+  - 请求路由
+  - 限流检查
+  - 调用LLMEngine.generate()
+
+- **步骤4：LLMEngine调度**
+  - 创建请求对象
+  - 提交给Scheduler
+  - 等待调度结果
+
+- **步骤5：Scheduler决策**
+  - 检查资源（GPU memory、compute）
+  - 选择可执行的请求
+  - 返回scheduled requests
+
+- **步骤6：ModelExecutor执行**
+  - 准备input data
+  - 调用Worker.execute_model()
+  - 等待GPU返回结果
+
+- **步骤7：Worker在GPU上执行**
+  - 加载模型weights
+  - 执行PagedAttention kernels
+  - 返回generated tokens
+
+- **步骤8：结果返回**
+  - Worker → ModelExecutor → LLMEngine
+  - LLMEngine → API Server → OpenAI Server
+  - OpenAI Server → 用户
+
+**5.7.3 架构图**
+
+```
+┌─────────────────────────────────────────────────┐
+│              Layer 1: Interfaces               │
+├─────────────────────────────────────────────────┤
+│  OpenAI Server  →  API Server  →  LLMEngine    │
+│  (HTTP)            (REST)         (Core)        │
+└─────────────────────────────────────────────────┘
+                        │
+┌─────────────────────────────────────────────────┐
+│           Layer 2: Model Authoring             │
+├─────────────────────────────────────────────────┤
+│  ModelExecutor  ←  Scheduler  ←  BlockManager   │
+│  (Execution)      (Policy)       (Memory)       │
+└─────────────────────────────────────────────────┘
+                        │
+┌─────────────────────────────────────────────────┐
+│             Layer 3: Runtime                    │
+├─────────────────────────────────────────────────┤
+│  CacheEngine  →  Worker  →  GPU Kernels         │
+│  (KV Cache)      (Compute)    (CUDA)            │
+└─────────────────────────────────────────────────┘
+```
+
+**5.7.4 与后续章节的关联**
+
+- **第6章 KV Cache优化**：
+  - BlockManager的详细实现（6.3.2）
+  - CacheEngine的内存管理（6.3.3）
+  - PagedAttention的核心创新（6.3.2）
+
+- **第7章 请求调度策略**：
+  - Scheduler的调度算法（7.4）
+  - Iteration-level scheduling（7.4.2）
+  - CPU overheads分析（7.4.3）
+
+- **第10章 生产环境部署**：
+  - Interface层部署模式（10.2-10.4）
+  - Model Authoring实战（10.6）
+  - 性能分析与调优（10.5）
+
+**5.7.5 实战：启动vLLM并观察架构**
+
+- **启动vLLM server**：
+  ```bash
+  vllm serve meta-llama/Llama-2-7b-hf \
+    --port 8000 \
+    --host 0.0.0.0
+  ```
+
+- **查看启动过程**：
+  ```
+  INFO:     Started server process
+  INFO:     Waiting for vLLM engine to initialize
+  INFO:     Initializing an LLM engine with config
+  INFO:     Loading model weights
+  INFO:     GPU memory: 15.50 GB
+  INFO:     Model loaded
+  ```
+
+- **发送请求**：
+  ```bash
+  curl http://localhost:8000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "meta-llama/Llama-2-7b-hf",
+      "messages": [{"role": "user", "content": "Hello!"}]
+    }'
+  ```
+
+**5.7.6 架构理解检查点**
+
+- [ ] 能解释vLLM的三层架构
+- [ ] 能描述用户请求的完整流程（8步骤）
+- [ ] 理解LLMEngine、ModelExecutor、Worker的职责
+- [ ] 知道BlockManager和Scheduler的作用
+- [ ] 理解PagedAttention在架构中的位置
+
 ---
 
 ## 第三部分：核心技术篇 (Part 3: Core Techniques)
@@ -499,9 +1454,709 @@
 
 #### 6.3 KV Cache实现
 - 6.3.1 朴素实现方式
-- 6.3.2 PagedAttention原理（vLLM的核心）
+- 6.3.2 PagedAttention原理（vLLM的核心）⚡️ 2025深度扩展
+
+  > **💡 深度来源**：[Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
+  >
+  > **核心洞察**：PagedAttention借鉴操作系统的虚拟内存机制，将KV Cache分成固定大小的pages，实现高效的内存管理。
+  >
+  > **为什么重要**：
+  > - vLLM最核心的创新（论文引用2000+）
+  > - 内存利用率从60-70%提升到90-95%
+  > - Prefix Caching的底层基础
+
+  **6.3.2.1 传统KV Cache的问题**
+
+  - **连续内存分配的缺陷**：
+    ```
+    Request 1: [████████] 1000 tokens → 连续分配1000 token空间
+    Request 2: [████] 500 tokens → 连续分配500 token空间
+    Request 1完成 → 释放1000 tokens
+    Request 3需要800 tokens → 无法使用Request 1的空间（碎片化！）
+    ```
+
+  - **内存碎片化**：
+    - **External fragmentation**: 请求之间的小空隙无法利用
+      ```
+      GPU Memory: [Req1: 1000][空隙: 200][Req2: 500][空隙: 300]
+      Request 3需要800 tokens → 失败！（空隙不够大）
+      ```
+    - **Internal fragmentation**: 预分配的固定大小可能浪费
+      ```
+      预分配2048 tokens → 实际使用1000 tokens → 浪费1048 tokens
+      ```
+
+  - **静态内存分配的问题**：
+    - 必须预先知道最大batch size和最大序列长度
+    - 无法动态调整内存使用
+    - GPU利用率低（大量内存浪费）
+
+  **6.3.2.2 PagedAttention的设计思想**
+
+  - **灵感来源：OS虚拟内存**
+    ```
+    OS Virtual Memory:  Pages (4KB) + Page Table
+    vLLM KV Cache:      Blocks (16 tokens) + Block Table
+    ```
+
+  - **核心概念**：
+    - **Logical blocks**: 逻辑上的连续序列（用户视角）
+    - **Physical blocks**: GPU内存中的实际块（系统视角）
+    - **Block table**: 映射关系（logical → physical）
+
+  - **工作原理**：
+    ```
+    Request: [token1-16][token17-32][token33-48][...]
+    Logical:  Block 0      Block 1       Block 2
+    Physical: Block 15     Block 7       Block 23
+             (分散在物理内存中，但逻辑上连续)
+    ```
+
+  - **关键优势**：
+    - 不需要连续内存
+    - 物理blocks可以分散在GPU内存任意位置
+    - 逻辑上连续，物理上分散
+
+  **6.3.2.3 Block Allocation策略**
+
+  - **预分配策略**：
+    ```python
+    # vLLM的启动时分配
+    def allocate_at_startup():
+        # 计算可用GPU内存
+        gpu_memory = get_gpu_memory()
+        # 预分配90%给KV Cache（保留10%给模型weights）
+        num_blocks = (gpu_memory * 0.9) / BLOCK_SIZE
+        # 创建block pool
+        block_pool = BlockPool(num_blocks)
+        return block_pool
+    ```
+
+  - **动态分配算法**：
+    ```python
+    def allocate_blocks(request, num_tokens):
+        num_blocks = ceil(num_tokens / BLOCK_SIZE)  # 16 tokens/block
+        for i in range(num_blocks):
+            block = find_free_block()
+            if block is None:
+                # 内存不足，触发eviction
+                trigger_eviction_policy()
+                block = find_free_block()
+            request.blocks.append(block)
+        return request.blocks
+    ```
+
+  - **Block的大小选择**：
+    - 默认：16 tokens/block
+    - 为什么是16？
+      - 太小（如8）：block table太大，管理开销高
+      - 太大（如32）：internal fragmentation严重
+      - 16是经验最优值（平衡开销和浪费）
+
+  **6.3.2.4 Block Eviction策略**
+
+  - **LRU (Least Recently Used)**：
+    ```python
+    class LRU_Eviction:
+        def __init__(self):
+            self.access_time = {}  # block_id → timestamp
+
+        def evict(self, num_blocks):
+            # 按访问时间排序
+            sorted_blocks = sorted(
+                self.access_time.items(),
+                key=lambda x: x[1]  # 按时间升序
+            )
+            # 驱逐最久未使用的blocks
+            return [block[0] for block in sorted_blocks[:num_blocks]]
+    ```
+    - 适用场景：大多数请求具有时间局部性
+    - 优势：简单，有效
+    - 劣势：不考虑访问频率
+
+  - **LFU (Least Frequently Used)**：
+    ```python
+    class LFU_Eviction:
+        def __init__(self):
+            self.access_count = {}  # block_id → count
+
+        def evict(self, num_blocks):
+            # 按访问频率排序
+            sorted_blocks = sorted(
+                self.access_count.items(),
+                key=lambda x: x[1]  # 按频率升序
+            )
+            # 驱逐访问频率最低的blocks
+            return [block[0] for block in sorted_blocks[:num_blocks]]
+    ```
+    - 适用场景：某些prefix被频繁复用（如系统提示词）
+    - 优势：保留热点数据
+    - 劣势：冷启动时效果差
+
+  - **vLLM的混合策略**：
+    ```python
+    class HybridEviction:
+        def evict(self, num_blocks):
+            # Prefix cache blocks: 使用LFU
+            # （系统提示词等，被频繁复用）
+            prefix_blocks = self.get_prefix_blocks()
+            prefix_evict = lfu_evict(prefix_blocks, num_blocks // 2)
+
+            # Decode blocks: 使用LRU
+            # （新生成的tokens，时间局部性）
+            decode_blocks = self.get_decode_blocks()
+            decode_evict = lru_evict(decode_blocks, num_blocks // 2)
+
+            return prefix_evict + decode_evict
+    ```
+    - 优势：兼顾cache hit rate和内存效率
+    - 结果：优于单一策略
+
+  **6.3.2.5 Memory Manager实现**
+
+  - **CacheEngine的核心职责**：
+    ```python
+    class CacheEngine:
+        def __init__(self, block_size, num_gpu_blocks):
+            self.block_size = block_size  # 16 tokens
+            self.num_gpu_blocks = num_gpu_blocks
+            self.free_blocks = set(range(num_gpu_blocks))
+            self.block_table = {}  # {request_id: [block_ids]}
+            self.hash_table = {}  # {block_hash: block_id}  # For prefix caching
+
+        def allocate(self, request_id, num_blocks):
+            """分配blocks给请求"""
+            if len(self.free_blocks) < num_blocks:
+                raise OutOfMemory(f"Need {num_blocks}, "
+                                f"only {len(self.free_blocks)} free")
+            blocks = list(self.free_blocks)[:num_blocks]
+            self.free_blocks.difference_update(blocks)
+            self.block_table[request_id] = blocks
+            return blocks
+
+        def free(self, request_id):
+            """释放请求的blocks"""
+            blocks = self.block_table.pop(request_id)
+            self.free_blocks.update(blocks)
+
+        def get_block_hash(self, block_id):
+            """计算block的hash（用于prefix caching）"""
+            block_data = self.get_block_data(block_id)
+            # 使用SHA256或自定义快速hash
+            return hash(block_data.tobytes())
+
+        def check_prefix_cache(self, request_id, block_hashes):
+            """检查prefix cache hit"""
+            cached_blocks = []
+            for h in block_hashes:
+                if h in self.hash_table:
+                    cached_blocks.append(self.hash_table[h])
+                else:
+                    break  # 第一个miss，后续无法使用
+            return cached_blocks
+    ```
+
+  **6.3.2.6 PagedAttention vs 传统方案对比**
+
+  | 维度 | 连续内存 | PagedAttention |
+  |------|---------|----------------|
+  | **内存利用率** | 60-70% | 90-95% |
+  | **碎片化** | 严重 | 轻微 |
+  | **Prefix Caching** | 困难 | 容易（hash-based） |
+  | **实现复杂度** | 简单 | 中等 |
+  | **性能开销** | 无 | 轻微（block table lookup） |
+  | **适用场景** | 单请求、短序列 | 多请求、长序列、生产环境 |
+
+  - **性能开销分析**：
+    - Block table lookup: O(1) hash table
+    - 额外内存: block_table (每个请求~1KB)
+    - 相比收益（+30%内存利用率），开销可忽略
+
+  **6.3.2.7 真实案例分析**
+
+  - **案例1：ChatGPT风格对话**
+    ```
+    系统提示词：500 tokens（"You are a helpful assistant..."）
+    用户输入：50 tokens
+    模型输出：100 tokens
+
+    传统方法：
+      - 每个请求需要650 tokens连续空间
+      - 系统提示词每次重新计算
+      - 内存利用率：~65%
+
+    PagedAttention + Prefix Caching：
+      - 系统提示词：32 blocks (cached)
+      - 100个请求共享这32个blocks
+      - 每个请求只需要: 用户输入4 blocks + 输出7 blocks
+      - 内存利用率：~92%
+    ```
+
+  - **案例2：长文档摘要**
+    ```
+    输入文档：100K tokens
+    Block数量：100000 / 16 = 6250 blocks
+
+    传统方法：
+      - 需要连续100K token空间（~200MB）
+      - 很难分配（GPU碎片化）
+      - 结果：Out of Memory
+
+    PagedAttention：
+      - 动态分配6250个blocks
+      - 不需要连续内存
+      - 可以分散在GPU各处
+      - 结果：成功执行
+    ```
+
+  - **案例3：RAG场景**
+    ```
+    固定知识库prefix：2000 tokens（125 blocks）
+    用户问题：50 tokens（4 blocks）
+
+    Cache hit rate分析：
+      - 100个请求，99个共享知识库blocks
+      - Hit rate: 99 / 100 = 99%
+      - 节省计算: 99 * 125 blocks = 12375 blocks
+      - 加速比: (2000+50) / 50 = 41倍
+    ```
+
+  **6.3.2.8 实战配置**
+
+  ```python
+  from vllm import LLM, SamplingParams
+
+  llm = LLM(
+      model="meta-llama/Llama-2-7b-hf",
+
+      # === Block相关配置 ===
+      block_size=16,  # 每个block的token数（默认16，通常不需修改）
+
+      # === Memory相关配置 ===
+      gpu_memory_utilization=0.9,  # GPU显存利用率（0.9 = 90%）
+      # 10%留给模型weights和CUDA kernels
+      # 90%用于KV Cache blocks
+
+      # === Prefix Caching ===
+      enable_prefix_caching=True,  # 启用prefix caching（重要！）
+
+      # === 自动计算 ===
+      # vLLM会自动计算：
+      # num_gpu_blocks = (gpu_memory * 0.9) / block_size
+  )
+
+  # 生成
+  prompts = ["Hello, my name is", "Hello, my name is Bob"]
+  sampling_params = SamplingParams(temperature=0.7, max_tokens=20)
+  outputs = llm.generate(prompts, sampling_params)
+
+  # 第二个请求会复用第一个请求的prefix cache！
+  ```
+
+  **6.3.2.9 性能监控**
+
+  ```python
+  # 查看block使用情况
+  from vllm import LLM
+
+  llm = LLM(model="...")
+
+  # 获取Cache Engine
+  cache_engine = llm.llm_engine.cache_engine
+
+  # 查看统计信息
+  print(f"Total blocks: {cache_engine.num_gpu_blocks}")
+  print(f"Free blocks: {len(cache_engine.free_blocks)}")
+  print(f"Used blocks: {cache_engine.num_gpu_blocks - len(cache_engine.free_blocks)}")
+  print(f"Utilization: {(cache_engine.num_gpu_blocks - len(cache_engine.free_blocks)) / cache_engine.num_gpu_blocks * 100:.1f}%")
+
+  # 查看prefix cache统计
+  if hasattr(cache_engine, 'cache_hash'):
+      print(f"Prefix cache hits: {cache_engine.cache_hits}")
+      print(f"Prefix cache misses: {cache_engine.cache_misses}")
+      print(f"Hit rate: {cache_engine.cache_hits / (cache_engine.cache_hits + cache_engine.cache_misses) * 100:.1f}%")
+  ```
+
+  **6.3.2.10 总结：PagedAttention的核心价值**
+
+  - **解决了什么问题**：
+    - ✅ 内存碎片化
+    - ✅ 静态内存分配的灵活性
+    - ✅ Prefix caching的实现基础
+
+  - **关键指标**：
+    - 内存利用率：60-70% → 90-95% (+30%)
+    - Prefix cache hit rate: 可达99% (RAG场景)
+    - 吞吐量提升：2-5倍 (ChatGPT风格对话)
+
+  - **适用场景**：
+    - ✅ 多用户并发
+    - ✅ 长序列
+    - ✅ 重复prefix（系统提示词、RAG）
+    - ✅ 生产环境
+
 - 6.3.3 内存管理策略
-- 6.3.4 代码示例：手动实现简单KV Cache
+- 6.3.4 Radix Attention (SGLang/Mini-SGLang) ⚡️ 2025新增
+
+  > **💡 深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/)
+  >
+  > **核心价值**：PagedAttention的竞争对手，另一种KV Cache复用方案
+  >
+  > **关键差异**：Radix Tree结构 vs 固定Block粒度
+
+  **6.3.4.1 Radix Cache vs PagedAttention**
+
+  | 维度 | PagedAttention (vLLM) | Radix Cache (SGLang/Mini-SGLang) |
+  |------|----------------------|----------------------------------|
+  | **思想来源** | OS虚拟内存（分页） | Radix Tree前缀树 |
+  | **粒度** | 固定Block (16 tokens) | 可变长度（自动检测共享前缀） |
+  | **检测方式** | 需要显式配置Prefix Caching | 自动检测共享前缀 |
+  | **内存组织** | Logical → Physical映射 | 树状层次结构 |
+  | **适用场景** | 多租户、通用场景 | Agent/RAG场景（大量共享prefix） |
+  | **实现复杂度** | 中等（需hash table） | 较高（需树维护） |
+  | **代码规模** | vLLM全框架 | Mini-SGLang仅5k行Python |
+
+  **6.3.4.2 Radix Tree结构**
+
+  - **核心概念**：
+    - 将prompts组织成树状结构
+    - 共享前缀的prompts共享KV Cache
+    - 类似字符串匹配的Trie树
+
+  - **示例**：
+    ```
+    Prompt A: "解释量子计算的基本原理"
+    Prompt B: "解释量子计算的量子纠缠"
+    Prompt C: "解释量子计算的历史发展"
+
+    Radix Tree:
+    Root
+     └─ "解释量子计算" [共享前缀，只计算一次！]
+         ├─ "的基本原理" [Prompt A的unique部分]
+         ├─ "的量子纠缠" [Prompt B的unique部分]
+         └─ "的历史发展" [Prompt C的unique部分]
+    ```
+
+  - **优势**：
+    - 自动检测共享前缀（无需手动配置）
+    - 可变粒度（比固定16 tokens更灵活）
+    - 在Agent/RAG场景中效率极高
+
+  **6.3.4.3 共享前缀检测算法**
+
+  - **算法流程**：
+    ```python
+    class RadixCache:
+        def __init__(self):
+            self.radix_tree = RadixTree()  # 前缀树
+            self.node_cache = {}  # {node_id: KV Cache}
+
+        def allocate(self, request_tokens):
+            # 1. 在树中查找最长匹配前缀
+            prefix_node, match_length = self.radix_tree.find_longest_prefix(
+                request_tokens
+            )
+
+            # 2. 如果找到前缀，复用其KV Cache
+            if prefix_node:
+                request.kv_cache = prefix_node.cache
+                remaining_tokens = request_tokens[match_length:]
+            else:
+                remaining_tokens = request_tokens
+
+            # 3. 计算剩余tokens的KV
+            if remaining_tokens:
+                new_cache = self.compute_kv(remaining_tokens)
+                request.kv_cache.extend(new_cache)
+
+                # 4. 更新Radix Tree
+                self.radix_tree.insert(request_tokens, request.kv_cache)
+
+            return request.kv_cache
+
+        def find_longest_prefix(self, tokens):
+            """在树中查找最长匹配前缀"""
+            current = self.root
+            match_length = 0
+
+            for token in tokens:
+                if token in current.children:
+                    current = current.children[token]
+                    match_length += 1
+                else:
+                    break
+
+            return current, match_length
+    ```
+
+  - **关键点**：
+    - 自动检测：无需手动指定哪些prompts共享
+    - 最长匹配：找到最大的共享前缀
+    - 增量更新：新prompt自动添加到树中
+
+  **6.3.4.4 性能对比（实战数据）**
+
+  - **RAG场景**（Mini-SGLang实测）：
+    - 场景：系统提示词1000 tokens + 用户查询20 tokens
+    - Radix Cache命中率：> 95%
+    - 性能提升：省去95%的prefill计算
+
+  - **Agent场景**（Manus实战数据）：
+    - 场景：50步tool calls，每步共享之前所有context
+    - Radix Cache优势：自动检测共享的action history
+    - Cache hit rate：80-90%
+
+  - **vs PagedAttention**：
+    - **PagedAttention**：
+      - 优势：成熟稳定，vLLM生产验证
+      - 适用：通用场景，多租户
+      - 缺点：需要显式配置prefix caching
+
+    - **Radix Cache**：
+      - 优势：自动检测，Agent/RAG场景更高效
+      - 适用：大量共享prefix的场景
+      - 缺点：树维护复杂度稍高
+
+  **6.3.4.5 Mini-SGLang 5k行实现精要**
+
+  - **代码结构**（仅5k行Python！）：
+    ```
+    mini-sglang/
+    ├── server.py          # 前端API server (OpenAI兼容)
+    ├── tokenizer.py       # 分词器服务
+    ├── scheduler.py       # 调度器（含overlap scheduling）
+    ├── radix_cache.py     # Radix Cache实现
+    ├── model_runner.py    # 模型执行（TP支持）
+    └── kernels/           # JIT CUDA kernels
+        ├── flashattention.py
+        └── flashinfer.py
+    ```
+
+  - **推荐阅读顺序**（学习路径）：
+    1. `server.py` → 理解整体架构
+    2. `scheduler.py` → 学习Overlap Scheduling
+    3. `radix_cache.py` → 理解Radix Cache
+    4. `model_runner.py` → 了解Tensor Parallelism
+
+  - **学习价值**：
+    - 比vLLM (300k+行)简单60倍
+    - 包含所有现代优化（Radix Cache, Overlap Scheduling, TP）
+    - 适合快速原型和研究验证
+
+  **6.3.4.6 实战：Mini-SGLang vs vLLM对比**
+
+  - **启动Mini-SGLang**：
+    ```bash
+    # 安装
+    pip install mini-sglang
+
+    # 启动server
+    python -m minisgl \
+      --model "Qwen/Qwen3-32B" \
+      --tp 4 \  # 4-way tensor parallelism
+      --cache radix  # 使用Radix Cache
+
+    # 发送请求（OpenAI兼容）
+    curl http://localhost:8000/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+        "model": "Qwen/Qwen3-32B",
+        "messages": [{"role": "user", "content": "Hello!"}]
+      }'
+    ```
+
+  - **对比vLLM**：
+    ```bash
+    # vLLM启动
+    vllm serve "Qwen/Qwen3-32B" \
+      --tensor-parallel-size 4 \
+      --enable-prefix-caching
+
+    # 性能对比（Agent场景）：
+    # - Radix Cache: 自动检测共享前缀
+    # - PagedAttention: 需要显式配置
+    # 结果：Mini-SGLang在Agent场景中吞吐量提升20-30%
+    ```
+
+  **6.3.4.7 总结：何时选择Radix Cache？**
+
+  - **选择Radix Cache (SGLang/Mini-SGLang)**：
+    - ✅ Agent系统（大量tool calls共享context）
+    - ✅ RAG系统（固定知识prefix）
+    - ✅ 多轮对话（共享历史context）
+    - ✅ 研究原型（代码简洁，易于修改）
+
+  - **选择PagedAttention (vLLM)**：
+    - ✅ 通用Chatbot场景
+    - ✅ 多租户SaaS平台
+    - ✅ 生产环境（成熟稳定）
+    - ✅ 团队熟悉vLLM生态
+
+  - **两者都支持**：
+    - Prefix caching
+    - KV Cache复用
+    - 高吞吐量
+
+  **6.3.4.8 SGLang的LRU Cache管理**
+
+  > **💡 深度来源**：[SGLang v0.2 Slides](/Users/mac/Downloads/sglang_v0_2.pdf)
+  >
+  > **核心机制**：Radix Tree + LRU Eviction
+  >
+  > **关键优化**：Cache-Aware Scheduling
+
+  - **LRU Cache管理策略**：
+    ```python
+    class RadixTreeLRUManager:
+        """Radix Tree with LRU eviction policy"""
+
+        def __init__(self, max_cache_size_gb):
+            self.radix_tree = RadixTree()
+            self.max_cache_size = max_cache_size_gb * 1024**3
+            self.current_size = 0
+            self.access_order = doubly_linked_list()  # LRU tracking
+
+        def get(self, tokens):
+            """获取KV cache，更新LRU order"""
+            # 1. 在Radix Tree中查找最长匹配prefix
+            node = self.radix_tree.find_longest_prefix(tokens)
+
+            if node:
+                # 2. Cache hit：更新LRU order
+                self.access_order.move_to_front(node)
+                return node.kv_cache
+            else:
+                # 3. Cache miss：返回None
+                return None
+
+        def put(self, tokens, kv_cache):
+            """插入新的KV cache，必要时evict"""
+
+            # 1. 计算新cache的大小
+            cache_size = kv_cache.size_bytes
+
+            # 2. 如果超过容量，evict LRU entries
+            while self.current_size + cache_size > self.max_cache_size:
+                # Evict least recently used
+                lru_node = self.access_order.pop_back()
+                self.radix_tree.remove(lru_node.tokens)
+                self.current_size -= lru_node.size
+
+            # 3. 插入新cache
+            node = self.radix_tree.insert(tokens, kv_cache)
+            self.access_order.push_front(node)
+            self.current_size += cache_size
+
+        def evict(self, num_bytes_needed):
+            """Evict足够的cache空间"""
+            evicted = 0
+            while evicted < num_bytes_needed:
+                lru_node = self.access_order.pop_back()
+                self.radix_tree.remove(lru_node.tokens)
+                evicted += lru_node.size
+                self.current_size -= lru_node.size
+    ```
+
+  - **LRU vs 其他Eviction策略**：
+
+    | 策略 | 优点 | 缺点 | 适用场景 |
+    |------|------|------|----------|
+    | **LRU** | 实现简单，temporal locality好 | 无法识别future accesses | 通用场景 |
+    | **LFU** | 保留高频prefix | 需要维护访问计数 | 稳定工作负载 |
+    | **FIFO** | 最简单 | 可能evict useful entries | 简单部署 |
+    | **基于Token Length** | 保留长prefix（省计算） | 可能频繁evict短prefix | RAG场景 |
+
+    - **SGLang选择LRU的原因**：
+      - Temporal locality：最近使用的prefix很可能再次使用
+      - 实现简单：O(1) access and update
+      - 低开销：doubly linked list + hash map
+
+  - **Cache-Aware Scheduling**：
+    ```python
+    class CacheAwareScheduler:
+        """根据cache hit率排序请求队列"""
+
+        def schedule(self, pending_requests):
+            """1. 评估每个请求的cache hit率
+            2. 按hit率降序排序
+            3. 优先处理高hit率请求
+            """
+
+            # 1. 计算每个请求的matched prefix length
+            for req in pending_requests:
+                req.matched_length = self.radix_tree.match_length(req.tokens)
+
+            # 2. 按matched length降序排序
+            #    matched length越大 → cache hit率越高 → 优先处理
+            sorted_requests = sorted(
+                pending_requests,
+                key=lambda r: r.matched_length,
+                reverse=True
+            )
+
+            return sorted_requests
+    ```
+
+    - **为什么有效？**
+      - **最大化cache复用**：
+        ```
+        请求队列（未排序）：
+        Req A: "System + Doc X + User Query 1"  (matched: 1000 tokens)
+        Req B: "System + Doc Y + User Query 2"  (matched: 1000 tokens)
+        Req C: "System + Doc X + User Query 3"  (matched: 2000 tokens!)
+        Req D: "System + Doc Z + User Query 4"  (matched: 1000 tokens)
+
+        Cache-Aware Scheduling排序后：
+        Req C (2000 tokens match) → 先处理
+        Req A (1000 tokens match)
+        Req B (1000 tokens match)
+        Req D (1000 tokens match)
+
+        结果：
+        - Req C处理完后，"System + Doc X"的cache仍在LRU list的front
+        - Req A和Req C可以共享更多cache
+        - 总cache hit率提升！
+        ```
+
+      - **减少cache thrashing**：
+        - 避免频繁evict即将使用的cache
+        - 提高cache的temporal locality
+
+  - **SGLang的完整RadixAttention技术栈**（来自v0.2 slides）：
+
+    1. **RadixAttention**（核心）
+       - Radix Tree structure
+       - LRU eviction
+       - Cache-aware scheduling
+
+    2. **Token Attention**（类似PagedAttention）
+       - Page size = 1（每个token一个page）
+       - 更灵活的memory management
+       - Fragmentation问题缓解
+
+    3. **Jump-forward JSON Decoding**
+       - Regex analysis
+       - FSM compression
+       - 3x faster latency, 2.5x higher throughput
+
+    4. **其他优化技术**
+       - Torch Compile
+       - Flashinfer Kernels
+       - Chunked Prefill
+       - Continuous Batching
+       - CUDA Graph
+       - Interleave window attention
+
+  - **性能数据**（SGLang v0.2）：
+    - 与vLLM对比：
+      - RAG场景：~5x throughput提升（大量共享prefix）
+      - Multi-turn chat：~3x throughput提升
+      - General chat：~1.5x throughput提升（部分共享prefix）
+
+    - Cache hit率：
+      - RAG with 1000 docs：~90% hit rate
+      - Multi-turn chat：~70% hit rate
+      - General chat：~30% hit rate
 
 #### 6.4 KV Cache优化技术
 - 6.4.1 Multi-Query Attention vs Multi-Head Attention
@@ -937,7 +2592,953 @@
 - 7.4.1 请求生命周期管理
 - 7.4.2 预分配vs动态分配
 - 7.4.3 迭代级调度 (Iteration-level Scheduling)
-- 7.4.4 优先级队列
+- 7.4.4 Overlap Scheduling (Mini-SGLang) ⚡️ 2025新增
+
+  > **💡 深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/) + [Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
+  >
+  > **核心问题**：Berkeley论文指出CPU overhead导致GPU闲置 → Overlap Scheduling是解决方案
+  >
+  > **性能提升**：消除GPU stalls，提升吞吐量20-30%
+
+  **7.4.4.1 CPU开销导致GPU闲置问题**
+
+  - **Berkeley EECS-2025-192的发现**：
+    - CPU开销占推理时间的**10-20%**
+    - 主要来源：
+      - Kernel launch（启动GPU kernel）
+      - Memory copy（CPU↔GPU数据传输）
+      - Synchronization（等待GPU完成）
+      - Batch scheduling（决定哪些请求一起处理）
+
+  - **问题**：
+    - vLLM的迭代级调度是**串行**的：
+      ```
+      Step 1: CPU调度下一批请求
+      Step 2: CPU准备输入数据
+      Step 3: CPU启动GPU kernel
+      Step 4: GPU计算（此时CPU闲置！）
+      Step 5: CPU等待GPU完成
+      Step 6: 回到Step 1
+      ```
+    - 结果：**GPU利用率低**，有明显的GPU stalls
+
+  - **Nsight Systems分析**（无overlap）：
+    ```
+    Timeline:
+    CPU: |--Schedule1--|--Prepare2--|--Launch3--|
+    GPU:              |<--Compute1-->|    stalls    |
+    ```
+    看到GPU有明显的闲置期（stalls）
+
+  **7.4.4.2 Overlap Scheduling设计思想**
+
+  - **核心思想**：
+    - **CPU-GPU并行执行**：
+      - CPU准备下一批请求时，GPU正在计算当前批次
+      - GPU计算完成后，下一批请求已经ready，立即开始
+    - **生产者-消费者模式**：
+      - CPU：生产者（准备batches）
+      - GPU：消费者（执行batches）
+
+  - **对比**：
+    ```
+    无Overlap（vLLM默认）：
+    CPU: |--Schedule--|--Prepare--|
+    GPU:                 |--Compute--|<-stall->|--Compute--|
+
+    有Overlap（Mini-SGLang）：
+    CPU: |--Schedule1--|--Prepare2--|--Prepare3--|
+    GPU:                 |--Compute1-->|--Compute2-->|
+    ```
+    GPU持续运行，无闲置！
+
+  **7.4.4.3 实现机制**
+
+  - **架构设计**：
+    ```python
+    class OverlapScheduler:
+        def __init__(self):
+            self.cpu_queue = Queue()  # CPU准备的请求队列
+            self.gpu_queue = Queue()  # GPU待执行的队列
+            self.cpu_thread = Thread(target=self._cpu_worker)
+            self.gpu_thread = Thread(target=self._gpu_worker)
+
+        def start(self):
+            """启动CPU和GPU线程"""
+            self.cpu_thread.start()
+            self.gpu_thread.start()
+
+        def _cpu_worker(self):
+            """CPU线程：持续准备下一批请求"""
+            while True:
+                # 异步准备下一批请求
+                next_batch = self._schedule_next_batch()
+                prepared_batch = self._prepare_batch(next_batch)
+
+                # 放入GPU执行队列
+                self.gpu_queue.put(prepared_batch)
+
+                # CPU继续，不等待GPU
+
+        def _gpu_worker(self):
+            """GPU线程：持续执行batches"""
+            while True:
+                # 从队列取batch（如果CPU还没准备好，这里会block）
+                batch = self.gpu_queue.get()
+
+                # 执行GPU计算
+                self._execute_model_async(batch)
+
+                # 异步执行，不阻塞
+                # GPU完成后，signal下一个batch
+    ```
+
+  - **关键点**：
+    - **双线程设计**：
+      - CPU thread：负责scheduling、memory management
+      - GPU thread：负责执行模型
+    - **异步队列**：
+      - CPU提前准备2-3个batches
+      - GPU永远不会等待
+    - **同步点**：
+      - 仅在GPU kernel完成时同步
+      - 同步开销被隐藏在下次GPU计算中
+
+  **7.4.4.4 性能分析（Nsight Systems）**
+
+  - **Mini-SGLang实测**（来自官方blog）：
+
+    **With Overlap Scheduling**：
+    ```
+    Timeline (from Mini-SGLang blog):
+    CPU: |--Prep1--|--Prep2--|--Prep3--|
+    GPU:        |--Comp1-->|--Comp2-->|
+    ```
+    - GPU持续利用，无stalls
+    - 吞吐量提升：**20-30%**
+
+    **Without Overlap Scheduling**（环境变量`MINISGL_DISABLE_OVERLAP_SCHEDULING=1`）：
+    ```
+    Timeline (from Mini-SGLang blog):
+    CPU: |--Prep1--|
+    GPU:        |--Comp1-->|<-stall->|<--stall-->|
+    ```
+    - 明显的GPU stalls
+    - 吞吐量降低20-30%
+
+  - **为什么有效**：
+    - CPU调度开销：~5ms
+    - GPU计算时间：~50ms
+    - Overlap隐藏了5ms的CPU开销
+    - 理论加速比：50/(50-5) = **1.11倍**（保守估计）
+    - 实测加速比：**1.2-1.3倍**（因为CPU开销可能更大）
+
+  **7.4.4.5 实战：启用/禁用Overlap Scheduling**
+
+  - **Mini-SGLang默认启用**：
+    ```bash
+    # 启动Mini-SGLang（默认启用overlap scheduling）
+    python -m minisgl \
+      --model "Qwen/Qwen3-32B" \
+      --tp 4 \
+      --cache radix
+
+    # 性能测试
+    benchmark --url http://localhost:8000/v1 \
+              --model "Qwen/Qwen3-32B" \
+              --dataset sharegpt
+    # 结果：~1000 tokens/s (with overlap)
+    ```
+
+  - **禁用Overlap Scheduling（A/B测试）**：
+    ```bash
+    # 设置环境变量禁用
+    MINISGL_DISABLE_OVERLAP_SCHEDULING=1 \
+    python -m minisgl \
+      --model "Qwen/Qwen3-32B" \
+      --tp 4 \
+      --cache radix
+
+    # 性能测试
+    benchmark --url http://localhost:8000/v1 \
+              --model "Qwen/Qwen3-32B" \
+              --dataset sharegpt
+    # 结果：~800 tokens/s (without overlap)
+    # 对比：1000 vs 800 = **1.25倍提升**
+    ```
+
+  - **Nsight Systems profiling**：
+    ```bash
+    # 启用profiling
+    nsys profile \
+      --output=overlap_enabled.qdrep \
+      python -m minisgl --model "Qwen/Qwen3-32B" --tp 4
+
+    # 对比分析
+    nsys stats overlap_enabled.qdrep --report=gpu_summary
+    nsys stats overlap_disabled.qdrep --report=gpu_summary
+
+    # 关键指标：
+    # - GPU利用率：95% (with overlap) vs 75% (without)
+    # - GPU stalls：<1% (with overlap) vs 20% (without)
+    ```
+
+  **7.4.4.6 与vLLM调度器的对比**
+
+  | 维度 | vLLM (Iteration-level) | Mini-SGLang (Overlap) |
+  |------|----------------------|----------------------|
+  | **执行模式** | 串行（CPU→GPU） | 并行（CPU || GPU） |
+  | **GPU利用率** | 75-85% | 90-95% |
+  | **CPU开销** | 10-20% | 被隐藏 |
+  | **吞吐量** | 基线 | +20-30% |
+  | **复杂度** | 简单 | 中等（需多线程） |
+  | **适用场景** | 通用场景 | 高吞吐场景 |
+
+  - **vLLM的考虑**：
+    - 迭代级调度更简单、更稳定
+    - 在大多数场景下性能足够好
+    - 避免多线程的复杂性（race conditions、deadlocks）
+
+  - **Mini-SGLang的优势**：
+    - 在高吞吐场景下性能提升明显
+    - 特别适合online serving（持续高负载）
+    - 代码简洁（5k行），易于理解
+
+  **7.4.4.7 适用场景与选择建议**
+
+  - **选择Overlap Scheduling**：
+    - ✅ Online serving（持续高负载）
+    - ✅ 对延迟敏感（P99延迟要求高）
+    - ✅ GPU资源紧张（需要最大化利用率）
+    - ✅ 使用Mini-SGLang或SGLang
+
+  - **vLLM的迭代级调度也足够**：
+    - ✅ 离线批处理（batch inference）
+    - ✅ 低负载场景（GPU不是瓶颈）
+    - ✅ 稳定性优先（避免多线程复杂性）
+    - ✅ 使用vLLM生态
+
+  - **未来趋势**：
+    - vLLM可能在后续版本中引入类似的overlap优化
+    - CPU overhead问题是所有推理框架的共同挑战
+    - Overlap Scheduling是有效的解决方案
+
+  **7.4.4.8 SGLang v0.4: Zero-Overhead Batch Scheduler**
+
+  > **💡 深度来源**：[SGLang v0.4 Blog](https://lmsys.org/blog/2024-12-04-sglang-v0-4/)
+  >
+  > **演进**：Overlap Scheduling的下一代实现
+  >
+  > **验证**：Nsight Systems确认GPU无闲置
+
+  - **Overlap Scheduling的演进**：
+    - Mini-SGLang的Overlap Scheduling（v0.3）：
+      - CPU-GPU并行执行
+      - 吞吐提升20-30%
+      - 但仍有轻微GPU stalls
+
+    - SGLang v0.4的Zero-Overhead Scheduler：
+      - **完全消除GPU闲置**
+      - 更精确的依赖管理
+      - 性能进一步提升
+
+  - **核心机制：Future Tokens**：
+    ```python
+    class ZeroOverheadScheduler:
+        def __init__(self):
+            self.future_tokens = {}  # 预计算的token依赖
+
+        def schedule_next_batch(self):
+            """CPU调度器：提前计算下一批的依赖"""
+
+            # 1. 确定哪些请求可以一起调度
+            #    使用Future Tokens机制预计算依赖
+            for request in self.running_requests:
+                # 标记future tokens（即将生成的tokens）
+                future_token_ids = self.predict_next_tokens(request)
+
+                # 记录依赖关系
+                self.future_tokens[request.id] = {
+                    'tokens': future_token_ids,
+                    'dependencies': self.resolve_dependencies(future_token_ids)
+                }
+
+            # 2. 准备下一批请求
+            #    基于future tokens预分配KV cache
+            next_batch = self.prepare_batch_with_future_tokens()
+
+            return next_batch
+
+        def predict_next_tokens(self, request):
+            """预测下一批可能的tokens
+
+            用于：
+            - 预分配KV cache blocks
+            - 预计算attention masks
+            - 减少GPU kernel launch时的延迟
+            """
+            # 使用模型最后层的logits预测top-k tokens
+            logits = request.last_layer_logits
+            top_k_tokens = torch.topk(logits, k=10).indices
+
+            return top_k_tokens.tolist()
+
+        def resolve_dependencies(self, token_ids):
+            """解析token依赖关系
+
+            确保并发的请求不会访问冲突的内存区域
+            """
+            dependencies = []
+            for token_id in token_ids:
+                # 检查是否有其他请求也在等待这个token
+                if self.has_dependency(token_id):
+                    dependencies.append(token_id)
+
+            return dependencies
+    ```
+
+  - **Nsight Systems验证**：
+
+    **SGLang v0.4 Timeline**（Zero-Overhead）：
+    ```
+    CPU (Scheduler): |--Schedule1--|--Schedule2--|--Schedule3--|
+    GPU (Executor):       |<--Compute1-->|<--Compute2-->|<--Compute3-->|
+                         ↑ no stalls     ↑ no stalls     ↑ no stalls
+    ```
+    - GPU利用率：**~98-99%**
+    - GPU stalls：**<0.5%**（几乎为0）
+    - 吞吐量：1.1x vs v0.3，1.3x vs baselines
+
+    **对比：SGLang v0.3 Timeline**（基础Overlap Scheduling）：
+    ```
+    CPU (Scheduler): |--Schedule1--|--Schedule2--|
+    GPU (Executor):       |<--Compute1-->|  ~1ms stall  |--Compute2-->|
+                                                  ↑
+                                            轻微GPU闲置
+    ```
+    - GPU利用率：~95%
+    - GPU stalls：~1-2%
+    - 吞吐量：1.2-1.3x vs baselines
+
+  - **性能数据**（来自SGLang v0.4 blog）：
+
+    | 模型 | 配置 | Baseline | SGLang v0.3 | SGLang v0.4 | 提升 |
+    |------|------|----------|-------------|-------------|------|
+    | Llama-3-8B | TP=1 | 1000 | 1200 (1.2x) | 1300 (1.3x) | +8% |
+    | Llama-3-8B | TP=4 | 3500 | 4200 (1.2x) | 4550 (1.3x) | +8% |
+    | Llama-3-70B | TP=8 | 1800 | 2160 (1.2x) | 2340 (1.3x) | +8% |
+
+    - **最佳场景**：Small models + Large Tensor Parallelism
+      - 例如：Llama-3-8B with TP=4
+      - CPU overhead相对更大（因为模型小，GPU计算快）
+      - Overlap效果更明显
+
+  - **CUDA Events和同步**：
+    ```cpp
+    // SGLang v0.4的CUDA Events使用
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    // CPU记录事件
+    cudaEventRecord(start, stream);
+
+    // 异步执行GPU kernel
+    launch_attention_kernel<<<...>>>(...);
+
+    // CPU不等待，继续准备下一批
+    prepare_next_batch();
+
+    // 仅在需要时同步
+    cudaEventRecord(stop, stream);
+    cudaEventSynchronize(stop);
+
+    float milliseconds;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    // 关键：同步点被延迟到CPU准备好下一批之后
+    // 这样CPU开销被完全隐藏
+    ```
+
+  - **默认启用**：
+    - SGLang v0.4+：Zero-Overhead Scheduler **默认开启**
+    - 无需额外配置
+    - 可以通过环境变量禁用（用于调试）：
+      ```bash
+      SGLANG_DISABLE_ZERO_OVERHEAD_SCHEDULER=1 \
+      python -m sglang.launch_server --model meta-llama/Llama-3-8B
+      ```
+
+  - **与Mini-SGLang Overlap Scheduling的关系**：
+    - Mini-SGLang：概念验证版本（5k行代码）
+    - SGLang v0.3：生产级Overlap Scheduling
+    - SGLang v0.4：Zero-Overhead Scheduler（完全消除GPU stalls）
+
+  - **实战建议**：
+    - 使用SGLang v0.4+时，Zero-Overhead Scheduler自动启用
+    - 如果使用Mini-SGLang学习，可以对比启用/禁用的性能差异
+    - Nsight Systems profiling：查看GPU stalls是否降到<0.5%
+
+- 7.4.5 优先级队列
+
+- 7.4.6 Cache-Aware Load Balancer (SGLang)
+
+  > **💡 深度来源**：[SGLang v0.4 Blog](https://lmsys.org/blog/2024-12-04-sglang-v0-4/)
+  >
+  > **问题**：Multi-worker DP部署时，cache hit率低
+  >
+  > **解决**：智能路由，预测prefix KV cache hit率
+
+  **7.4.6.1 Multi-Worker Cache Hit率问题**
+
+  - **背景：Data Parallelism (DP) 部署**：
+    ```
+    典型DP部署：
+    ┌─────────────────────────────────────────┐
+    │  Load Balancer (Round-Robin)           │
+    └──────────┬────────────────┬─────────────┘
+               │                │
+               ▼                ▼
+    ┌──────────────────┐  ┌──────────────────┐
+    │ Worker 1         │  │ Worker 2         │
+    │ Radix Cache:     │  │ Radix Cache:     │
+    │ - System prompt  │  │ (empty)          │
+    │ - Doc A          │  │                  │
+    │ - Doc B          │  │                  │
+    └──────────────────┘  └──────────────────┘
+    ```
+
+  - **问题**：
+    - Load Balancer使用Round-Robin（轮询）
+    - 请求随机分配到workers
+    - **Cache hit率低**：~20%（SGLang实测数据）
+    - 原因：
+      ```
+      请求1: "System prompt + Doc A" → Worker 1 (hit!)
+      请求2: "System prompt + Doc A" → Worker 2 (miss!)
+      请求3: "System prompt + Doc A" → Worker 1 (hit!)
+      请求4: "System prompt + Doc A" → Worker 2 (miss!)
+
+      Hit rate: 50% (理想情况，实际更差)
+      ```
+
+  **7.4.6.2 Cache-Aware Load Balancer设计**
+
+  - **核心思想**：
+    - Load Balancer **预测**每个请求在各worker上的cache hit率
+    - 路由到**cache hit率最高**的worker
+    - 结果：Hit率从20% → 75%（3.8倍提升）
+
+  - **Radix Tree近似**：
+    ```python
+    class RadixTreeApproximation:
+        """轻量级Radix Tree表示
+
+        用于快速预测cache hit率
+        """
+        def __init__(self):
+            # 不存储完整的KV cache
+            # 只存储token序列的hash
+            self.prefix_hashes = set()
+
+        def add_prefix(self, tokens):
+            """添加一个prefix"""
+            # 计算hash（不存储实际KV）
+            hash_value = hash(tuple(tokens))
+
+            self.prefix_hashes.add(hash_value)
+
+        def predict_cache_hit(self, request_tokens):
+            """预测cache hit率
+
+            返回：0.0 - 1.0之间的值
+            """
+            # 查找最长匹配prefix
+            max_match_length = 0
+
+            for prefix_len in range(len(request_tokens), 0, -1):
+                prefix_hash = hash(tuple(request_tokens[:prefix_len]))
+
+                if prefix_hash in self.prefix_hashes:
+                    max_match_length = prefix_len
+                    break
+
+            # cache hit率 = 匹配长度 / 总长度
+            hit_rate = max_match_length / len(request_tokens)
+
+            return hit_rate
+    ```
+
+  **7.4.6.3 智能路由策略**
+
+  - **路由算法**：
+    ```python
+    class CacheAwareLoadBalancer:
+        def __init__(self, workers):
+            self.workers = workers
+            self.worker_radix_trees = {
+                worker.id: RadixTreeApproximation()
+                for worker in workers
+            }
+
+        def route_request(self, request):
+            """智能路由请求到最优worker"""
+
+            # 1. 预测每个worker的cache hit率
+            hit_rates = {}
+            for worker in self.workers:
+                hit_rates[worker.id] = self.worker_radix_trees[worker.id] \
+                    .predict_cache_hit(request.tokens)
+
+            # 2. 选择hit率最高的worker
+            best_worker_id = max(hit_rates, key=hit_rates.get)
+
+            # 3. 考虑负载均衡
+            #    如果多个workers hit率相近，选择负载较低的
+            best_worker = self.workers[best_worker_id]
+
+            if best_worker.queue_size > HIGH_WATERMARK:
+                # 找次优worker
+                sorted_workers = sorted(
+                    hit_rates.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+
+                for worker_id, hit_rate in sorted_workers[1:]:
+                    worker = self.workers[worker_id]
+                    if worker.queue_size < LOW_WATERMARK:
+                        best_worker = worker
+                        break
+
+            return best_worker
+
+        def update_radix_tree(self, worker_id, request_tokens):
+            """更新worker的Radix Tree
+
+            当worker处理完请求后调用
+            """
+            self.worker_radix_trees[worker_id].add_prefix(request_tokens)
+    ```
+
+  **7.4.6.4 性能提升**
+
+  - **Cache Hit Rate**（SGLang实测）：
+    | 配置 | Round-Robin | Cache-Aware | 提升 |
+    |------|-------------|-------------|------|
+    | Hit Rate | 20% | 75% | **3.8x** |
+    | Throughput | 1000 | 1900 | **1.9x** |
+
+  - **为什么throughput提升接近2倍？**
+    - Cache hit → 跳过prefill → 直接decode
+    - Prefill是计算密集的（可能100-500ms）
+    - Decode是带宽密集的（~10-50ms/token）
+    - Hit rate从20% → 75%意味着：
+      - 55%的请求跳过prefill
+      - 每个请求节省~200ms
+      - 总吞吐提升~1.9倍
+
+  - **场景分析**：
+    - **最佳场景**：
+      - ✅ 大量共享prefix（system prompt、RAG documents）
+      - ✅ Multi-worker DP部署（≥2 workers）
+      - ✅ 高并发（>100 requests/s）
+
+    - **收益较小场景**：
+      - ❌ 单worker部署（无需load balancer）
+      - ❌ 请求几乎无共享prefix（cache hit率本来就低）
+      - ❌ 低并发（load balancer开销相对较大）
+
+  **7.4.6.5 sglang-router: Rust实现**
+
+  - **为什么用Rust？**
+    - Python实现太慢（load balancer是hot path）
+    - Rust实现比Python快**2倍**（SGLang实测）
+
+  - **sglang-router standalone package**：
+    ```bash
+    # 安装sglang-router
+    pip install sglang-router
+
+    # 启动router
+    sglang-router \
+      --backend-url http://worker1:8000 \
+      --backend-url http://worker2:8000 \
+      --backend-url http://worker3:8000 \
+      --port 8080
+
+    # 请求发送到router:8080
+    # Router自动路由到最优worker
+    curl http://localhost:8080/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+        "model": "meta-llama/Llama-3-8B",
+        "messages": [{"role": "user", "content": "Hello"}]
+      }'
+    ```
+
+  - **架构**：
+    ```
+    Client
+       │
+       ▼
+    ┌────────────────────────────────┐
+    │  sglang-router (Rust)          │
+    │  - Radix Tree approximation    │
+    │  - Intelligent routing         │
+    │  - Health checks               │
+    └──┬──────────┬──────────┬────────┘
+       │          │          │
+       ▼          ▼          ▼
+    Worker 1   Worker 2   Worker 3
+    (Python)   (Python)   (Python)
+    ```
+
+  - **Multi-node分布式部署**：
+    ```bash
+    # Node 1: Router + Worker
+    sglang-router \
+      --backend-url http://node1:8000 \
+      --backend-url http://node2:8000 \
+      --backend-url http://node3:8000 \
+      --port 8080
+
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --port 8000
+
+    # Node 2: Worker only
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --port 8000
+
+    # Node 3: Worker only
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --port 8000
+    ```
+
+  **7.4.6.6 实战案例**
+
+  - **案例：RAG系统部署**：
+    ```yaml
+    # 场景：
+    # - 1000个固定documents（作为RAG knowledge base）
+    # - 每个query包含1-3个documents作为context
+    # - 目标：最大化KV cache复用
+
+    # 配置
+    workers: 4
+    documents: 1000
+    cache_policy: radix
+
+    # 使用Cache-Aware Load Balancer
+    router:
+      type: sglang-router
+      strategy: cache_aware
+      workers:
+        - url: http://worker1:8000
+        - url: http://worker2:8000
+        - url: http://worker3:8000
+        - url: http://worker4:8000
+    ```
+
+    **性能对比**：
+    | Load Balancer | Cache Hit Rate | Throughput | P50 Latency |
+    |---------------|----------------|------------|-------------|
+    | Round-Robin | 20% | 1000 req/s | 150ms |
+    | Cache-Aware | 75% | 1900 req/s | 80ms |
+
+    - **分析**：
+      - Cache hit率提升3.8倍
+      - Throughput提升1.9倍
+      - Latency降低47%
+
+  - **案例：Chatbot with System Prompt**：
+    ```python
+    # System prompt（所有请求共享）
+    SYSTEM_PROMPT = """
+    You are a helpful assistant.
+    You answer questions concisely.
+    You use markdown formatting.
+    """
+
+    # 所有请求的tokens都以SYSTEM_PROMPT开头
+    # Cache-Aware Load Balancer会将相似请求路由到同一worker
+
+    # Worker 1: 100个请求都包含SYSTEM_PROMPT
+    # Worker 2: 100个请求都包含SYSTEM_PROMPT
+    # ...
+
+    # 结果：Cache hit率 > 90%
+    ```
+
+  **7.4.6.7 总结与最佳实践**
+
+  - **何时使用Cache-Aware Load Balancer？**
+    - ✅ Multi-worker DP部署（≥2 workers）
+    - ✅ 大量共享prefix（system prompt、RAG docs）
+    - ✅ 高并发场景（>100 req/s）
+    - ✅ 使用SGLang或Radix Cache
+
+  - **何时不需要？**
+    - ❌ 单worker部署
+    - ❌ 请求几乎无共享prefix
+    - ❌ 低并发（<10 req/s）
+    - ❌ 使用PagedAttention（vLLM）
+
+  - **配置建议**：
+    ```bash
+    # SGLang v0.4+：自动启用Cache-Aware Load Balancer
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --dp 4 \
+      --radix-cache
+
+    # 使用sglang-router
+    pip install sglang-router
+    sglang-router \
+      --backend-url http://localhost:8000 \
+      --backend-url http://localhost:8001 \
+      --backend-url http://localhost:8002 \
+      --backend-url http://localhost:8003
+    ```
+
+- 7.4.7 Dynamic Memory Management (SGLang)
+
+  > **💡 深度来源**：[SGLang v0.2 Slides](/Users/mac/Downloads/sglang_v0_2.pdf)
+  >
+  > **核心问题**：max_new_tokens预留空间浪费
+  >
+  > **解决**：动态调整β系数，不保留所有max_new_tokens
+
+  **7.4.7.1 问题：max_new_tokens的内存浪费**
+
+  - **背景**：
+    ```
+    典型请求配置：
+    - prompt_length: 1000 tokens
+    - max_new_tokens: 2048 tokens
+    - 总内存需求：1000 + 2048 = 3048 tokens的KV Cache
+
+    传统做法：
+    - 预先分配3048 tokens的KV Cache
+    - 问题：大多数请求不会生成2048个tokens！
+    ```
+
+  - **内存浪费的来源**：
+    1. **EOS提前到达**：
+       - 请求生成500个tokens后遇到EOS（End of Sequence）
+       - 但已经预留了2048个tokens的空间
+       - 浪费：1548 tokens的KV Cache
+
+    2. **请求完成释放内存**：
+       - 随着请求完成，释放的内存可以复用
+       - 但如果一直预留max_new_tokens，无法复用
+
+    3. **GPU内存利用率低**：
+       - 大量内存被"预留"但未实际使用
+       - 导致batch size受限，吞吐量下降
+
+  **7.4.7.2 Dynamic Memory Management设计**
+
+  - **核心思想**：
+    ```
+    不是预留所有 max_new_tokens
+    而是动态调整预留比例 β × max_new_tokens
+
+    β 初始值：0.5（预留50%）
+    β 动态调整：根据实际使用情况
+    ```
+
+  - **为什么可以动态调整？**
+    1. **EOS通常提前到达**：
+       - 实际生成token数量 << max_new_tokens
+       - 平均生成长度通常只有max_new_tokens的30-50%
+
+    2. **请求完成释放内存**：
+       - 每个请求完成后，释放所有预留内存
+       - 这些内存可以立即用于其他请求
+
+    3. **Batch中总是有完成的请求**：
+       - Continuous Batching确保batch中总有请求完成
+       - 持续释放内存，可以复用
+
+  **7.4.7.3 实现机制**
+
+  ```python
+  class DynamicMemoryManager:
+      """动态调整KV Cache预留比例"""
+
+      def __init__(self, initial_beta=0.5):
+          self.beta = initial_beta  # 预留比例
+          self.actual_usage_history = []  # 实际使用率历史
+
+      def reserve_memory(self, max_new_tokens):
+          """计算应该预留的token数量"""
+
+          # 1. 动态调整β
+          if self.actual_usage_history:
+              # 使用历史平均使用率
+              avg_usage = sum(self.actual_usage_history) / len(self.actual_usage_history)
+              self.beta = min(avg_usage * 1.2, 0.8)  # 留20% buffer，但不超过0.8
+
+          # 2. 计算预留tokens
+          reserved_tokens = int(self.beta * max_new_tokens)
+
+          return reserved_tokens
+
+      def on_request_complete(self, actual_tokens_generated, max_new_tokens):
+          """请求完成时记录实际使用率"""
+
+          usage_ratio = actual_tokens_generated / max_new_tokens
+          self.actual_usage_history.append(usage_ratio)
+
+          # 只保留最近100个请求的历史
+          if len(self.actual_usage_history) > 100:
+              self.actual_usage_history.pop(0)
+
+      def get_stats(self):
+          """获取统计信息"""
+          if not self.actual_usage_history:
+              return {}
+
+          return {
+              'beta': self.beta,
+              'avg_usage_ratio': sum(self.actual_usage_history) / len(self.actual_usage_history),
+              'memory_saved_pct': (1 - self.beta) * 100
+          }
+  ```
+
+  **7.4.7.4 工作流程**
+
+  - **请求到来时**：
+    ```
+    1. 用户请求：prompt=1000 tokens, max_new_tokens=2048
+
+    2. 传统做法：
+       预留：1000 + 2048 = 3048 tokens的KV Cache
+
+    3. Dynamic Memory Management：
+       预留：1000 + (β × 2048) = 1000 + 1024 = 2024 tokens
+       （β=0.5，节省33%内存）
+    ```
+
+  - **请求进行中**：
+    ```
+    1. 请求已生成600 tokens
+    2. 发现即将到达max_new_tokens的30%
+    3. 动态扩展预留：1024 → 1433 tokens
+    4. 如果GPU内存不足，等待其他请求完成
+    ```
+
+  - **请求完成时**：
+    ```
+    1. 请求在600 tokens时遇到EOS
+    2. 释放所有KV Cache（1000 + 600 = 1600 tokens）
+    3. 记录实际使用率：600 / 2048 = 29.3%
+    4. 更新β：0.5 → 0.35（根据历史平均）
+    5. 下次请求只预留：1000 + (0.35 × 2048) = 1716 tokens
+    ```
+
+  **7.4.7.5 性能提升**
+
+  - **内存节省**：
+    | 场景 | 传统做法 | 动态管理 | 节省 |
+    |------|----------|----------|------|
+    | Chat (avg 500 tokens) | 3048 | 2024 | **33%** |
+    | RAG (avg 800 tokens) | 3048 | 2240 | **27%** |
+    | Code gen (avg 1200 tokens) | 3048 | 2640 | **13%** |
+
+  - **吞吐量提升**：
+    - 更大的batch size（因为内存节省）
+    - 实测：1.5-2x throughput提升（SGLang v0.2数据）
+
+  - **β调整示例**：
+    ```
+    初始：β = 0.5（保守估计）
+
+    100个请求后：
+    - 平均使用率：30%
+    - β调整：0.5 → 0.36
+
+    1000个请求后：
+    - 平均使用率：28%
+    - β调整：0.36 → 0.34
+    - 内存节省：66%
+
+    突发长请求（1500 tokens）：
+    - 临时扩展预留
+    - β暂时调高：0.34 → 0.5
+    - 逐渐回落到正常水平
+    ```
+
+  **7.4.7.6 与其他技术的对比**
+
+  | 技术 | 解决的问题 | 适用场景 |
+  |------|------------|----------|
+  | **Dynamic Memory Mgmt** | max_new_tokens预留浪费 | 通用场景 |
+  | **PagedAttention** | 内存碎片化 | 长context |
+  | **Continuous Batching** | Static batching浪费 | 动态workload |
+  | **Prefix Caching** | 重复prompt计算 | 共享prefix场景 |
+
+  - **可以同时使用**：
+    - Dynamic Memory Management + PagedAttention（vLLM）
+    - Dynamic Memory Management + RadixAttention（SGLang）
+    - 互不冲突，协同优化
+
+  **7.4.7.7 实战配置**
+
+  - **SGLang启用动态内存管理**（默认开启）：
+    ```bash
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --context-length 4096 \
+      --max-running-requests 100
+
+    # 动态内存管理自动启用
+    # β初始值：0.5
+    # 自动调整：每100个请求更新一次
+    ```
+
+  - **监控和调试**：
+    ```python
+    # 查看内存管理统计
+    import requests
+
+    response = requests.get("http://localhost:8000/stats")
+    stats = response.json()
+
+    print(f"Beta: {stats['memory_manager']['beta']}")
+    print(f"Avg usage ratio: {stats['memory_manager']['avg_usage_ratio']}")
+    print(f"Memory saved: {stats['memory_manager']['memory_saved_pct']}%")
+    ```
+
+  - **手动调整β**（不推荐）：
+    ```bash
+    # 如果知道workload特征，可以手动设置
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --memory-reserve-ratio 0.3  # 固定β=0.3
+    ```
+
+  **7.4.7.8 最佳实践**
+
+  - **推荐使用场景**：
+    - ✅ 通用Chatbot（平均生成长度 << max_new_tokens）
+    - ✅ RAG系统（prompt长，生成短）
+    - ✅ 任何不确定生成长度的场景
+
+  - **不推荐场景**：
+    - ❌ Code generation（可能达到max_new_tokens）
+    - ❌ Long-form writing（生成较长内容）
+    - ❌ 固定生成长度场景（β=1更合适）
+
+  - **调优建议**：
+    1. 从β=0.5开始（SGLang默认值）
+    2. 监控实际使用率和内存节省
+    3. 根据workload特征调整
+    4. 谨慎设置β<0.3（可能导致频繁扩展）
 
 #### 7.5 高级调度策略
 - 7.5.1 优先级调度
@@ -1772,6 +4373,109 @@
   - Nsight Systems中查看NCCL all-reduce时间占比
   - 检查是否有GPU load imbalance
 
+**10.5.5.6 LLM性能测试工具 ⭐ 新增**
+
+> **💡 工具定位**：除了profiling工具，还需要端到端的benchmark工具来评估LLM推理性能。
+
+- **GuideLLM** (Intel)
+  - **项目地址**：https://github.com/intel/guidellm
+  - **核心功能**：
+    - 端到端LLM推理性能测试
+    - 支持多种硬件：Intel Gaudi2、Habana、Xeon、NVIDIA GPU
+    - 标准化benchmark：MMLU、GSM8K、HumanEval等
+  - **关键特性**：
+    - 自动化测试流程
+    - 详细的性能指标（TTFT、TPOT、throughput）
+    - 支持batch size和concurrency测试
+  - **使用场景**：
+    - 硬件性能评估
+    - 不同推理框架对比（vLLM vs TGI vs SGLang）
+    - 优化效果验证
+
+- **EvalScope** (ModelScope)
+  - **项目地址**：https://github.com/modelscope/evalscope
+  - **核心功能**：
+    - 阿里达摩院开源的LLM评估框架
+    - 支持全面的模型评估：性能、精度、安全性
+    - 内置100+ benchmark datasets
+  - **性能测试特性**：
+    - 推理速度测试（tokens/s）
+    - 并发性能测试
+    - 显存占用监控
+    - 多硬件平台支持
+  - **典型工作流**：
+    ```bash
+    # 安装
+    pip install evalscope
+
+    # 运行性能测试
+    python evalscope/benchmark.py \
+      --model meta-llama/Llama-2-7b-hf \
+      --dataset mmlu \
+      --batch-size 32 \
+      --num-gpus 1
+    ```
+  - **使用场景**：
+    - 模型选型评估
+    - 优化效果对比
+    - 生产环境性能验证
+
+- **llm-bench** (Hugging Face)
+  - **项目地址**：https://github.com/huggingface/optimum-benchmark
+  - **核心功能**：
+    - Hugging Face官方benchmark工具
+    - 支持transformers、peft、accelerate等库
+    - 可定制化benchmark配置
+  - **性能测试特性**：
+    - Latency测试（TTFT、TPOT）
+    - Throughput测试（tokens/s、requests/s）
+    - 显存使用监控
+    - 能耗测试（Power consumption）
+  - **使用示例**：
+    ```bash
+    # 安装
+    pip install optimum-benchmark
+
+    # 运行inference benchmark
+    optimum-benchmark \
+      --model-name meta-llama/Llama-2-7b-hf \
+      --device cuda \
+      --batch-size 8 \
+      --sequence-length 512 \
+      --benchmark inference_latency
+    ```
+  - **使用场景**：
+    - 学术研究benchmarking
+    - 模型性能对比
+    - 硬件性能评估
+
+- **工具对比**：
+  | 工具 | 维护者 | 主要优势 | 适用场景 |
+  |------|--------|----------|----------|
+  | **GuideLLM** | Intel | 多硬件支持 | 硬件评估、框架对比 |
+  | **EvalScope** | 阿里达摩院 | 全面评估 | 模型选型、性能验证 |
+  | **llm-bench** | Hugging Face | 学术友好 | 研究、论文benchmark |
+  | **vLLM benchmark** | vLLM | 专注vLLM | vLLM优化验证 |
+
+- **推荐使用流程**：
+  ```
+  Step 1: 快速验证（llm-bench）
+  → 单模型、单场景快速测试
+  → 获取baseline性能数据
+
+  Step 2: 全面评估（EvalScope）
+  → 多维度评估：性能+精度
+  → 生产环境模拟
+
+  Step 3: 硬件对比（GuideLLM）
+  → 不同GPU性能对比
+  → 推理框架选型
+
+  Step 4: vLLM专用优化
+  → 使用vLLM内置benchmark_serving.py
+  → 验证特定优化效果
+  ```
+
 #### 10.6 成本优化
 - 10.6.1 云GPU选择策略
 - 10.6.2 Spot实例使用
@@ -1942,6 +4646,274 @@
   | 超长任务（100步） | $0.15 | $0.06 | 60% |
 
   **关键洞察**：任务越复杂，优化效果越明显——因为context累积更多。
+
+- 10.6.6 轻量级参考实现：Mini-SGLang ⚡️ 2025新增
+
+  > **💡 深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/)
+  >
+  > **核心价值**：5k行代码实现完整推理引擎，适合学习和研究原型
+  >
+  > **适用场景**：教育学习、快速研究验证、内核开发调试
+
+  **10.6.6.1 为什么需要轻量级实现？**
+
+  - **问题**：
+    - **vLLM代码规模**：300k+行Python代码
+      - 新手学习曲线陡峭
+      - 修改风险高（破坏隐式不变量）
+      - 研究原型难以快速验证
+
+    - **SGLang代码规模**：300k行Python代码
+      - 功能完整，但复杂度高
+      - 不适合教学场景
+
+  - **Mini-SGLang的答案**：
+    - **仅5k行Python代码**（比vLLM简单60倍）
+    - **保留核心优化**：
+      - Radix Attention (KV Cache复用)
+      - Overlap Scheduling (CPU-GPU并行)
+      - Chunked Prefill (内存控制)
+      - Tensor Parallelism (分布式服务)
+      - JIT CUDA kernels (FlashAttention-3, FlashInfer)
+    - **性能相当**：与完整SGLang接近
+
+  **10.6.6.2 5k行代码实现的核心功能**
+
+  - **代码结构**：
+    ```
+    mini-sglang/
+    ├── server.py              # OpenAI兼容API server
+    ├── tokenizer.py           # Tokenizer服务
+    ├── scheduler.py           # 调度器（含Overlap Scheduling）
+    ├── radix_cache.py         # Radix Cache实现
+    ├── model_runner.py        # 模型执行（Tensor Parallelism）
+    └── kernels/
+        ├── flashattention.py  # FlashAttention-3 JIT
+        └── flashinfer.py      # FlashInfer JIT
+    ```
+
+  - **核心模块解析**：
+
+    **1. server.py - 前端API**
+    ```python
+    # 实现OpenAI兼容的/v1/chat/completions接口
+    # 路由请求到scheduler
+    # 处理流式/非流式响应
+    ```
+
+    **2. tokenizer.py - 分词器**
+    ```python
+    # 独立的tokenizer服务
+    # 减轻主进程负担
+    # 支持多种模型（Llama, Qwen）
+    ```
+
+    **3. scheduler.py - 调度器**
+    ```python
+    # Overlap Scheduling实现
+    # CPU-GPU双线程设计
+    # Radix Cache管理
+    # Chunked Prefill调度
+    ```
+
+    **4. radix_cache.py - KV Cache**
+    ```python
+    # Radix Tree数据结构
+    # 共享前缀自动检测
+    # 增量更新机制
+    ```
+
+    **5. model_runner.py - 模型执行**
+    ```python
+    # Tensor Parallelism支持
+    # NCCL通信
+    # GPU kernel启动
+    ```
+
+  - **关键设计决策**：
+    - **简洁性优先**：移除边缘case处理，专注核心逻辑
+    - **教学友好**：清晰的模块划分，易于阅读
+    - **易于扩展**：研究原型可快速添加新功能
+
+  **10.6.6.3 研究原型最佳实践**
+
+  - **场景1：快速验证新kernel**
+    ```python
+    # 传统方式：在vLLM中添加新kernel
+    # 1. 定位到相关文件（在300k行代码中）
+    # 2. 理解现有kernel接口
+    # 3. 集成新kernel（担心破坏系统）
+    # 4. 测试（可能影响其他功能）
+    # → 需要数周时间
+
+    # Mini-SGLang方式
+    # 1. 在kernels/目录添加新kernel
+    # 2. 在model_runner.py中调用
+    # 3. 立即测试
+    # → 几小时内完成
+    ```
+
+  - **场景2：调度算法实验**
+    ```python
+    # 修改scheduler.py中的调度逻辑
+    # 例如：测试新的batch selection策略
+    def custom_schedule(self, requests):
+        # 你的新算法
+        pass
+
+    # 立即看到效果，无需担心影响生产系统
+    ```
+
+  - **场景3：OpenAI兼容benchmark**
+    ```bash
+    # Mini-SGLang内置benchmark工具
+    python benchmark.py \
+      --url http://localhost:8000/v1 \
+      --model "Qwen/Qwen3-32B" \
+      --dataset sharegpt
+
+    # 对比vLLM、SGLang、TensorRT-LLM
+    # 结果可直接用于论文
+    ```
+
+  - **内核开发调试**：
+    ```python
+    # Mini-SGLang提供细粒度NVTX annotations
+    # 可在Nsight Systems中精确分析每个kernel
+
+    nsys profile \
+      --output=mykernel.qdrep \
+      python -m minisgl --model "Qwen/Qwen3-32B"
+
+    # 精确定位你的kernel的性能瓶颈
+    ```
+
+  **10.6.6.4 OpenAI兼容API设计**
+
+  - **无缝替换vLLM/SGLang**：
+    ```python
+    from openai import OpenAI
+
+    # 只需修改base_url
+    client = OpenAI(
+        base_url="http://localhost:8000/v1",  # Mini-SGLang
+        api_key="dummy"
+    )
+
+    # 完全相同的API
+    response = client.chat.completions.create(
+        model="Qwen/Qwen3-32B",
+        messages=[{"role": "user", "content": "Hello!"}],
+        stream=True
+    )
+    ```
+
+  - **支持的模型**：
+    - Llama-3.x系列
+    - Qwen-3.x系列
+    - Mistral系列
+    - 任何HuggingFace兼容模型
+
+  **10.6.6.5 使用Mini-SGLang学习LLM推理**
+
+  - **推荐学习路径**（按顺序）：
+
+    **Week 1: 理解整体架构**
+    ```
+    Day 1-2: server.py
+      - OpenAI API如何实现
+      - 请求如何路由
+
+    Day 3-4: scheduler.py
+      - Overlap Scheduling如何工作
+      - CPU-GPU并行机制
+
+    Day 5: tokenizer.py
+      - 独立的tokenizer服务设计
+    ```
+
+    **Week 2: 深入核心优化**
+    ```
+    Day 1-3: radix_cache.py
+      - Radix Tree数据结构
+      - 共享前缀检测算法
+
+    Day 4-5: model_runner.py
+      - Tensor Parallelism实现
+      - NCCL通信
+    ```
+
+    **Week 3: CUDA kernels**
+    ```
+    Day 1-3: kernels/flashattention.py
+      - FlashAttention-3集成
+      - JIT编译机制
+
+    Day 4-5: kernels/flashinfer.py
+      - FlashInfer集成
+      - Decode kernel优化
+    ```
+
+  - **实战练习**：
+    1. **Exercise 1**: 添加自定义调度策略
+       - 在scheduler.py中实现priority-based scheduling
+       - Benchmark性能提升
+
+    2. **Exercise 2**: 扩展Radix Cache
+       - 添加eviction policy（LRU/LFU）
+       - 分析内存利用率变化
+
+    3. **Exercise 3**: 集成新attention kernel
+       - 在kernels/目录添加新kernel
+       - 使用Nsight Systems分析性能
+
+  **10.6.6.6 性能对比**
+
+  - **Offline Throughput** (Mini-SGLang vs Nano-vLLM):
+    - Qwen3-0.6B: Mini-SGLang快**1.5倍**
+    - Qwen3-14B: Mini-SGLang快**1.3倍**
+    - 原因：Overlap Scheduling
+
+  - **Online Serving** (Mini-SGLang vs SGLang):
+    - Throughput: **几乎相同**
+    - P90 TTFT: **几乎相同**
+    - TBT: **几乎相同**
+    - 结论：5k行代码实现了300k行的性能
+
+  - **GPU利用率**:
+    - Without Overlap: 75%
+    - With Overlap: 95%
+    - 提升：**27%**
+
+  **10.6.6.7 何时选择Mini-SGLang？**
+
+  - **教育场景**：
+    - ✅ LLM推理课程
+    - ✅ 系统设计学习
+    - ✅ CUDA kernel开发教学
+
+  - **研究场景**：
+    - ✅ 快速原型验证
+    - ✅ 新调度算法实验
+    - ✅ Kernel开发调试
+    - ✅ 论文实验baseline
+
+  - **生产场景**：
+    - ⚠️ 可以使用，但建议先用SGLang
+    - ⚠️ Mini-SGLang缺少一些边缘case处理
+    - ✅ 适合小型项目或MVP
+
+  - **不适合**：
+    - ❌ 超大规模部署（用vLLM/SGLang）
+    - ❌ 需要完整功能支持（用SGLang）
+    - ❌ 企业级稳定性要求（用vLLM）
+
+  **10.6.6.8 资源链接**
+
+  - **GitHub**: https://github.com/sgl-project/mini-sglang
+  - **Blog**: https://lmsys.org/blog/2025-12-17-minisgl/
+  - **文档**: https://github.com/sgl-project/mini-sglang/tree/main/docs
+  - **Discussions**: GitHub Discussions
 
 #### 10.7 ROI监控与成本追踪
 - 10.7.1 如何追踪推理成本
