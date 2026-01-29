@@ -319,7 +319,16 @@
   - 7.4.4.5 实战：启用/禁用Overlap Scheduling
   - 7.4.4.6 与vLLM调度器的对比
   - 7.4.4.7 适用场景与选择建议
+  - 7.4.4.8 SGLang v0.4: Zero-Overhead Batch Scheduler
 - 7.4.5 优先级队列
+- 7.4.6 Cache-Aware Load Balancer (SGLang)
+  - 7.4.6.1 Multi-Worker Cache Hit率问题
+  - 7.4.6.2 Cache-Aware Load Balancer设计
+  - 7.4.6.3 智能路由策略
+  - 7.4.6.4 性能提升
+  - 7.4.6.5 sglang-router: Rust实现
+  - 7.4.6.6 实战案例
+  - 7.4.6.7 总结与最佳实践
 
 #### 7.5 高级调度策略
 - 7.5.1 优先级调度

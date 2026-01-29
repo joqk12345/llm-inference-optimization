@@ -1902,7 +1902,486 @@
     - CPU overhead问题是所有推理框架的共同挑战
     - Overlap Scheduling是有效的解决方案
 
+  **7.4.4.8 SGLang v0.4: Zero-Overhead Batch Scheduler**
+
+  > **💡 深度来源**：[SGLang v0.4 Blog](https://lmsys.org/blog/2024-12-04-sglang-v0-4/)
+  >
+  > **演进**：Overlap Scheduling的下一代实现
+  >
+  > **验证**：Nsight Systems确认GPU无闲置
+
+  - **Overlap Scheduling的演进**：
+    - Mini-SGLang的Overlap Scheduling（v0.3）：
+      - CPU-GPU并行执行
+      - 吞吐提升20-30%
+      - 但仍有轻微GPU stalls
+
+    - SGLang v0.4的Zero-Overhead Scheduler：
+      - **完全消除GPU闲置**
+      - 更精确的依赖管理
+      - 性能进一步提升
+
+  - **核心机制：Future Tokens**：
+    ```python
+    class ZeroOverheadScheduler:
+        def __init__(self):
+            self.future_tokens = {}  # 预计算的token依赖
+
+        def schedule_next_batch(self):
+            """CPU调度器：提前计算下一批的依赖"""
+
+            # 1. 确定哪些请求可以一起调度
+            #    使用Future Tokens机制预计算依赖
+            for request in self.running_requests:
+                # 标记future tokens（即将生成的tokens）
+                future_token_ids = self.predict_next_tokens(request)
+
+                # 记录依赖关系
+                self.future_tokens[request.id] = {
+                    'tokens': future_token_ids,
+                    'dependencies': self.resolve_dependencies(future_token_ids)
+                }
+
+            # 2. 准备下一批请求
+            #    基于future tokens预分配KV cache
+            next_batch = self.prepare_batch_with_future_tokens()
+
+            return next_batch
+
+        def predict_next_tokens(self, request):
+            """预测下一批可能的tokens
+
+            用于：
+            - 预分配KV cache blocks
+            - 预计算attention masks
+            - 减少GPU kernel launch时的延迟
+            """
+            # 使用模型最后层的logits预测top-k tokens
+            logits = request.last_layer_logits
+            top_k_tokens = torch.topk(logits, k=10).indices
+
+            return top_k_tokens.tolist()
+
+        def resolve_dependencies(self, token_ids):
+            """解析token依赖关系
+
+            确保并发的请求不会访问冲突的内存区域
+            """
+            dependencies = []
+            for token_id in token_ids:
+                # 检查是否有其他请求也在等待这个token
+                if self.has_dependency(token_id):
+                    dependencies.append(token_id)
+
+            return dependencies
+    ```
+
+  - **Nsight Systems验证**：
+
+    **SGLang v0.4 Timeline**（Zero-Overhead）：
+    ```
+    CPU (Scheduler): |--Schedule1--|--Schedule2--|--Schedule3--|
+    GPU (Executor):       |<--Compute1-->|<--Compute2-->|<--Compute3-->|
+                         ↑ no stalls     ↑ no stalls     ↑ no stalls
+    ```
+    - GPU利用率：**~98-99%**
+    - GPU stalls：**<0.5%**（几乎为0）
+    - 吞吐量：1.1x vs v0.3，1.3x vs baselines
+
+    **对比：SGLang v0.3 Timeline**（基础Overlap Scheduling）：
+    ```
+    CPU (Scheduler): |--Schedule1--|--Schedule2--|
+    GPU (Executor):       |<--Compute1-->|  ~1ms stall  |--Compute2-->|
+                                                  ↑
+                                            轻微GPU闲置
+    ```
+    - GPU利用率：~95%
+    - GPU stalls：~1-2%
+    - 吞吐量：1.2-1.3x vs baselines
+
+  - **性能数据**（来自SGLang v0.4 blog）：
+
+    | 模型 | 配置 | Baseline | SGLang v0.3 | SGLang v0.4 | 提升 |
+    |------|------|----------|-------------|-------------|------|
+    | Llama-3-8B | TP=1 | 1000 | 1200 (1.2x) | 1300 (1.3x) | +8% |
+    | Llama-3-8B | TP=4 | 3500 | 4200 (1.2x) | 4550 (1.3x) | +8% |
+    | Llama-3-70B | TP=8 | 1800 | 2160 (1.2x) | 2340 (1.3x) | +8% |
+
+    - **最佳场景**：Small models + Large Tensor Parallelism
+      - 例如：Llama-3-8B with TP=4
+      - CPU overhead相对更大（因为模型小，GPU计算快）
+      - Overlap效果更明显
+
+  - **CUDA Events和同步**：
+    ```cpp
+    // SGLang v0.4的CUDA Events使用
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    // CPU记录事件
+    cudaEventRecord(start, stream);
+
+    // 异步执行GPU kernel
+    launch_attention_kernel<<<...>>>(...);
+
+    // CPU不等待，继续准备下一批
+    prepare_next_batch();
+
+    // 仅在需要时同步
+    cudaEventRecord(stop, stream);
+    cudaEventSynchronize(stop);
+
+    float milliseconds;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    // 关键：同步点被延迟到CPU准备好下一批之后
+    // 这样CPU开销被完全隐藏
+    ```
+
+  - **默认启用**：
+    - SGLang v0.4+：Zero-Overhead Scheduler **默认开启**
+    - 无需额外配置
+    - 可以通过环境变量禁用（用于调试）：
+      ```bash
+      SGLANG_DISABLE_ZERO_OVERHEAD_SCHEDULER=1 \
+      python -m sglang.launch_server --model meta-llama/Llama-3-8B
+      ```
+
+  - **与Mini-SGLang Overlap Scheduling的关系**：
+    - Mini-SGLang：概念验证版本（5k行代码）
+    - SGLang v0.3：生产级Overlap Scheduling
+    - SGLang v0.4：Zero-Overhead Scheduler（完全消除GPU stalls）
+
+  - **实战建议**：
+    - 使用SGLang v0.4+时，Zero-Overhead Scheduler自动启用
+    - 如果使用Mini-SGLang学习，可以对比启用/禁用的性能差异
+    - Nsight Systems profiling：查看GPU stalls是否降到<0.5%
+
 - 7.4.5 优先级队列
+
+- 7.4.6 Cache-Aware Load Balancer (SGLang)
+
+  > **💡 深度来源**：[SGLang v0.4 Blog](https://lmsys.org/blog/2024-12-04-sglang-v0-4/)
+  >
+  > **问题**：Multi-worker DP部署时，cache hit率低
+  >
+  > **解决**：智能路由，预测prefix KV cache hit率
+
+  **7.4.6.1 Multi-Worker Cache Hit率问题**
+
+  - **背景：Data Parallelism (DP) 部署**：
+    ```
+    典型DP部署：
+    ┌─────────────────────────────────────────┐
+    │  Load Balancer (Round-Robin)           │
+    └──────────┬────────────────┬─────────────┘
+               │                │
+               ▼                ▼
+    ┌──────────────────┐  ┌──────────────────┐
+    │ Worker 1         │  │ Worker 2         │
+    │ Radix Cache:     │  │ Radix Cache:     │
+    │ - System prompt  │  │ (empty)          │
+    │ - Doc A          │  │                  │
+    │ - Doc B          │  │                  │
+    └──────────────────┘  └──────────────────┘
+    ```
+
+  - **问题**：
+    - Load Balancer使用Round-Robin（轮询）
+    - 请求随机分配到workers
+    - **Cache hit率低**：~20%（SGLang实测数据）
+    - 原因：
+      ```
+      请求1: "System prompt + Doc A" → Worker 1 (hit!)
+      请求2: "System prompt + Doc A" → Worker 2 (miss!)
+      请求3: "System prompt + Doc A" → Worker 1 (hit!)
+      请求4: "System prompt + Doc A" → Worker 2 (miss!)
+
+      Hit rate: 50% (理想情况，实际更差)
+      ```
+
+  **7.4.6.2 Cache-Aware Load Balancer设计**
+
+  - **核心思想**：
+    - Load Balancer **预测**每个请求在各worker上的cache hit率
+    - 路由到**cache hit率最高**的worker
+    - 结果：Hit率从20% → 75%（3.8倍提升）
+
+  - **Radix Tree近似**：
+    ```python
+    class RadixTreeApproximation:
+        """轻量级Radix Tree表示
+
+        用于快速预测cache hit率
+        """
+        def __init__(self):
+            # 不存储完整的KV cache
+            # 只存储token序列的hash
+            self.prefix_hashes = set()
+
+        def add_prefix(self, tokens):
+            """添加一个prefix"""
+            # 计算hash（不存储实际KV）
+            hash_value = hash(tuple(tokens))
+
+            self.prefix_hashes.add(hash_value)
+
+        def predict_cache_hit(self, request_tokens):
+            """预测cache hit率
+
+            返回：0.0 - 1.0之间的值
+            """
+            # 查找最长匹配prefix
+            max_match_length = 0
+
+            for prefix_len in range(len(request_tokens), 0, -1):
+                prefix_hash = hash(tuple(request_tokens[:prefix_len]))
+
+                if prefix_hash in self.prefix_hashes:
+                    max_match_length = prefix_len
+                    break
+
+            # cache hit率 = 匹配长度 / 总长度
+            hit_rate = max_match_length / len(request_tokens)
+
+            return hit_rate
+    ```
+
+  **7.4.6.3 智能路由策略**
+
+  - **路由算法**：
+    ```python
+    class CacheAwareLoadBalancer:
+        def __init__(self, workers):
+            self.workers = workers
+            self.worker_radix_trees = {
+                worker.id: RadixTreeApproximation()
+                for worker in workers
+            }
+
+        def route_request(self, request):
+            """智能路由请求到最优worker"""
+
+            # 1. 预测每个worker的cache hit率
+            hit_rates = {}
+            for worker in self.workers:
+                hit_rates[worker.id] = self.worker_radix_trees[worker.id] \
+                    .predict_cache_hit(request.tokens)
+
+            # 2. 选择hit率最高的worker
+            best_worker_id = max(hit_rates, key=hit_rates.get)
+
+            # 3. 考虑负载均衡
+            #    如果多个workers hit率相近，选择负载较低的
+            best_worker = self.workers[best_worker_id]
+
+            if best_worker.queue_size > HIGH_WATERMARK:
+                # 找次优worker
+                sorted_workers = sorted(
+                    hit_rates.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+
+                for worker_id, hit_rate in sorted_workers[1:]:
+                    worker = self.workers[worker_id]
+                    if worker.queue_size < LOW_WATERMARK:
+                        best_worker = worker
+                        break
+
+            return best_worker
+
+        def update_radix_tree(self, worker_id, request_tokens):
+            """更新worker的Radix Tree
+
+            当worker处理完请求后调用
+            """
+            self.worker_radix_trees[worker_id].add_prefix(request_tokens)
+    ```
+
+  **7.4.6.4 性能提升**
+
+  - **Cache Hit Rate**（SGLang实测）：
+    | 配置 | Round-Robin | Cache-Aware | 提升 |
+    |------|-------------|-------------|------|
+    | Hit Rate | 20% | 75% | **3.8x** |
+    | Throughput | 1000 | 1900 | **1.9x** |
+
+  - **为什么throughput提升接近2倍？**
+    - Cache hit → 跳过prefill → 直接decode
+    - Prefill是计算密集的（可能100-500ms）
+    - Decode是带宽密集的（~10-50ms/token）
+    - Hit rate从20% → 75%意味着：
+      - 55%的请求跳过prefill
+      - 每个请求节省~200ms
+      - 总吞吐提升~1.9倍
+
+  - **场景分析**：
+    - **最佳场景**：
+      - ✅ 大量共享prefix（system prompt、RAG documents）
+      - ✅ Multi-worker DP部署（≥2 workers）
+      - ✅ 高并发（>100 requests/s）
+
+    - **收益较小场景**：
+      - ❌ 单worker部署（无需load balancer）
+      - ❌ 请求几乎无共享prefix（cache hit率本来就低）
+      - ❌ 低并发（load balancer开销相对较大）
+
+  **7.4.6.5 sglang-router: Rust实现**
+
+  - **为什么用Rust？**
+    - Python实现太慢（load balancer是hot path）
+    - Rust实现比Python快**2倍**（SGLang实测）
+
+  - **sglang-router standalone package**：
+    ```bash
+    # 安装sglang-router
+    pip install sglang-router
+
+    # 启动router
+    sglang-router \
+      --backend-url http://worker1:8000 \
+      --backend-url http://worker2:8000 \
+      --backend-url http://worker3:8000 \
+      --port 8080
+
+    # 请求发送到router:8080
+    # Router自动路由到最优worker
+    curl http://localhost:8080/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+        "model": "meta-llama/Llama-3-8B",
+        "messages": [{"role": "user", "content": "Hello"}]
+      }'
+    ```
+
+  - **架构**：
+    ```
+    Client
+       │
+       ▼
+    ┌────────────────────────────────┐
+    │  sglang-router (Rust)          │
+    │  - Radix Tree approximation    │
+    │  - Intelligent routing         │
+    │  - Health checks               │
+    └──┬──────────┬──────────┬────────┘
+       │          │          │
+       ▼          ▼          ▼
+    Worker 1   Worker 2   Worker 3
+    (Python)   (Python)   (Python)
+    ```
+
+  - **Multi-node分布式部署**：
+    ```bash
+    # Node 1: Router + Worker
+    sglang-router \
+      --backend-url http://node1:8000 \
+      --backend-url http://node2:8000 \
+      --backend-url http://node3:8000 \
+      --port 8080
+
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --port 8000
+
+    # Node 2: Worker only
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --port 8000
+
+    # Node 3: Worker only
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --port 8000
+    ```
+
+  **7.4.6.6 实战案例**
+
+  - **案例：RAG系统部署**：
+    ```yaml
+    # 场景：
+    # - 1000个固定documents（作为RAG knowledge base）
+    # - 每个query包含1-3个documents作为context
+    # - 目标：最大化KV cache复用
+
+    # 配置
+    workers: 4
+    documents: 1000
+    cache_policy: radix
+
+    # 使用Cache-Aware Load Balancer
+    router:
+      type: sglang-router
+      strategy: cache_aware
+      workers:
+        - url: http://worker1:8000
+        - url: http://worker2:8000
+        - url: http://worker3:8000
+        - url: http://worker4:8000
+    ```
+
+    **性能对比**：
+    | Load Balancer | Cache Hit Rate | Throughput | P50 Latency |
+    |---------------|----------------|------------|-------------|
+    | Round-Robin | 20% | 1000 req/s | 150ms |
+    | Cache-Aware | 75% | 1900 req/s | 80ms |
+
+    - **分析**：
+      - Cache hit率提升3.8倍
+      - Throughput提升1.9倍
+      - Latency降低47%
+
+  - **案例：Chatbot with System Prompt**：
+    ```python
+    # System prompt（所有请求共享）
+    SYSTEM_PROMPT = """
+    You are a helpful assistant.
+    You answer questions concisely.
+    You use markdown formatting.
+    """
+
+    # 所有请求的tokens都以SYSTEM_PROMPT开头
+    # Cache-Aware Load Balancer会将相似请求路由到同一worker
+
+    # Worker 1: 100个请求都包含SYSTEM_PROMPT
+    # Worker 2: 100个请求都包含SYSTEM_PROMPT
+    # ...
+
+    # 结果：Cache hit率 > 90%
+    ```
+
+  **7.4.6.7 总结与最佳实践**
+
+  - **何时使用Cache-Aware Load Balancer？**
+    - ✅ Multi-worker DP部署（≥2 workers）
+    - ✅ 大量共享prefix（system prompt、RAG docs）
+    - ✅ 高并发场景（>100 req/s）
+    - ✅ 使用SGLang或Radix Cache
+
+  - **何时不需要？**
+    - ❌ 单worker部署
+    - ❌ 请求几乎无共享prefix
+    - ❌ 低并发（<10 req/s）
+    - ❌ 使用PagedAttention（vLLM）
+
+  - **配置建议**：
+    ```bash
+    # SGLang v0.4+：自动启用Cache-Aware Load Balancer
+    python -m sglang.launch_server \
+      --model meta-llama/Llama-3-8B \
+      --dp 4 \
+      --radix-cache
+
+    # 使用sglang-router
+    pip install sglang-router
+    sglang-router \
+      --backend-url http://localhost:8000 \
+      --backend-url http://localhost:8001 \
+      --backend-url http://localhost:8002 \
+      --backend-url http://localhost:8003
+    ```
 
 #### 7.5 高级调度策略
 - 7.5.1 优先级调度

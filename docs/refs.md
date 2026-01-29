@@ -151,6 +151,29 @@
   - 引用章节：6.3.4, 7.4.4, 10.6.6
   - GitHub: https://github.com/sgl-project/mini-sglang
 
+#### SGLang v0.4
+- **SGLang v0.4 Release Blog**: https://lmsys.org/blog/2024-12-04-sglang-v0-4/
+  - 发布日期：2024年12月4日
+  - 核心内容：
+    - Zero-Overhead Batch Scheduler（完全消除GPU stalls）
+    - Cache-Aware Load Balancer（智能路由，3.8倍cache hit率提升）
+    - Radix Tree approximation和预测
+    - sglang-router standalone package（Rust实现）
+    - Multi-node分布式部署支持
+  - 引用章节：7.4.4.8, 7.4.6
+  - 性能数据：1.9x throughput, 3.8x cache hit rate improvement
+
+#### SGLang Original (2024-01-17)
+- **SGLang Launch Blog**: https://lmsys.org/blog/2024-01-17-sglang/
+  - 发布日期：2024年1月17日
+  - 核心内容：
+    - RadixAttention原始设计（9步动态tree操作）
+    - Cache-aware scheduling policy
+    - LRU eviction policy
+    - Multimodal support（image tokens）
+    - 性能：5x throughput vs Guidance and vLLM
+  - 引用章节：6.3.4
+
 ### 技术博客
 
 #### vLLM Official Blog
@@ -191,6 +214,10 @@
 - **7.4.4** Overlap Scheduling (Mini-SGLang)
   - Mini-SGLang Blog - CPU-GPU并行，隐藏CPU开销
   - Berkeley EECS-2025-192 - CPU overhead问题分析
+  - SGLang v0.4 Blog - Zero-Overhead Batch Scheduler (7.4.4.8)
+
+- **7.4.6** Cache-Aware Load Balancer (SGLang)
+  - SGLang v0.4 Blog - 智能路由，3.8倍cache hit率提升
 
 - **7.7** Prefill-Decode分离（PD分离）
   - vLLM、SGLang社区合作
@@ -267,6 +294,8 @@
 - **2025-01-29**: 添加性能分析资源（10.5.5）
 - **2025-01-29**: 添加2025"青稞"AI嘉年华专家观点
 - **2025-01-29**: 添加Mini-SGLang博客资源（6.3.4 Radix Attention, 7.4.4 Overlap Scheduling, 10.6.6 轻量级参考实现）
+- **2025-01-29**: 添加SGLang v0.4博客资源（7.4.4.8 Zero-Overhead Scheduler, 7.4.6 Cache-Aware Load Balancer）
+- **2025-01-29**: 添加SGLang原始博客资源（6.3.4 RadixAttention原始设计）
 
 ---
 
