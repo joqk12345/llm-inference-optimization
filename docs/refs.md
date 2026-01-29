@@ -139,6 +139,18 @@
   - 引用章节：10.11
   - 核心内容：无需fork即可定制vLLM
 
+#### Mini-SGLang
+- **Mini-SGLang Blog**: https://lmsys.org/blog/2025-12-17-minisgl/
+  - 发布日期：2025年12月17日
+  - 核心内容：
+    - 轻量级推理框架（5k行 vs SGLang的300k行）
+    - Overlap Scheduling（CPU-GPU并行，隐藏CPU开销）
+    - Radix Attention（高效KV Cache复用）
+    - Chunked Prefill、Tensor Parallelism、JIT CUDA kernels
+    - 教育学习与研究原型
+  - 引用章节：6.3.4, 7.4.4, 10.6.6
+  - GitHub: https://github.com/sgl-project/mini-sglang
+
 ### 技术博客
 
 #### vLLM Official Blog
@@ -165,12 +177,20 @@
 - **6.3.3** 内存管理深度剖析
   - Berkeley EECS-2025-192 - BlockManager, CacheEngine实现
 
+- **6.3.4** Radix Attention (SGLang/Mini-SGLang)
+  - Mini-SGLang Blog - Radix Cache vs PagedAttention
+  - Mini-SGLang Blog - 5k行代码实现精要
+
 - **6.7.8** Agent系统的KV Cache优化实战
   - Manus Blog - Context Engineering
 
 ### 第7章 - 请求调度策略
 - **7.4** vLLM的调度器实现
   - Berkeley EECS-2025-192 - CPU overheads, Iteration-level scheduling
+
+- **7.4.4** Overlap Scheduling (Mini-SGLang)
+  - Mini-SGLang Blog - CPU-GPU并行，隐藏CPU开销
+  - Berkeley EECS-2025-192 - CPU overhead问题分析
 
 - **7.7** Prefill-Decode分离（PD分离）
   - vLLM、SGLang社区合作
@@ -199,6 +219,10 @@
 
 - **10.6.5** Agent系统的成本优化策略
   - Manus Blog - Claude Sonnet定价
+
+- **10.6.6** 轻量级参考实现：Mini-SGLang
+  - Mini-SGLang Blog - 教育学习与研究原型
+  - Mini-SGLang Blog - 5k行代码实现核心功能
 
 - **10.10** RL系统部署
   - 朱子林@质朴、朱立耕@NVIDIA
@@ -242,6 +266,7 @@
 - **2025-01-29**: 添加Manus Blog资源（6.7.8, 10.6.5, 11.1.7）
 - **2025-01-29**: 添加性能分析资源（10.5.5）
 - **2025-01-29**: 添加2025"青稞"AI嘉年华专家观点
+- **2025-01-29**: 添加Mini-SGLang博客资源（6.3.4 Radix Attention, 7.4.4 Overlap Scheduling, 10.6.6 轻量级参考实现）
 
 ---
 

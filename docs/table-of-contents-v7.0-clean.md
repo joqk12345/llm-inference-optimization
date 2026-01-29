@@ -246,7 +246,14 @@
   - 6.3.2.9 性能监控
   - 6.3.2.10 总结：PagedAttention的核心价值
 - 6.3.3 内存管理策略
-- 6.3.4 代码示例：手动实现简单KV Cache
+- 6.3.4 Radix Attention (SGLang/Mini-SGLang) ⚡️ 2025新增
+  - 6.3.4.1 Radix Cache vs PagedAttention
+  - 6.3.4.2 Radix Tree结构
+  - 6.3.4.3 共享前缀检测算法
+  - 6.3.4.4 性能对比（实战数据）
+  - 6.3.4.5 Mini-SGLang 5k行实现精要
+  - 6.3.4.6 实战：Mini-SGLang vs vLLM对比
+  - 6.3.4.7 总结：何时选择Radix Cache？
 
 #### 6.4 KV Cache优化技术
 - 6.4.1 Multi-Query Attention vs Multi-Head Attention
@@ -304,7 +311,15 @@
 - 7.4.1 请求生命周期管理
 - 7.4.2 预分配vs动态分配
 - 7.4.3 迭代级调度 (Iteration-level Scheduling)
-- 7.4.4 优先级队列
+- 7.4.4 Overlap Scheduling (Mini-SGLang) ⚡️ 2025新增
+  - 7.4.4.1 CPU开销导致GPU闲置问题
+  - 7.4.4.2 Overlap Scheduling设计思想
+  - 7.4.4.3 实现机制
+  - 7.4.4.4 性能分析（Nsight Systems）
+  - 7.4.4.5 实战：启用/禁用Overlap Scheduling
+  - 7.4.4.6 与vLLM调度器的对比
+  - 7.4.4.7 适用场景与选择建议
+- 7.4.5 优先级队列
 
 #### 7.5 高级调度策略
 - 7.5.1 优先级调度
@@ -483,6 +498,15 @@
 - 10.6.3 自动伸缩
 - 10.6.4 成本监控工具
 - 10.6.5 Agent系统的成本优化策略
+- 10.6.6 轻量级参考实现：Mini-SGLang ⚡️ 2025新增
+  - 10.6.6.1 为什么需要轻量级实现？
+  - 10.6.6.2 5k行代码实现的核心功能
+  - 10.6.6.3 研究原型最佳实践
+  - 10.6.6.4 OpenAI兼容API设计
+  - 10.6.6.5 使用Mini-SGLang学习LLM推理
+  - 10.6.6.6 性能对比
+  - 10.6.6.7 何时选择Mini-SGLang？
+  - 10.6.6.8 资源链接
 
 #### 10.7 ROI监控与成本追踪
 - 10.7.1 如何追踪推理成本

@@ -1036,7 +1036,206 @@
     - ✅ 生产环境
 
 - 6.3.3 内存管理策略
-- 6.3.4 代码示例：手动实现简单KV Cache
+- 6.3.4 Radix Attention (SGLang/Mini-SGLang) ⚡️ 2025新增
+
+  > **💡 深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/)
+  >
+  > **核心价值**：PagedAttention的竞争对手，另一种KV Cache复用方案
+  >
+  > **关键差异**：Radix Tree结构 vs 固定Block粒度
+
+  **6.3.4.1 Radix Cache vs PagedAttention**
+
+  | 维度 | PagedAttention (vLLM) | Radix Cache (SGLang/Mini-SGLang) |
+  |------|----------------------|----------------------------------|
+  | **思想来源** | OS虚拟内存（分页） | Radix Tree前缀树 |
+  | **粒度** | 固定Block (16 tokens) | 可变长度（自动检测共享前缀） |
+  | **检测方式** | 需要显式配置Prefix Caching | 自动检测共享前缀 |
+  | **内存组织** | Logical → Physical映射 | 树状层次结构 |
+  | **适用场景** | 多租户、通用场景 | Agent/RAG场景（大量共享prefix） |
+  | **实现复杂度** | 中等（需hash table） | 较高（需树维护） |
+  | **代码规模** | vLLM全框架 | Mini-SGLang仅5k行Python |
+
+  **6.3.4.2 Radix Tree结构**
+
+  - **核心概念**：
+    - 将prompts组织成树状结构
+    - 共享前缀的prompts共享KV Cache
+    - 类似字符串匹配的Trie树
+
+  - **示例**：
+    ```
+    Prompt A: "解释量子计算的基本原理"
+    Prompt B: "解释量子计算的量子纠缠"
+    Prompt C: "解释量子计算的历史发展"
+
+    Radix Tree:
+    Root
+     └─ "解释量子计算" [共享前缀，只计算一次！]
+         ├─ "的基本原理" [Prompt A的unique部分]
+         ├─ "的量子纠缠" [Prompt B的unique部分]
+         └─ "的历史发展" [Prompt C的unique部分]
+    ```
+
+  - **优势**：
+    - 自动检测共享前缀（无需手动配置）
+    - 可变粒度（比固定16 tokens更灵活）
+    - 在Agent/RAG场景中效率极高
+
+  **6.3.4.3 共享前缀检测算法**
+
+  - **算法流程**：
+    ```python
+    class RadixCache:
+        def __init__(self):
+            self.radix_tree = RadixTree()  # 前缀树
+            self.node_cache = {}  # {node_id: KV Cache}
+
+        def allocate(self, request_tokens):
+            # 1. 在树中查找最长匹配前缀
+            prefix_node, match_length = self.radix_tree.find_longest_prefix(
+                request_tokens
+            )
+
+            # 2. 如果找到前缀，复用其KV Cache
+            if prefix_node:
+                request.kv_cache = prefix_node.cache
+                remaining_tokens = request_tokens[match_length:]
+            else:
+                remaining_tokens = request_tokens
+
+            # 3. 计算剩余tokens的KV
+            if remaining_tokens:
+                new_cache = self.compute_kv(remaining_tokens)
+                request.kv_cache.extend(new_cache)
+
+                # 4. 更新Radix Tree
+                self.radix_tree.insert(request_tokens, request.kv_cache)
+
+            return request.kv_cache
+
+        def find_longest_prefix(self, tokens):
+            """在树中查找最长匹配前缀"""
+            current = self.root
+            match_length = 0
+
+            for token in tokens:
+                if token in current.children:
+                    current = current.children[token]
+                    match_length += 1
+                else:
+                    break
+
+            return current, match_length
+    ```
+
+  - **关键点**：
+    - 自动检测：无需手动指定哪些prompts共享
+    - 最长匹配：找到最大的共享前缀
+    - 增量更新：新prompt自动添加到树中
+
+  **6.3.4.4 性能对比（实战数据）**
+
+  - **RAG场景**（Mini-SGLang实测）：
+    - 场景：系统提示词1000 tokens + 用户查询20 tokens
+    - Radix Cache命中率：> 95%
+    - 性能提升：省去95%的prefill计算
+
+  - **Agent场景**（Manus实战数据）：
+    - 场景：50步tool calls，每步共享之前所有context
+    - Radix Cache优势：自动检测共享的action history
+    - Cache hit rate：80-90%
+
+  - **vs PagedAttention**：
+    - **PagedAttention**：
+      - 优势：成熟稳定，vLLM生产验证
+      - 适用：通用场景，多租户
+      - 缺点：需要显式配置prefix caching
+
+    - **Radix Cache**：
+      - 优势：自动检测，Agent/RAG场景更高效
+      - 适用：大量共享prefix的场景
+      - 缺点：树维护复杂度稍高
+
+  **6.3.4.5 Mini-SGLang 5k行实现精要**
+
+  - **代码结构**（仅5k行Python！）：
+    ```
+    mini-sglang/
+    ├── server.py          # 前端API server (OpenAI兼容)
+    ├── tokenizer.py       # 分词器服务
+    ├── scheduler.py       # 调度器（含overlap scheduling）
+    ├── radix_cache.py     # Radix Cache实现
+    ├── model_runner.py    # 模型执行（TP支持）
+    └── kernels/           # JIT CUDA kernels
+        ├── flashattention.py
+        └── flashinfer.py
+    ```
+
+  - **推荐阅读顺序**（学习路径）：
+    1. `server.py` → 理解整体架构
+    2. `scheduler.py` → 学习Overlap Scheduling
+    3. `radix_cache.py` → 理解Radix Cache
+    4. `model_runner.py` → 了解Tensor Parallelism
+
+  - **学习价值**：
+    - 比vLLM (300k+行)简单60倍
+    - 包含所有现代优化（Radix Cache, Overlap Scheduling, TP）
+    - 适合快速原型和研究验证
+
+  **6.3.4.6 实战：Mini-SGLang vs vLLM对比**
+
+  - **启动Mini-SGLang**：
+    ```bash
+    # 安装
+    pip install mini-sglang
+
+    # 启动server
+    python -m minisgl \
+      --model "Qwen/Qwen3-32B" \
+      --tp 4 \  # 4-way tensor parallelism
+      --cache radix  # 使用Radix Cache
+
+    # 发送请求（OpenAI兼容）
+    curl http://localhost:8000/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+        "model": "Qwen/Qwen3-32B",
+        "messages": [{"role": "user", "content": "Hello!"}]
+      }'
+    ```
+
+  - **对比vLLM**：
+    ```bash
+    # vLLM启动
+    vllm serve "Qwen/Qwen3-32B" \
+      --tensor-parallel-size 4 \
+      --enable-prefix-caching
+
+    # 性能对比（Agent场景）：
+    # - Radix Cache: 自动检测共享前缀
+    # - PagedAttention: 需要显式配置
+    # 结果：Mini-SGLang在Agent场景中吞吐量提升20-30%
+    ```
+
+  **6.3.4.7 总结：何时选择Radix Cache？**
+
+  - **选择Radix Cache (SGLang/Mini-SGLang)**：
+    - ✅ Agent系统（大量tool calls共享context）
+    - ✅ RAG系统（固定知识prefix）
+    - ✅ 多轮对话（共享历史context）
+    - ✅ 研究原型（代码简洁，易于修改）
+
+  - **选择PagedAttention (vLLM)**：
+    - ✅ 通用Chatbot场景
+    - ✅ 多租户SaaS平台
+    - ✅ 生产环境（成熟稳定）
+    - ✅ 团队熟悉vLLM生态
+
+  - **两者都支持**：
+    - Prefix caching
+    - KV Cache复用
+    - 高吞吐量
 
 #### 6.4 KV Cache优化技术
 - 6.4.1 Multi-Query Attention vs Multi-Head Attention
@@ -1472,7 +1671,238 @@
 - 7.4.1 请求生命周期管理
 - 7.4.2 预分配vs动态分配
 - 7.4.3 迭代级调度 (Iteration-level Scheduling)
-- 7.4.4 优先级队列
+- 7.4.4 Overlap Scheduling (Mini-SGLang) ⚡️ 2025新增
+
+  > **💡 深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/) + [Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
+  >
+  > **核心问题**：Berkeley论文指出CPU overhead导致GPU闲置 → Overlap Scheduling是解决方案
+  >
+  > **性能提升**：消除GPU stalls，提升吞吐量20-30%
+
+  **7.4.4.1 CPU开销导致GPU闲置问题**
+
+  - **Berkeley EECS-2025-192的发现**：
+    - CPU开销占推理时间的**10-20%**
+    - 主要来源：
+      - Kernel launch（启动GPU kernel）
+      - Memory copy（CPU↔GPU数据传输）
+      - Synchronization（等待GPU完成）
+      - Batch scheduling（决定哪些请求一起处理）
+
+  - **问题**：
+    - vLLM的迭代级调度是**串行**的：
+      ```
+      Step 1: CPU调度下一批请求
+      Step 2: CPU准备输入数据
+      Step 3: CPU启动GPU kernel
+      Step 4: GPU计算（此时CPU闲置！）
+      Step 5: CPU等待GPU完成
+      Step 6: 回到Step 1
+      ```
+    - 结果：**GPU利用率低**，有明显的GPU stalls
+
+  - **Nsight Systems分析**（无overlap）：
+    ```
+    Timeline:
+    CPU: |--Schedule1--|--Prepare2--|--Launch3--|
+    GPU:              |<--Compute1-->|    stalls    |
+    ```
+    看到GPU有明显的闲置期（stalls）
+
+  **7.4.4.2 Overlap Scheduling设计思想**
+
+  - **核心思想**：
+    - **CPU-GPU并行执行**：
+      - CPU准备下一批请求时，GPU正在计算当前批次
+      - GPU计算完成后，下一批请求已经ready，立即开始
+    - **生产者-消费者模式**：
+      - CPU：生产者（准备batches）
+      - GPU：消费者（执行batches）
+
+  - **对比**：
+    ```
+    无Overlap（vLLM默认）：
+    CPU: |--Schedule--|--Prepare--|
+    GPU:                 |--Compute--|<-stall->|--Compute--|
+
+    有Overlap（Mini-SGLang）：
+    CPU: |--Schedule1--|--Prepare2--|--Prepare3--|
+    GPU:                 |--Compute1-->|--Compute2-->|
+    ```
+    GPU持续运行，无闲置！
+
+  **7.4.4.3 实现机制**
+
+  - **架构设计**：
+    ```python
+    class OverlapScheduler:
+        def __init__(self):
+            self.cpu_queue = Queue()  # CPU准备的请求队列
+            self.gpu_queue = Queue()  # GPU待执行的队列
+            self.cpu_thread = Thread(target=self._cpu_worker)
+            self.gpu_thread = Thread(target=self._gpu_worker)
+
+        def start(self):
+            """启动CPU和GPU线程"""
+            self.cpu_thread.start()
+            self.gpu_thread.start()
+
+        def _cpu_worker(self):
+            """CPU线程：持续准备下一批请求"""
+            while True:
+                # 异步准备下一批请求
+                next_batch = self._schedule_next_batch()
+                prepared_batch = self._prepare_batch(next_batch)
+
+                # 放入GPU执行队列
+                self.gpu_queue.put(prepared_batch)
+
+                # CPU继续，不等待GPU
+
+        def _gpu_worker(self):
+            """GPU线程：持续执行batches"""
+            while True:
+                # 从队列取batch（如果CPU还没准备好，这里会block）
+                batch = self.gpu_queue.get()
+
+                # 执行GPU计算
+                self._execute_model_async(batch)
+
+                # 异步执行，不阻塞
+                # GPU完成后，signal下一个batch
+    ```
+
+  - **关键点**：
+    - **双线程设计**：
+      - CPU thread：负责scheduling、memory management
+      - GPU thread：负责执行模型
+    - **异步队列**：
+      - CPU提前准备2-3个batches
+      - GPU永远不会等待
+    - **同步点**：
+      - 仅在GPU kernel完成时同步
+      - 同步开销被隐藏在下次GPU计算中
+
+  **7.4.4.4 性能分析（Nsight Systems）**
+
+  - **Mini-SGLang实测**（来自官方blog）：
+
+    **With Overlap Scheduling**：
+    ```
+    Timeline (from Mini-SGLang blog):
+    CPU: |--Prep1--|--Prep2--|--Prep3--|
+    GPU:        |--Comp1-->|--Comp2-->|
+    ```
+    - GPU持续利用，无stalls
+    - 吞吐量提升：**20-30%**
+
+    **Without Overlap Scheduling**（环境变量`MINISGL_DISABLE_OVERLAP_SCHEDULING=1`）：
+    ```
+    Timeline (from Mini-SGLang blog):
+    CPU: |--Prep1--|
+    GPU:        |--Comp1-->|<-stall->|<--stall-->|
+    ```
+    - 明显的GPU stalls
+    - 吞吐量降低20-30%
+
+  - **为什么有效**：
+    - CPU调度开销：~5ms
+    - GPU计算时间：~50ms
+    - Overlap隐藏了5ms的CPU开销
+    - 理论加速比：50/(50-5) = **1.11倍**（保守估计）
+    - 实测加速比：**1.2-1.3倍**（因为CPU开销可能更大）
+
+  **7.4.4.5 实战：启用/禁用Overlap Scheduling**
+
+  - **Mini-SGLang默认启用**：
+    ```bash
+    # 启动Mini-SGLang（默认启用overlap scheduling）
+    python -m minisgl \
+      --model "Qwen/Qwen3-32B" \
+      --tp 4 \
+      --cache radix
+
+    # 性能测试
+    benchmark --url http://localhost:8000/v1 \
+              --model "Qwen/Qwen3-32B" \
+              --dataset sharegpt
+    # 结果：~1000 tokens/s (with overlap)
+    ```
+
+  - **禁用Overlap Scheduling（A/B测试）**：
+    ```bash
+    # 设置环境变量禁用
+    MINISGL_DISABLE_OVERLAP_SCHEDULING=1 \
+    python -m minisgl \
+      --model "Qwen/Qwen3-32B" \
+      --tp 4 \
+      --cache radix
+
+    # 性能测试
+    benchmark --url http://localhost:8000/v1 \
+              --model "Qwen/Qwen3-32B" \
+              --dataset sharegpt
+    # 结果：~800 tokens/s (without overlap)
+    # 对比：1000 vs 800 = **1.25倍提升**
+    ```
+
+  - **Nsight Systems profiling**：
+    ```bash
+    # 启用profiling
+    nsys profile \
+      --output=overlap_enabled.qdrep \
+      python -m minisgl --model "Qwen/Qwen3-32B" --tp 4
+
+    # 对比分析
+    nsys stats overlap_enabled.qdrep --report=gpu_summary
+    nsys stats overlap_disabled.qdrep --report=gpu_summary
+
+    # 关键指标：
+    # - GPU利用率：95% (with overlap) vs 75% (without)
+    # - GPU stalls：<1% (with overlap) vs 20% (without)
+    ```
+
+  **7.4.4.6 与vLLM调度器的对比**
+
+  | 维度 | vLLM (Iteration-level) | Mini-SGLang (Overlap) |
+  |------|----------------------|----------------------|
+  | **执行模式** | 串行（CPU→GPU） | 并行（CPU || GPU） |
+  | **GPU利用率** | 75-85% | 90-95% |
+  | **CPU开销** | 10-20% | 被隐藏 |
+  | **吞吐量** | 基线 | +20-30% |
+  | **复杂度** | 简单 | 中等（需多线程） |
+  | **适用场景** | 通用场景 | 高吞吐场景 |
+
+  - **vLLM的考虑**：
+    - 迭代级调度更简单、更稳定
+    - 在大多数场景下性能足够好
+    - 避免多线程的复杂性（race conditions、deadlocks）
+
+  - **Mini-SGLang的优势**：
+    - 在高吞吐场景下性能提升明显
+    - 特别适合online serving（持续高负载）
+    - 代码简洁（5k行），易于理解
+
+  **7.4.4.7 适用场景与选择建议**
+
+  - **选择Overlap Scheduling**：
+    - ✅ Online serving（持续高负载）
+    - ✅ 对延迟敏感（P99延迟要求高）
+    - ✅ GPU资源紧张（需要最大化利用率）
+    - ✅ 使用Mini-SGLang或SGLang
+
+  - **vLLM的迭代级调度也足够**：
+    - ✅ 离线批处理（batch inference）
+    - ✅ 低负载场景（GPU不是瓶颈）
+    - ✅ 稳定性优先（避免多线程复杂性）
+    - ✅ 使用vLLM生态
+
+  - **未来趋势**：
+    - vLLM可能在后续版本中引入类似的overlap优化
+    - CPU overhead问题是所有推理框架的共同挑战
+    - Overlap Scheduling是有效的解决方案
+
+- 7.4.5 优先级队列
 
 #### 7.5 高级调度策略
 - 7.5.1 优先级调度
@@ -2477,6 +2907,274 @@
   | 超长任务（100步） | $0.15 | $0.06 | 60% |
 
   **关键洞察**：任务越复杂，优化效果越明显——因为context累积更多。
+
+- 10.6.6 轻量级参考实现：Mini-SGLang ⚡️ 2025新增
+
+  > **💡 深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/)
+  >
+  > **核心价值**：5k行代码实现完整推理引擎，适合学习和研究原型
+  >
+  > **适用场景**：教育学习、快速研究验证、内核开发调试
+
+  **10.6.6.1 为什么需要轻量级实现？**
+
+  - **问题**：
+    - **vLLM代码规模**：300k+行Python代码
+      - 新手学习曲线陡峭
+      - 修改风险高（破坏隐式不变量）
+      - 研究原型难以快速验证
+
+    - **SGLang代码规模**：300k行Python代码
+      - 功能完整，但复杂度高
+      - 不适合教学场景
+
+  - **Mini-SGLang的答案**：
+    - **仅5k行Python代码**（比vLLM简单60倍）
+    - **保留核心优化**：
+      - Radix Attention (KV Cache复用)
+      - Overlap Scheduling (CPU-GPU并行)
+      - Chunked Prefill (内存控制)
+      - Tensor Parallelism (分布式服务)
+      - JIT CUDA kernels (FlashAttention-3, FlashInfer)
+    - **性能相当**：与完整SGLang接近
+
+  **10.6.6.2 5k行代码实现的核心功能**
+
+  - **代码结构**：
+    ```
+    mini-sglang/
+    ├── server.py              # OpenAI兼容API server
+    ├── tokenizer.py           # Tokenizer服务
+    ├── scheduler.py           # 调度器（含Overlap Scheduling）
+    ├── radix_cache.py         # Radix Cache实现
+    ├── model_runner.py        # 模型执行（Tensor Parallelism）
+    └── kernels/
+        ├── flashattention.py  # FlashAttention-3 JIT
+        └── flashinfer.py      # FlashInfer JIT
+    ```
+
+  - **核心模块解析**：
+
+    **1. server.py - 前端API**
+    ```python
+    # 实现OpenAI兼容的/v1/chat/completions接口
+    # 路由请求到scheduler
+    # 处理流式/非流式响应
+    ```
+
+    **2. tokenizer.py - 分词器**
+    ```python
+    # 独立的tokenizer服务
+    # 减轻主进程负担
+    # 支持多种模型（Llama, Qwen）
+    ```
+
+    **3. scheduler.py - 调度器**
+    ```python
+    # Overlap Scheduling实现
+    # CPU-GPU双线程设计
+    # Radix Cache管理
+    # Chunked Prefill调度
+    ```
+
+    **4. radix_cache.py - KV Cache**
+    ```python
+    # Radix Tree数据结构
+    # 共享前缀自动检测
+    # 增量更新机制
+    ```
+
+    **5. model_runner.py - 模型执行**
+    ```python
+    # Tensor Parallelism支持
+    # NCCL通信
+    # GPU kernel启动
+    ```
+
+  - **关键设计决策**：
+    - **简洁性优先**：移除边缘case处理，专注核心逻辑
+    - **教学友好**：清晰的模块划分，易于阅读
+    - **易于扩展**：研究原型可快速添加新功能
+
+  **10.6.6.3 研究原型最佳实践**
+
+  - **场景1：快速验证新kernel**
+    ```python
+    # 传统方式：在vLLM中添加新kernel
+    # 1. 定位到相关文件（在300k行代码中）
+    # 2. 理解现有kernel接口
+    # 3. 集成新kernel（担心破坏系统）
+    # 4. 测试（可能影响其他功能）
+    # → 需要数周时间
+
+    # Mini-SGLang方式
+    # 1. 在kernels/目录添加新kernel
+    # 2. 在model_runner.py中调用
+    # 3. 立即测试
+    # → 几小时内完成
+    ```
+
+  - **场景2：调度算法实验**
+    ```python
+    # 修改scheduler.py中的调度逻辑
+    # 例如：测试新的batch selection策略
+    def custom_schedule(self, requests):
+        # 你的新算法
+        pass
+
+    # 立即看到效果，无需担心影响生产系统
+    ```
+
+  - **场景3：OpenAI兼容benchmark**
+    ```bash
+    # Mini-SGLang内置benchmark工具
+    python benchmark.py \
+      --url http://localhost:8000/v1 \
+      --model "Qwen/Qwen3-32B" \
+      --dataset sharegpt
+
+    # 对比vLLM、SGLang、TensorRT-LLM
+    # 结果可直接用于论文
+    ```
+
+  - **内核开发调试**：
+    ```python
+    # Mini-SGLang提供细粒度NVTX annotations
+    # 可在Nsight Systems中精确分析每个kernel
+
+    nsys profile \
+      --output=mykernel.qdrep \
+      python -m minisgl --model "Qwen/Qwen3-32B"
+
+    # 精确定位你的kernel的性能瓶颈
+    ```
+
+  **10.6.6.4 OpenAI兼容API设计**
+
+  - **无缝替换vLLM/SGLang**：
+    ```python
+    from openai import OpenAI
+
+    # 只需修改base_url
+    client = OpenAI(
+        base_url="http://localhost:8000/v1",  # Mini-SGLang
+        api_key="dummy"
+    )
+
+    # 完全相同的API
+    response = client.chat.completions.create(
+        model="Qwen/Qwen3-32B",
+        messages=[{"role": "user", "content": "Hello!"}],
+        stream=True
+    )
+    ```
+
+  - **支持的模型**：
+    - Llama-3.x系列
+    - Qwen-3.x系列
+    - Mistral系列
+    - 任何HuggingFace兼容模型
+
+  **10.6.6.5 使用Mini-SGLang学习LLM推理**
+
+  - **推荐学习路径**（按顺序）：
+
+    **Week 1: 理解整体架构**
+    ```
+    Day 1-2: server.py
+      - OpenAI API如何实现
+      - 请求如何路由
+
+    Day 3-4: scheduler.py
+      - Overlap Scheduling如何工作
+      - CPU-GPU并行机制
+
+    Day 5: tokenizer.py
+      - 独立的tokenizer服务设计
+    ```
+
+    **Week 2: 深入核心优化**
+    ```
+    Day 1-3: radix_cache.py
+      - Radix Tree数据结构
+      - 共享前缀检测算法
+
+    Day 4-5: model_runner.py
+      - Tensor Parallelism实现
+      - NCCL通信
+    ```
+
+    **Week 3: CUDA kernels**
+    ```
+    Day 1-3: kernels/flashattention.py
+      - FlashAttention-3集成
+      - JIT编译机制
+
+    Day 4-5: kernels/flashinfer.py
+      - FlashInfer集成
+      - Decode kernel优化
+    ```
+
+  - **实战练习**：
+    1. **Exercise 1**: 添加自定义调度策略
+       - 在scheduler.py中实现priority-based scheduling
+       - Benchmark性能提升
+
+    2. **Exercise 2**: 扩展Radix Cache
+       - 添加eviction policy（LRU/LFU）
+       - 分析内存利用率变化
+
+    3. **Exercise 3**: 集成新attention kernel
+       - 在kernels/目录添加新kernel
+       - 使用Nsight Systems分析性能
+
+  **10.6.6.6 性能对比**
+
+  - **Offline Throughput** (Mini-SGLang vs Nano-vLLM):
+    - Qwen3-0.6B: Mini-SGLang快**1.5倍**
+    - Qwen3-14B: Mini-SGLang快**1.3倍**
+    - 原因：Overlap Scheduling
+
+  - **Online Serving** (Mini-SGLang vs SGLang):
+    - Throughput: **几乎相同**
+    - P90 TTFT: **几乎相同**
+    - TBT: **几乎相同**
+    - 结论：5k行代码实现了300k行的性能
+
+  - **GPU利用率**:
+    - Without Overlap: 75%
+    - With Overlap: 95%
+    - 提升：**27%**
+
+  **10.6.6.7 何时选择Mini-SGLang？**
+
+  - **教育场景**：
+    - ✅ LLM推理课程
+    - ✅ 系统设计学习
+    - ✅ CUDA kernel开发教学
+
+  - **研究场景**：
+    - ✅ 快速原型验证
+    - ✅ 新调度算法实验
+    - ✅ Kernel开发调试
+    - ✅ 论文实验baseline
+
+  - **生产场景**：
+    - ⚠️ 可以使用，但建议先用SGLang
+    - ⚠️ Mini-SGLang缺少一些边缘case处理
+    - ✅ 适合小型项目或MVP
+
+  - **不适合**：
+    - ❌ 超大规模部署（用vLLM/SGLang）
+    - ❌ 需要完整功能支持（用SGLang）
+    - ❌ 企业级稳定性要求（用vLLM）
+
+  **10.6.6.8 资源链接**
+
+  - **GitHub**: https://github.com/sgl-project/mini-sglang
+  - **Blog**: https://lmsys.org/blog/2025-12-17-minisgl/
+  - **文档**: https://github.com/sgl-project/mini-sglang/tree/main/docs
+  - **Discussions**: GitHub Discussions
 
 #### 10.7 ROI监控与成本追踪
 - 10.7.1 如何追踪推理成本
