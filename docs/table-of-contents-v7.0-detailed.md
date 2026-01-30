@@ -3,7 +3,7 @@
 **创建日期**：2025-01-27
 **版本**：V2.0 + V3.0 融合版
 **总字数目标**：约35,000字（扩大）
-**章节数**：10章（新增1章）+ 3个附录
+**章节数**：11章 + 3个附录
 
 ---
 
@@ -1968,14 +1968,14 @@ vLLM插件系统提供了更好的解决方案。
   print(f"Overhead: {(with_plugin_time/no_plugin_time - 1)*100:.2f}%")
   ```
 
-**5.7.8 常见误区专栏**
+#### 常见误区专栏
 - 误区1："Attention很复杂，很难理解" → 其实核心就是QK^T
 - 误区2："KV Cache总是好的" → 显存换计算，长序列显存压力大
 - 误区3："Batch越大越好" → padding浪费，continuous batching才是正解
 - 误区4："Prefill和Decode应该分开处理" → 混合处理才能最大化throughput
 - 误区5："vLLM架构很复杂，难以定制" → 插件系统让定制变得简单
 
-**5.7.9 实战检查清单**
+#### 实战检查清单
 - [ ] 理解Attention的Q、K、V投影
 - [ ] 能够画出Causal Mask的可视化
 - [ ] 计算给定模型的KV Cache显存占用
@@ -1987,7 +1987,7 @@ vLLM插件系统提供了更好的解决方案。
 - [ ] 理解vLLM插件系统的基本原理
 - [ ] 能够创建简单的vLLM插件
 
-**5.7.10 动手练习**
+#### 动手练习
 - 练习5.1：手动计算一个简单模型的KV Cache大小
 - 练习5.2：可视化不同batching策略的attention mask
 - 练习5.3：对比static batching和continuous batching的padding数量
@@ -2818,127 +2818,6 @@ vLLM插件系统提供了更好的解决方案。
       - 加速比 = (1000+20)/20 = **51倍**（极端case）
   - **内存开销**：
     - Hash table存储：每个block ~32 bytes hash
-
-- 6.7.8 Agent系统的KV Cache优化实战 ⚡️ 2025更新
-
-  > **来源**：[Manus - Context Engineering for AI Agents](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus)
-  >
-  > **核心洞察**：KV-cache hit rate是生产级AI agent最重要的指标——直接决定成本和延迟
-
-  **6.7.8.1 Agent vs Chatbot的根本差异**
-
-  - **输入输出token比例**：
-    - **Chatbot**：1:1
-      - 用户输入："What's the weather?"
-      - 模型输出："The weather is sunny..."
-      - Prefill和decode时间相近
-
-    - **Agent**：100:1
-      - 用户输入："Book a flight to Tokyo"
-      - Agent内部：50步tool calls（search、compare、book...）
-      - 每步的context包含之前所有actions/observations
-      - Context快速累积到数万tokens
-      - 但每步输出只是简短的function call
-
-  - **成本影响**（Claude Sonnet）：
-    - Cached tokens: **$0.30/MTok**
-    - Uncached tokens: **$3.00/MTok**
-    - **10倍成本差异！**
-
-  **6.7.8.2 生产级优化策略**
-
-  - **策略1：稳定的Prompt Prefix**
-    ```python
-    # ❌ Bad - 破坏cache
-    system_prompt = f"""
-    You are a helpful assistant.
-    Current time: {datetime.now()}  # 每秒不同！
-    """
-
-    # ✅ Good - 保持cache
-    system_prompt = """
-    You are a helpful assistant.
-    Current time: <use get_current_time() tool>
-    """
-    ```
-
-    - **问题**：
-      - LLM是autoregressive：单个token差异会破坏后续所有cache
-      - Timestamp精确到秒 = 每次请求都cache miss
-
-    - **解决方案**：
-      - 移除timestamp
-      - 使用相对时间（"2 hours ago"）
-      - 通过工具获取时间而非硬编码
-
-    - **效果**：Cache hit rate提升20-30%
-
-  - **策略2：Append-only Context设计**
-    ```python
-    # ❌ Bad - 动态修改context
-    def update_context(context, new_action):
-        # 修改之前的action
-        context["actions"][-1]["status"] = "completed"
-        return context
-
-    # ✅ Good - append-only
-    def update_context(context, new_action):
-        # 只追加，不修改
-        context["actions"].append({
-            "action": new_action,
-            "status": "completed"
-        })
-        return context
-    ```
-
-    - **关键原则**：
-      - 不修改之前的actions/observations
-      - 确定性序列化（JSON key顺序稳定）
-      - 避免动态工具定义（会破坏prefix）
-
-    - **效果**：Cache hit rate提升15-25%
-
-  - **策略3：Session-aware Routing**
-    ```python
-    # vLLM配置
-    # 1. 启用prefix caching
-    VLLM_ATTENTION_BACKEND=flashattention
-    VLLM_USE_PREFIX_CACHING=true
-
-    # 2. 使用session ID路由
-    requests = [
-        {"session_id": "user123", "prompt": "..."},
-        {"session_id": "user123", "prompt": "..."},  # 相同session
-        {"session_id": "user456", "prompt": "..."},
-    ]
-
-    # 路由策略：同一session → 同一GPU worker
-    def route_request(request):
-        worker_id = hash(request["session_id"]) % num_workers
-        return workers[worker_id]
-    ```
-
-    - **原理**：
-      - Prefix caching是per-worker的
-      - 同一session的请求路由到同一worker
-      - 最大化cache复用
-
-    - **效果**：TTFT降低40-60%
-
-  **6.7.8.3 高级技巧：Cache Breakpoints策略**
-
-  - **问题**：某些provider不支持自动incremental caching
-
-  - **Solution**：显式标记cache breakpoints
-    ```python
-    context = [
-        {"role": "system", "content": "...", "cache_breakpoint": True},
-        {"role": "user", "content": "..."},
-        {"role": "assistant", "content": "...", "cache_breakpoint": True},
-        # 可以在此断点复用之前的cache
-    ]
-    ```
-
   - **考虑因素**：
     - Cache expiration时间
     - Memory pressure
@@ -3121,11 +3000,131 @@ vLLM插件系统提供了更好的解决方案。
     - [ ] 是否监控了cache hit rate？
     - [ ] 当context window满时，compact策略是什么？
 
+- 6.7.8 Agent系统的KV Cache优化实战 ⚡️ 2025更新
+
+  > **来源**：[Manus - Context Engineering for AI Agents](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus)
+  >
+  > **核心洞察**：KV-cache hit rate是生产级AI agent最重要的指标——直接决定成本和延迟
+
+  **6.7.8.1 Agent vs Chatbot的根本差异**
+
+  - **输入输出token比例**：
+    - **Chatbot**：1:1
+      - 用户输入："What's the weather?"
+      - 模型输出："The weather is sunny..."
+      - Prefill和decode时间相近
+
+    - **Agent**：100:1
+      - 用户输入："Book a flight to Tokyo"
+      - Agent内部：50步tool calls（search、compare、book...）
+      - 每步的context包含之前所有actions/observations
+      - Context快速累积到数万tokens
+      - 但每步输出只是简短的function call
+
+  - **成本影响**（Claude Sonnet）：
+    - Cached tokens: **$0.30/MTok**
+    - Uncached tokens: **$3.00/MTok**
+    - **10倍成本差异！**
+
+  **6.7.8.2 生产级优化策略**
+
+  - **策略1：稳定的Prompt Prefix**
+    ```python
+    # ❌ Bad - 破坏cache
+    system_prompt = f"""
+    You are a helpful assistant.
+    Current time: {datetime.now()}  # 每秒不同！
+    """
+
+    # ✅ Good - 保持cache
+    system_prompt = """
+    You are a helpful assistant.
+    Current time: <use get_current_time() tool>
+    """
+    ```
+
+    - **问题**：
+      - LLM是autoregressive：单个token差异会破坏后续所有cache
+      - Timestamp精确到秒 = 每次请求都cache miss
+
+    - **解决方案**：
+      - 移除timestamp
+      - 使用相对时间（"2 hours ago"）
+      - 通过工具获取时间而非硬编码
+
+    - **效果**：Cache hit rate提升20-30%
+
+  - **策略2：Append-only Context设计**
+    ```python
+    # ❌ Bad - 动态修改context
+    def update_context(context, new_action):
+        # 修改之前的action
+        context["actions"][-1]["status"] = "completed"
+        return context
+
+    # ✅ Good - append-only
+    def update_context(context, new_action):
+        # 只追加，不修改
+        context["actions"].append({
+            "action": new_action,
+            "status": "completed"
+        })
+        return context
+    ```
+
+    - **关键原则**：
+      - 不修改之前的actions/observations
+      - 确定性序列化（JSON key顺序稳定）
+      - 避免动态工具定义（会破坏prefix）
+
+    - **效果**：Cache hit rate提升15-25%
+
+  - **策略3：Session-aware Routing**
+    ```python
+    # vLLM配置
+    # 1. 启用prefix caching
+    VLLM_ATTENTION_BACKEND=flashattention
+    VLLM_USE_PREFIX_CACHING=true
+
+    # 2. 使用session ID路由
+    requests = [
+        {"session_id": "user123", "prompt": "..."},
+        {"session_id": "user123", "prompt": "..."},  # 相同session
+        {"session_id": "user456", "prompt": "..."},
+    ]
+
+    # 路由策略：同一session → 同一GPU worker
+    def route_request(request):
+        worker_id = hash(request["session_id"]) % num_workers
+        return workers[worker_id]
+    ```
+
+    - **原理**：
+      - Prefix caching是per-worker的
+      - 同一session的请求路由到同一worker
+      - 最大化cache复用
+
+    - **效果**：TTFT降低40-60%
+
+  **6.7.8.3 高级技巧：Cache Breakpoints策略**
+
+  - **问题**：某些provider不支持自动incremental caching
+
+  - **Solution**：显式标记cache breakpoints
+    ```python
+    context = [
+        {"role": "system", "content": "...", "cache_breakpoint": True},
+        {"role": "user", "content": "..."},
+        {"role": "assistant", "content": "...", "cache_breakpoint": True},
+        # 可以在此断点复用之前的cache
+    ]
+    ```
+
 #### 常见误区专栏
 #### 实战检查清单
 #### 动手练习
-- 练习5.1：实现简单的KV Cache
-- 练习5.2：对比有无KV Cache的性能差异
+- 练习6.1：实现简单的KV Cache
+- 练习6.2：对比有无KV Cache的性能差异
 
 ---
 
@@ -4162,9 +4161,9 @@ vLLM插件系统提供了更好的解决方案。
 #### 常见误区专栏
 #### 实战检查清单
 #### 动手练习
-- 练习6.1：对比静态批处理和动态批处理
-- 练习6.2：针对不同场景优化调度参数
-- 练习6.3：使用vLLM部署PD分离架构 ⭐
+- 练习7.1：对比静态批处理和动态批处理
+- 练习7.2：针对不同场景优化调度参数
+- 练习7.3：使用vLLM部署PD分离架构 ⭐
 
 ---
 
@@ -4445,11 +4444,11 @@ vLLM插件系统提供了更好的解决方案。
 - [ ] 生产环境部署
 
 #### 动手练习
-- 练习7.1：对比不同量化格式的性能和精度
-- 练习7.2：量化Llama-3-70B并测试（使用vLLM + AWQ）
-- 练习7.3：使用SGLang部署INT4模型并benchmark ⭐
-- 练习7.4：（进阶）实现简单的fake quantization ⭐
-- 练习7.5：（进阶）验证train和inference算子的精度对齐 ⭐
+- 练习8.1：对比不同量化格式的性能和精度
+- 练习8.2：量化Llama-3-70B并测试（使用vLLM + AWQ）
+- 练习8.3：使用SGLang部署INT4模型并benchmark ⭐
+- 练习8.4：（进阶）实现简单的fake quantization ⭐
+- 练习8.5：（进阶）验证train和inference算子的精度对齐 ⭐
 
 ---
 
@@ -4735,14 +4734,14 @@ vLLM插件系统提供了更好的解决方案。
 - [ ] 优化和调优
 
 #### 动手练习
-- 练习8.1：使用投机采样加速生成
-- 练习8.2：对比不同草稿模型的效果
-- 练习8.3：使用SGLang + Eagle 3部署推理服务 ⭐
-- 练习8.4：（进阶）训练自己的草稿模型 ⭐
+- 练习9.1：使用投机采样加速生成
+- 练习9.2：对比不同草稿模型的效果
+- 练习9.3：使用SGLang + Eagle 3部署推理服务 ⭐
+- 练习9.4：（进阶）训练自己的草稿模型 ⭐
 
 ---
 
-## 第四部分：生产部署篇 (Part 4: Production Deployment)
+## 第四部分：生产与进阶篇 (Part 4: Production & Advanced Topics)
 
 ### 第10章 生产环境部署
 
@@ -6406,16 +6405,16 @@ vLLM插件系统提供了更好的解决方案。
 ## 完整统计
 
 ### 内容规模
-- **总章节数**：10章 + 3个附录（新增第2章）
+- **总章节数**：11章 + 3个附录
 - **总节数**：约160节
 - **总小节数**：约420小节
 - **预计总字数**：35,000-45,000字（扩大）
 
 ### 特色内容
-- **常见误区专栏**：每章1个，共10个
-- **实战检查清单**：每章1个，共10个
-- **动手练习**：每章2个，共20个
-- **成本影响说明**：第3-10章每章1个
+- **常见误区专栏**：每章1个，共11个
+- **实战检查清单**：每章1个，共11个
+- **动手练习**：共28个（第3-10章）
+- **成本影响说明**：第3-11章每章1个
 - **ROI案例**：贯穿全书的真实商业案例
 - **文明视角**：第1章引入"人类当量"理论
 - **历史类比**：马尔萨斯陷阱等历史视角
@@ -6434,7 +6433,8 @@ vLLM插件系统提供了更好的解决方案。
 - ✅ 新增第2章："技术全景与学习路径"
 - ✅ 将原第1章拆分为2章，更加合理
 - ✅ 第1章聚焦"为什么重要"，第2章聚焦"如何学习"
-- ✅ 总章节数从9章增加到10章
+- ✅ 新增第11章："高级话题"
+- ✅ 总章节数从9章增加到11章
 
 ### 第1章：融合文明视角与商业案例
 - ✅ 引入"人类当量"概念（50,000倍震撼）
@@ -6451,7 +6451,7 @@ vLLM插件系统提供了更好的解决方案。
 ### 其他章节增强
 - ✅ 每章开头增加"💰 成本影响"说明
 - ✅ 技术章节增加ROI案例
-- ✅ 第9章新增"ROI监控与成本追踪"
+- ✅ 第10章新增"ROI监控与成本追踪"
 - ✅ 附录C新增6个完整案例（含DeepSeek）
 
 ### 数据来源
