@@ -417,10 +417,10 @@ docker-compose up
 
 ## 📎 参考资料
 
-- DeepSeek-V3 Technical Report (arXiv:2412.19437, Dec 2024) citeturn0search1
-- vLLM: Disaggregated Prefilling (experimental) citeturn0search3
-- Ray Serve LLM: Prefill/decode disaggregation citeturn0search0turn0search2
-- SGLang Documentation citeturn0search5
+- DeepSeek-V3 Technical Report (arXiv:2412.19437, Dec 2024) citeturn0search0
+- vLLM: Disaggregated Prefilling (experimental) citeturn0search2
+- Ray Serve LLM: Prefill/decode disaggregation citeturn0search1turn0search3
+- SGLang Documentation citeturn0search5turn0search6
 
 ---
 
