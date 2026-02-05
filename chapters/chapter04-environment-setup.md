@@ -1,6 +1,6 @@
 # 第4章: 环境搭建
 
-> **💰 商业动机**: 正确的环境配置可以避免80%的部署问题。根据行业数据,环境不当导致的故障平均排查时间为4-8小时,而正确配置可以在30分钟内完成部署。
+> **💰 商业动机**: 正确的环境配置通常能显著降低部署故障率。许多团队经验显示,环境问题的排查往往耗时数小时,而规范化配置可将部署时间压缩到较短区间。
 
 ## 简介
 
@@ -47,7 +47,7 @@
 ```
 Docker 容器:
 - 固定的基础镜像
-- �装的 CUDA 版本
+- 封装的 CUDA 版本
 - 锁定的依赖版本
 - 标准的运行环境
 
@@ -354,7 +354,7 @@ pip install --upgrade pip
 **vLLM** 是目前最流行的开源 LLM 推理引擎之一,由 UC Berkeley 的团队开发。
 
 **核心特性**:
-- ⚡ **高性能**: PagedAttention 算法,吞吐量比 HuggingFace Transformers 高 24 倍
+- ⚡ **高性能**: PagedAttention 等优化在多场景中可显著提升吞吐
 - 🚀 **连续批处理**: Continuous Batching,最大化 GPU 利用率
 - 🎯 **易用性**: 兼容 OpenAI API,一行代码启动服务
 - 🔧 **灵活性**: 支持多种量化格式、投机解码、前缀缓存
@@ -366,7 +366,7 @@ pip install --upgrade pip
 - ✅ 生产环境部署
 
 **不适用场景**:
-- ❌ 研究和实验 (建议使用 Transformers)
+- ❌ 需要极高灵活性的研究实验 (Transformers 更灵活)
 - ❌ 需要最大化的模型灵活性
 - ❌ 超大模型的模型并行 (vLLM 支持有限)
 
@@ -467,14 +467,16 @@ curl http://localhost:8000/v1/chat/completions \
     ]
   }'
 
-# 使用 Python
-import openai
+# 使用 Python (OpenAI SDK v1+ 接口)
+from openai import OpenAI
 
 # 配置本地端点
-openai.api_base = "http://localhost:8000/v1"
-openai.api_key = "dummy"  # vLLM 不验证 key
+client = OpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="dummy",  # vLLM 不验证 key
+)
 
-response = openai.ChatCompletion.create(
+response = client.chat.completions.create(
     model="meta-llama/Llama-2-7b-chat-hf",
     messages=[
         {"role": "user", "content": "Hello, how are you?"}
@@ -635,14 +637,8 @@ services:
     image: llm-inference:latest
     container_name: vllm-server
 
-    # GPU 配置
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # GPU 配置 (Compose 模式)
+    gpus: all
 
     # 环境变量
     environment:
@@ -745,16 +741,16 @@ networks:
 
 ```bash
 # 构建并启动
-docker-compose up -d
+docker compose up -d
 
 # 查看日志
-docker-compose logs -f vllm-server
+docker compose logs -f vllm-server
 
 # 停止服务
-docker-compose down
+docker compose down
 
 # 停止并删除数据卷
-docker-compose down -v
+docker compose down -v
 ```
 
 ---

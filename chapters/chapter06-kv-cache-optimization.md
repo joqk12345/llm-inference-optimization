@@ -1,15 +1,15 @@
 # 第6章: KV Cache优化
 
-> **💰 成本影响** (基于行业数据)
-> - **显存节省**: KV Cache优化可减少显存占用50-70%
-> - **吞吐提升**: 在同样硬件上可服务2-3倍更多用户
-> - **成本节省**: 典型场景从$0.002/token降到$0.001/token
+> **💰 成本影响** (经验区间,需基准测试验证)
+> - **显存节省**: 取决于模型结构、序列长度与缓存策略
+> - **吞吐提升**: 可能显著提高,但幅度依赖负载与实现
+> - **成本节省**: 通常随吞吐与利用率提升而下降,需用实际成本模型核算
 
 ## 简介
 
-在第5章中,我们学习了 KV Cache 的基本原理——通过缓存历史 token 的 Key 和 Value 向量,避免重复计算,将复杂度从 O(n²) 降到 O(n)。但传统的 KV Cache 实现有一个致命问题:**内存碎片化**,导致 GPU 显存利用率只有 60-70%。
+在第5章中,我们学习了 KV Cache 的基本原理——通过缓存历史 token 的 Key 和 Value 向量,避免重复计算,将生成阶段的计算复杂度从每步 O(n²) 降到 O(n)。但传统的 KV Cache 实现常常面临**内存碎片化**问题,导致显存利用率偏低。
 
-vLLM 的核心创新——**PagedAttention**,借鉴操作系统的虚拟内存机制,将显存利用率提升到 90-95%。这是 vLLM 论文被引用 2000+ 次的根本原因,也是 Prefix Caching、Continuous Batching 等高级特性的基础。
+vLLM 的核心创新——**PagedAttention**——借鉴操作系统的虚拟内存机制,以更细粒度的块管理来提升显存利用率。这一设计也是 Prefix Caching、Continuous Batching 等高级特性的基础。
 
 本章将深入讲解:
 - 传统 KV Cache 的问题和局限性
@@ -18,7 +18,7 @@ vLLM 的核心创新——**PagedAttention**,借鉴操作系统的虚拟内存�
 - Prefix Caching 的原理和性能提升
 - 多种 KV Cache 优化技术 (GQA、量化、共享等)
 
-**学完本章,你将理解为什么 vLLM 比其他推理框架快 3-5 倍。**
+**学完本章,你将理解为什么 vLLM 在多种负载下更高效,以及效率提升来自哪些具体机制。**
 
 ---
 
@@ -234,12 +234,12 @@ for step in range(1, num_tokens):
     output = model.generate(K, V)
 ```
 
-**加速比**:
+**复杂度对比(示意)**:
 ```
-序列长度 n = 1000:
-- 无 KV Cache: ~1,000,000,000 次运算
-- 有 KV Cache: ~1,000,000 + 999 × 1,000 = ~2,000,000 次运算
-- 加速比: ~500x
+序列长度 n:
+- 无 KV Cache: 近似 O(n^3) 的重复计算开销
+- 有 KV Cache: 近似 O(n^2) 的总开销
+- 实际加速比取决于实现、带宽与模型规模
 ```
 
 ---
@@ -278,18 +278,18 @@ Tokens: [t0,   t1,   t2,   t3,   t4]
 每个 token 的 KV Cache:
 = 2 × num_layers × num_heads × head_dim × bytes
 
-Llama-2-7B:
+Llama-2-7B (示意):
 = 2 × 32 × 32 × 128 × 2 bytes
 = 524,288 bytes
-≈ 0.5 MB/token
+≈ 0.5 MB/token (仅用于粗略估算)
 
 1000 tokens:
 = 1000 × 0.5 MB
-= 500 MB
+= 500 MB (粗略估算)
 
 10000 tokens:
 = 10000 × 0.5 MB
-= 5000 MB = 5 GB
+= 5000 MB = 5 GB (粗略估算)
 ```
 
 ---
@@ -346,7 +346,7 @@ class NaiveKVCache:
 
 3. GPU 利用率低
    - 内存碎片化导致大量空间无法使用
-   - 实际利用率只有 60-70%
+   - 实际利用率可能偏低(依负载而定)
 ```
 
 ---
@@ -355,12 +355,12 @@ class NaiveKVCache:
 
 > **💡 深度来源**: [Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
 >
-> **核心洞察**: PagedAttention 借鉴操作系统的虚拟内存机制,将 KV Cache 分成固定大小的 pages,实现高效的内存管理。
+> **核心洞察**: PagedAttention 借鉴操作系统的虚拟内存机制,将 KV Cache 分成固定大小的 blocks,以实现更高效的内存管理。
 >
 > **为什么重要**:
-> - vLLM 最核心的创新 (论文引用 2000+)
-> - 内存利用率从 60-70% 提升到 90-95%
-> - Prefix Caching 的底层基础
+> - vLLM 的关键创新之一
+> - 在多请求与长序列场景下可提升显存利用率
+> - 为 Prefix Caching 等机制提供基础
 
 ---
 
@@ -469,8 +469,8 @@ def allocate_blocks(request, num_tokens):
 - 默认: 16 tokens/block
 - 为什么是 16?
   - 太小 (如 8): block table 太大,管理开销高
-  - 太大 (如 32): internal fragmentation 严重
-  - 16 是经验最优值 (平衡开销和浪费)
+  - 太大 (如 32): internal fragmentation 增加
+  - 16 是经验上的折中值,具体可随负载调整
 
 **内存利用率对比**:
 ```
@@ -478,13 +478,13 @@ def allocate_blocks(request, num_tokens):
 Request 1: 1000 tokens → 分配 1000 (连续)
 Request 2: 500 tokens → 分配 500 (连续)
 Request 3: 800 tokens → 需要连续 800 → 失败!
-内存利用率: (1000 + 500) / 2048 = 73%
+内存利用率(示意): (1000 + 500) / 2048 ≈ 73%
 
 PagedAttention:
 Request 1: 1000 tokens → 63 blocks
 Request 2: 500 tokens → 32 blocks
 Request 3: 800 tokens → 50 blocks (分散使用碎片空间)
-内存利用率: (1000 + 500 + 800) / 2048 = 91%
+内存利用率(示意): (1000 + 500 + 800) / 2048 ≈ 91%
 ```
 
 ---
@@ -600,7 +600,7 @@ class CacheEngine:
 
 | 维度 | 连续内存 | PagedAttention |
 |------|---------|----------------|
-| **内存利用率** | 60-70% | 90-95% |
+| **内存利用率** | 偏低(易碎片化) | 通常更高(依负载而定) |
 | **碎片化** | 严重 | 轻微 |
 | **Prefix Caching** | 困难 | 容易 (hash-based) |
 | **实现复杂度** | 简单 | 中等 |
@@ -608,15 +608,15 @@ class CacheEngine:
 | **适用场景** | 单请求、短序列 | 多请求、长序列、生产环境 |
 
 **性能开销分析**:
-- Block table lookup: O(1) hash table
-- 额外内存: block_table (每个请求 ~1KB)
-- 相比收益 (+30% 内存利用率),开销可忽略
+- Block table lookup: O(1) 级别
+- 额外内存: block_table (随请求数量线性增长)
+- 相比收益,开销通常可接受
 
 ---
 
 #### 6.3.2.7 真实案例分析
 
-**案例 1: ChatGPT 风格对话**
+**案例 1: ChatGPT 风格对话 (示意)**
 ```
 系统提示词: 500 tokens ("You are a helpful assistant...")
 用户输入: 50 tokens
@@ -625,16 +625,16 @@ class CacheEngine:
 传统方法:
   - 每个请求需要 650 tokens 连续空间
   - 系统提示词每次重新计算
-  - 内存利用率: ~65%
+  - 内存利用率: 偏低(示意)
 
 PagedAttention + Prefix Caching:
   - 系统提示词: 32 blocks (cached)
   - 100 个请求共享这 32 个 blocks
   - 每个请求只需要: 用户输入 4 blocks + 输出 7 blocks
-  - 内存利用率: ~92%
+  - 内存利用率: 较高(示意)
 ```
 
-**案例 2: 长文档摘要**
+**案例 2: 长文档摘要 (示意)**
 ```
 文档长度: 10,000 tokens
 摘要长度: 200 tokens
@@ -642,14 +642,14 @@ PagedAttention + Prefix Caching:
 
 传统方法:
   - 需要 10 × 10,200 = 102,000 tokens 连续空间
-  - 24GB GPU 只能处理 ~2 个并发请求
-  - 内存利用率: ~60%
+  - 并发数受显存约束 (示意)
+  - 内存利用率: 偏低(示意)
 
 PagedAttention:
   - 动态分配 blocks
-  - 可以处理 ~5 个并发请求
-  - 内存利用率: ~88%
-  - 吞吐量提升: 2.5x
+  - 并发数提升(示意)
+  - 内存利用率: 较高(示意)
+  - 吞吐量提升: 需基准测试验证
 ```
 
 ---
@@ -695,9 +695,9 @@ fragmentation = 1 - (largest_free_block / total_free_blocks)
 
 **告警阈值**:
 ```
-Block 利用率 > 95% → 考虑增加 GPU 或减小 batch size
-Cache hit rate < 30% → Prefix Caching 效果不佳
-Fragmentation > 20% → 可能需要调整 block size
+Block 利用率持续偏高 → 考虑增加 GPU 或减小 batch size
+Cache hit rate 偏低 → Prefix Caching 效果可能不佳
+Fragmentation 偏高 → 可能需要调整 block size
 ```
 
 ---
@@ -705,8 +705,8 @@ Fragmentation > 20% → 可能需要调整 block size
 #### 6.3.2.10 总结: PagedAttention 的核心价值
 
 **关键成就**:
-1. ✅ 内存利用率从 60-70% 提升到 90-95%
-2. ✅ 支持 Prefix Caching (相同 prompt 只计算一次)
+1. ✅ 内存利用率通常显著提升(依负载而定)
+2. ✅ 支持 Prefix Caching (相同或高度相似 prompt 可复用)
 3. ✅ 动态内存分配 (不需要预知序列长度)
 4. ✅ 支持更高的并发和更长的序列
 
@@ -746,17 +746,17 @@ Heads 0-31: 共享 K, V
 
 KV Cache 大小:
 = 1 × 2 × seq_len × head_dim × bytes
-= MHA 的 1/32!
+= 显著小于 MHA (示意)
 ```
 
 **对比**:
 
 | 维度 | MHA | MQA |
 |------|-----|-----|
-| **KV Cache 大小** | 大 (32x) | 小 (1x) |
-| **模型质量** | 高 | 略低 |
-| **推理速度** | 慢 | 快 |
-| **适用场景** | 追求质量 | 追求速度 |
+| **KV Cache 大小** | 大 | 小 |
+| **模型质量** | 高 | 可能下降 |
+| **推理速度** | 慢 | 通常更快 |
+| **适用场景** | 追求质量 | 追求速度/显存 |
 
 ---
 
@@ -776,9 +776,9 @@ KV Cache 大小:
 = MHA 的 1/4, MQA 的 8x
 ```
 
-**为什么 GQA 是最佳选择**:
-- ✅ 接近 MHA 的质量
-- ✅ 接近 MQA 的速度
+**为什么 GQA 是常见折中**:
+- ✅ 通常接近 MHA 的质量
+- ✅ 同时降低 KV Cache 开销
 - ✅ Llama-3、Mistral 等现代模型采用
 
 ---
@@ -791,7 +791,7 @@ Request A: "System: You are assistant. User: Hello"
 Request B: "System: You are assistant. User: Hi"
 
 共享部分: "System: You are assistant."
-→ 只计算一次 KV Cache
+→ 可复用 KV Cache
 → Request A 和 B 都复用
 ```
 
@@ -837,7 +837,7 @@ def dequantize_kv(kv_int8, scale):
 ```
 
 **质量影响**:
-- ✅ 大多数场景下精度损失可接受
+- ✅ 许多场景下精度损失可接受
 - ⚠️ 复杂推理任务可能受影响
 - 💡 建议: 先实验,再决定是否使用
 
@@ -847,7 +847,7 @@ def dequantize_kv(kv_int8, scale):
 
 ### 6.5.1 显存占用分析
 
-**Llama-2-7B 的 KV Cache**:
+**Llama-2-7B 的 KV Cache (示意)**:
 ```
 单层单头的 KV Cache:
 = 2 × seq_len × head_dim × bytes
@@ -858,7 +858,7 @@ def dequantize_kv(kv_int8, scale):
 所有层所有头:
 = 2 MB × 32 layers × 32 heads
 = 2,048 MB
-≈ 2 GB (seq_len = 4096)
+≈ 2 GB (seq_len = 4096, 粗略估算)
 ```
 
 **不同模型的 KV Cache 大小**:
@@ -869,29 +869,27 @@ def dequantize_kv(kv_int8, scale):
 | Llama-2-13B | 40 | 40 | 128 | 0.8 GB | 1.6 GB | 3.2 GB |
 | Llama-2-70B | 80 | 64 | 128 | 2 GB | 4 GB | 8 GB |
 
-**并发请求的显存需求**:
+**并发请求的显存需求(示意)**:
 ```
 10 个并发请求,每个 4K tokens:
 - Llama-2-7B: 10 × 0.5 GB = 5 GB
 - Llama-2-70B: 10 × 2 GB = 20 GB
 
 加上模型权重:
-- Llama-2-7B (13 GB) + KV (5 GB) = 18 GB → 单张 A100 (40GB) ✅
-- Llama-2-70B (140 GB) → 需要模型并行
+- Llama-2-7B (13 GB) + KV (5 GB) = 18 GB → 需要足够显存
+- Llama-2-70B (140 GB) → 通常需要模型并行
 ```
 
 ---
 
 ### 6.5.2 序列长度限制
 
-**GPU 显存限制序列长度**:
+**GPU 显存限制序列长度(示意)**:
 ```
-A100 40GB:
-- 模型权重: 13 GB (Llama-2-7B FP16)
-- 剩余: 27 GB
-- KV Cache: 27 GB / 0.5 GB per 4K = 216K tokens
-- 单请求: 216K tokens
-- 10 个并发: 21.6K tokens each
+示意方法:
+- 估算模型权重占用
+- 估算每 4K tokens 的 KV Cache 占用
+- 用剩余显存粗算可承载的序列长度/并发数
 ```
 
 **实际考虑**:
@@ -925,11 +923,11 @@ A100 40GB:
   - 延迟高
 ```
 
-**最佳实践**:
+**实践建议**:
 ```
-短序列 (< 2K tokens): 不需要 KV Cache
-中等序列 (2K-8K): KV Cache
-长序列 (> 8K): KV Cache + 量化 + 分块处理
+短序列: 仍通常启用 KV Cache,但收益可能有限
+中等序列: KV Cache 通常显著降低延迟
+长序列: KV Cache + 量化 + 分块处理 更有价值
 ```
 
 ---
@@ -938,23 +936,21 @@ A100 40GB:
 
 ### 6.6.1 无 KV Cache vs 有 KV Cache
 
-**性能测试**:
+**性能测试(示意)**:
 ```
 模型: Llama-2-7B
 硬件: A100 40GB
 序列长度: 1024 tokens
 
 无 KV Cache:
-- TTFT: 200ms
-- TBT: 50ms/token
-- 总时间 (生成 100 tokens): 200ms + 100 × 50ms = 5.2s
+- TTFT: 取决于模型与硬件
+- TBT: 随序列增长显著变慢
 
 有 KV Cache:
-- TTFT: 200ms (相同)
-- TBT: 5ms/token (10x 快!)
-- 总时间 (生成 100 tokens): 200ms + 100 × 5ms = 0.7s
+- TTFT: 变化不大
+- TBT: 通常显著降低
 
-加速比: 5.2s / 0.7s = 7.4x
+加速比: 需以实际基准测试为准
 ```
 
 ---
@@ -1163,7 +1159,7 @@ def compute_block_hash(block_kv):
 ```
 
 **内存开销**:
-- Hash table 存储: 每个 block ~32 bytes hash
+- Hash table 存储: 与 block 数量线性相关
 - KV Cache 存储: 原本就需要,不算额外开销
 
 **考虑因素**:
@@ -1206,7 +1202,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ### 6.7.7 实战案例
 
-**案例 1: Chatbot 服务**
+**案例 1: Chatbot 服务 (示意)**
 ```
 场景:
 - 系统提示词: 500 tokens
@@ -1221,10 +1217,10 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
   - 首个请求: 550 tokens
   - 后续 999 个请求: 每个 50 tokens
   - 总计算: 550 + 999 × 50 = 50.5K tokens/分钟
-  - 加速比: 550K / 50.5K = **10.9x**
+  - 加速比: 取决于命中率与请求分布(示意)
 ```
 
-**案例 2: RAG 应用**
+**案例 2: RAG 应用 (示意)**
 ```
 场景:
 - 知识库 prefix: 2000 tokens
@@ -1236,7 +1232,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 有 Prefix Caching:
   - 总计算: 2030 + 499 × 30 = 17K tokens/分钟
-  - 加速比: 1,015K / 17K = **59.7x**
+  - 加速比: 取决于命中率与请求分布(示意)
 ```
 
 ---
@@ -1268,7 +1264,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 建议:
   - 根据实际 hit rate 调整
-  - 目标: 70-90% hit rate
+  - 以业务效果与成本指标为目标,而非固定阈值
 ```
 
 **3. 监控和调优**
@@ -1277,8 +1273,9 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 def monitor_prefix_cache(llm):
     stats = llm.get_cache_stats()
 
-    if stats['hit_rate'] < 0.5:
-        print("⚠️  Cache hit rate 低于 50%,考虑优化:")
+    threshold = 0.5  # 根据业务容忍度调整
+    if stats['hit_rate'] < threshold:
+        print("⚠️  Cache hit rate 偏低,考虑优化:")
         print("  1. 增加系统提示词长度")
         print("  2. 检查是否有可共享的 prefix")
         print("  3. 调整 cache size")
@@ -1355,8 +1352,8 @@ GPU 总显存: 2048 tokens
 ## 🎯 总结
 
 **关键要点**:
-- 传统 KV Cache 遭受内存碎片化,利用率只有 60-70%
-- PagedAttention 借鉴 OS 虚拟内存,将利用率提升到 90-95%
+- 传统 KV Cache 容易碎片化,利用率可能偏低
+- PagedAttention 借鉴 OS 虚拟内存,在多请求场景下通常更高效
 - Block allocation 和 eviction 策略是 PagedAttention 的核心
 - Prefix Caching 通过跨请求复用,可带来 2-50x 加速
 - GQA 是质量与速度的最佳平衡

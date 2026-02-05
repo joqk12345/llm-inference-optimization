@@ -18,7 +18,7 @@
 - 为什么需要 Continuous Batching
 - vLLM 的三层架构全景
 
-**学完本章,你将能够解释为什么 vLLM 比传统方法快 24 倍。**
+**学完本章,你将能够解释为什么 vLLM 在多种场景下显著更快,以及这些性能差异来自哪些机制。**
 
 ---
 
@@ -26,7 +26,7 @@
 
 ### 5.1.1 自回归生成的基本过程
 
-**LLM 的本质**: "Fancy next token predictors" (花哨的下一个词预测器)
+**LLM 的本质**: 概率性的下一 token 预测器
 
 ```
 用户输入: "The capital of France is"
@@ -91,15 +91,14 @@
 - ⏱️ **时间**: TTFT (Time To First Token), 首字延迟
 
 **为什么 Prefill 可以并行?**
-- 所有输入 token 是已知的
-- 不需要考虑因果关系
-- Attention 矩阵可以一次性计算
+- 所有输入 token 已知
+- 仍遵循因果掩码,但可在一次前向中并行计算
+- Attention 的矩阵运算可批量执行
 
-**示例**:
+**示意**:
 ```
 Prompt: 100 tokens
-GPU RTX 4090:
-- Prefill 时间: ~200ms (一次处理 100 个 tokens)
+单次 Prefill 的耗时通常明显低于完整生成阶段,但具体数值取决于模型规模、硬件与实现。
 ```
 
 ---
@@ -137,12 +136,12 @@ GPU RTX 4090:
 - 必须等待前一个 token 生成完成
 - 这是自回归模型的本质限制
 
-**示例**:
+**示意**:
 ```
 生成 100 tokens:
-- 每个 token: ~20ms
-- 总时间: 100 × 20ms = 2000ms
-- 是 Prefill 的 10 倍!
+- Decode 阶段会逐 token 串行生成
+- 总耗时通常显著高于一次 Prefill
+- 具体倍数取决于模型规模、KV Cache 实现与硬件带宽
 ```
 
 ---
@@ -175,13 +174,13 @@ Decode 阶段:
 
 **优化方向**:
 - **Prefill**: 优化计算 (更快的 GPU, 更好的内核)
-- **Decode**: 优化内存带宽 (KV Cache, PagedAttention)
+- **Decode**: 优化内存带宽与缓存命中 (KV Cache, PagedAttention)
 
 ---
 
 ## 5.2 Attention 机制详解
 
-> **💡 为什么重要**: Attention 是唯一让不同 token 产生交互的地方。理解 Attention,就理解了 LLM 的核心。
+> **💡 为什么重要**: Attention 是让不同 token 产生交互的主要机制。理解 Attention,就理解了 LLM 的核心。
 
 ### 5.2.1 Token 的表示: 向量与 hidden dimension
 
