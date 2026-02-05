@@ -25,11 +25,11 @@
 
 ---
 
-## 5.0 训练 vs 推理: 工作负载的本质差异
+## 5.1 训练 vs 推理: 工作负载的本质差异
 
 >  核心洞察: 理解训练和推理的工作负载差异,是理解优化策略的第一步。
 
-### 5.0.1 训练: 计算密集型的并行工作负载
+### 5.11.1 训练: 计算密集型的并行工作负载
 
 训练流程:
 
@@ -51,7 +51,7 @@
 - 时间: 数周到数月
 - 成本: 数百万美元
 
-### 5.0.2 推理: 内存带宽密集型的串行工作负载
+### 5.11.2 推理: 内存带宽密集型的串行工作负载
 
 推理流程:
 
@@ -88,7 +88,7 @@
 - GPU: 内存带宽瓶颈
 ```
 
-### 5.0.3 为什么优化推理更关键
+### 5.11.3 为什么优化推理更关键
 
 商业现实:
 
@@ -115,9 +115,9 @@
 
 ---
 
-## 5.1 LLM 如何生成文本
+## 5.2 LLM 如何生成文本
 
-### 5.1.1 自回归生成的基本过程
+### 5.11.1 自回归生成的基本过程
 
 LLM 的本质: "Fancy next token predictors" (花哨的下一个词预测器)
 
@@ -163,7 +163,7 @@ LLM 的本质: "Fancy next token predictors" (花哨的下一个词预测器)
 
 ---
 
-### 5.1.2 Prefill 阶段: 并行处理 prompt
+### 5.11.2 Prefill 阶段: 并行处理 prompt
 
 定义: 处理初始 prompt,生成第一个 token 的阶段
 
@@ -197,7 +197,7 @@ GPU RTX 4090:
 
 ---
 
-### 5.1.3 Decode 阶段: 逐 token 生成
+### 5.11.3 Decode 阶段: 逐 token 生成
 
 定义: 逐个生成后续 token 的阶段
 
@@ -240,7 +240,7 @@ GPU RTX 4090:
 
 ---
 
-### 5.1.4 图解完整流程
+### 5.11.4 图解完整流程
 
 ```
 时间线:
@@ -272,11 +272,11 @@ Decode 阶段:
 
 ---
 
-## 5.2 Attention 机制详解
+## 5.3 Attention 机制详解
 
 >  为什么重要: Attention 是唯一让不同 token 产生交互的地方。理解 Attention,就理解了 LLM 的核心。
 
-### 5.2.1 Token 的表示: 向量与 hidden dimension
+### 5.11.1 Token 的表示: 向量与 hidden dimension
 
 Tokenization: 文本 → token 序列
 
@@ -320,7 +320,7 @@ Hidden Dimension: 模型的"表示能力"
 
 ---
 
-### 5.2.2 Query、Key、Value 投影
+### 5.11.2 Query、Key、Value 投影
 
 三个权重矩阵: Wq、Wk、Wv
 
@@ -367,7 +367,7 @@ head_dim = hidden_dim // num_heads  # 4096 // 32 = 128
 
 ---
 
-### 5.2.3 Attention 计算: QK^T 与二次复杂度
+### 5.11.3 Attention 计算: QK^T 与二次复杂度
 
 计算步骤:
 
@@ -424,7 +424,7 @@ attn_weights @ V:
 
 ---
 
-### 5.2.4 Attention Mask: 控制 token 交互
+### 5.11.4 Attention Mask: 控制 token 交互
 
 什么是 Mask: 布尔矩阵,决定哪些 token 可以交互
 
@@ -456,7 +456,7 @@ attn_weights = torch.softmax(scores, dim=-1)
 
 ---
 
-### 5.2.5 Causal Mask: 因果关系的可视化
+### 5.11.5 Causal Mask: 因果关系的可视化
 
 定义: 每个 token 只能与之前的 token 交互
 
@@ -506,7 +506,7 @@ print(mask)
 
 ---
 
-### 5.2.6 为什么 Attention 是唯一让 token 交互的地方
+### 5.11.6 为什么 Attention 是唯一让 token 交互的地方
 
 其他操作: token-wise,每个 token 独立处理
 
@@ -532,9 +532,9 @@ output = Attention(Q, K, V)  # token 之间聚合信息!
 
 ---
 
-## 5.3 从朴素生成到 KV Cache
+## 5.4 从朴素生成到 KV Cache
 
-### 5.3.1 朴素方法: 每次重新计算 (O(n²))
+### 5.11.1 朴素方法: 每次重新计算 (O(n²))
 
 问题场景: 生成第 n+1 个 token
 
@@ -573,7 +573,7 @@ output = Attention(Q, K, V)  # token 之间聚合信息!
 
 ---
 
-### 5.3.2 重复计算问题的可视化
+### 5.11.2 重复计算问题的可视化
 
 关键观察: 新 token (如"will") 不影响旧 token 的 attention 计算
 
@@ -610,7 +610,7 @@ mask = [False, False, False, False, True]
 
 ---
 
-### 5.3.3 KV Cache 的核心思想
+### 5.11.3 KV Cache 的核心思想
 
 核心洞察: 旧 token 的 K、V 已经计算过,缓存起来!
 
@@ -652,7 +652,7 @@ Decode 阶段 - 第 2 步:
 
 ---
 
-### 5.3.4 计算复杂度降低: 从 O(n²) 到 O(n)
+### 5.11.4 计算复杂度降低: 从 O(n²) 到 O(n)
 
 无 KV Cache:
 ```
@@ -691,7 +691,7 @@ Decode 阶段 - 第 2 步:
 
 ---
 
-### 5.3.5 显存代价: 每个 token 需要多少显存?
+### 5.11.5 显存代价: 每个 token 需要多少显存?
 
 单 token 的 cache 大小:
 ```
@@ -731,7 +731,7 @@ Llama-2-7B:
 -  计算: 大幅加速
 -  显存: 线性增长
 
-### 5.3.6 不同Attention变体的内存优化
+### 5.11.6 不同Attention变体的内存优化
 
 问题: KV Cache的显存占用仍然很大
 
@@ -782,11 +782,11 @@ Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
 
 ---
 
-## 5.4 KV Cache的内存管理挑战
+## 5.5 KV Cache的内存管理挑战
 
 >  为什么重要: 理解内存碎片化问题,才能理解PagedAttention的设计动机。
 
-### 5.4.1 内存碎片化: 隐形的性能杀手
+### 5.11.1 内存碎片化: 隐形的性能杀手
 
 场景: 在A100 40GB上运行LLaMA-2-13B
 
@@ -805,7 +805,7 @@ Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
 
 原因: 内存碎片化浪费了60-80%的KV Cache内存
 
-### 5.4.2 内部碎片化 (Internal Fragmentation)
+### 5.11.2 内部碎片化 (Internal Fragmentation)
 
 定义: 已分配但未使用的内存
 
@@ -834,7 +834,7 @@ Request C: 预分配2048 slots, 实际使用300
 浪费: (6144 - 600) / 6144 = 90%!
 ```
 
-### 5.4.3 外部碎片化 (External Fragmentation)
+### 5.11.3 外部碎片化 (External Fragmentation)
 
 定义: 内存总量足够,但无法分配连续的大块
 
@@ -883,7 +883,7 @@ Request C: 预分配2048 slots, 实际使用300
   结果:  失败! (虽然有112 MB空闲)
 ```
 
-### 5.4.4 传统解决方案的困境
+### 5.11.4 传统解决方案的困境
 
 静态分配:
 -  简单
@@ -898,11 +898,11 @@ Request C: 预分配2048 slots, 实际使用300
 
 ---
 
-## 5.5 操作系统类比: 虚拟内存与分页
+## 5.6 操作系统类比: 虚拟内存与分页
 
 >  核心洞察: PagedAttention的设计思想直接借鉴了操作系统的虚拟内存机制。
 
-### 5.5.1 操作系统面临的内存管理问题
+### 5.11.1 操作系统面临的内存管理问题
 
 场景: 运行总大小超过物理内存的程序
 
@@ -919,7 +919,7 @@ Request C: 预分配2048 slots, 实际使用300
 - 其他页存储在磁盘上
 ```
 
-### 5.5.2 虚拟内存的核心概念
+### 5.11.2 虚拟内存的核心概念
 
 页 (Page): 虚拟地址空间中的固定大小块
 
@@ -954,7 +954,7 @@ MMU (Memory Management Unit): 硬件单元,负责地址翻译
   ...
 ```
 
-### 5.5.3 地址翻译流程
+### 5.11.3 地址翻译流程
 
 ```
 程序访问: 虚拟地址 10000
@@ -977,7 +977,7 @@ MMU重新翻译: 页2 → 帧3
 ↓
 访问内存: ```
 
-### 5.5.4 虚拟内存的优势
+### 5.11.4 虚拟内存的优势
 
 解决外部碎片化:
 - 所有分配都是固定大小的页
@@ -995,7 +995,7 @@ MMU重新翻译: 页2 → 帧3
 - 可以运行比物理内存大的程序
 - 可以动态加载/卸载代码段
 
-### 5.5.5 从操作系统到LLM推理
+### 5.11.5 从操作系统到LLM推理
 
 类比映射:
 
@@ -1016,9 +1016,9 @@ MMU重新翻译: 页2 → 帧3
 
 ---
 
-## 5.6 Chunked Prefill: 处理长 prompt
+## 5.7 Chunked Prefill: 处理长 prompt
 
-### 5.6. 问题: 大 prompt 超过显存
+### 5.11. 问题: 大 prompt 超过显存
 
 场景: Cursor 添加整个代码仓库到 prompt
 
@@ -1039,7 +1039,7 @@ GPU: RTX 4090 24GB
 
 ---
 
-### 5.6. 解决方案: 分块处理
+### 5.11. 解决方案: 分块处理
 
 思路: 将 n 个 token 的 prompt 分成 ⌈n/m⌉ 个 chunks
 
@@ -1056,7 +1056,7 @@ Chunk 2: [t4, t5, t6]
 
 ---
 
-### 5.6. KV Cache 在 chunked prefill 中的作用
+### 5.11. KV Cache 在 chunked prefill 中的作用
 
 Chunk 1:
 ```
@@ -1103,7 +1103,7 @@ mask2 = [
 
 ---
 
-### 5.6. 图解分块处理流程
+### 5.11. 图解分块处理流程
 
 无 chunked prefill:
 ```
@@ -1140,11 +1140,11 @@ GPU 内存紧张: chunk_size = 2048
 
 ---
 
-## 5.7 PagedAttention入门: 借鉴OS的内存管理
+## 5.8 PagedAttention入门: 借鉴OS的内存管理
 
 >  核心思想: 将KV Cache分成固定大小的blocks,就像OS将内存分成pages一样。
 
-### 5.6. 传统KV Cache的问题
+### 5.11. 传统KV Cache的问题
 
 连续内存分配:
 
@@ -1158,7 +1158,7 @@ Request A的KV Cache:
   3. 如果需要超过2048 tokens,需要重新分配更大的空间
 ```
 
-### 5.6. Paged KV Cache的核心设计
+### 5.11. Paged KV Cache的核心设计
 
 分块存储:
 
@@ -1194,7 +1194,7 @@ block_table = {
 }
 ```
 
-### 5.6. PagedAttention如何工作
+### 5.11. PagedAttention如何工作
 
 Attention计算的挑战:
 
@@ -1240,7 +1240,7 @@ PagedAttention算法:
 2. 内存灵活性: blocks可以分散在任意位置
 3. 增量计算: 只加载需要的blocks
 
-### 5.6. PagedAttention的优势
+### 5.11. PagedAttention的优势
 
 解决内部碎片化:
 
@@ -1284,7 +1284,7 @@ Paged方式:
   → 节省内存!
 ```
 
-### 5.7.5 性能对比
+### 5.11.5 性能对比
 
 vLLM论文数据:
 
@@ -1306,9 +1306,9 @@ vLLM (PagedAttention):
 
 ---
 
-## 5.8 批处理的挑战: 从静态到动态
+## 5.9 批处理的挑战: 从静态到动态
 
-### 5.8.1 静态批处理
+### 5.11.1 静态批处理
 
 目标: 提高吞吐量 (throughput)
 
@@ -1338,7 +1338,7 @@ prompt3 = "<pad><pad><pad><pad><pad><pad><pad><pad><pad>Hey"
 
 ---
 
-### 5.8.2 Padding 的问题: 计算浪费
+### 5.11.2 Padding 的问题: 计算浪费
 
 Padding 位置: 左侧 (添加`<pad>` token)
 
@@ -1366,7 +1366,7 @@ mask1 = [
 
 ---
 
-### 5.8.3 不同序列长度的困境
+### 5.11.3 不同序列长度的困境
 
 场景: batch 中有多个 prompt,长度差异大
 
@@ -1422,7 +1422,7 @@ Padding 数量 = (n-1) × (B-1)
 
 ---
 
-### 5.8.4 示例: 为什么 padding 成本随 batch 和长度二次增长
+### 5.11.4 示例: 为什么 padding 成本随 batch 和长度二次增长
 
 参数:
 ```
@@ -1453,10 +1453,10 @@ Padding 数量:
 
 ---
 
-## 5.9 Continuous Batching 入门 
+## 5.10 Continuous Batching 入门 
 >  核心洞察: 去掉 batch 维度,用 attention mask 控制 token 交互,让 GPU 时刻满载。
 
-### 5.9.1 核心思想: 去掉 batch 维度
+### 5.11.1 核心思想: 去掉 batch 维度
 
 问题根源: batch 维度引入了 padding
 
@@ -1481,7 +1481,7 @@ shape: [5]  # 只有 seq_len!
 
 ---
 
-### 5.9.2 Ragged Batching: 用 attention mask 控制交互
+### 5.11.2 Ragged Batching: 用 attention mask 控制交互
 
 方法:
 1. 将多个 prompt 拼接成一个序列
@@ -1525,7 +1525,7 @@ B2:   [ ]  [ ]  [ ]  []  []
 
 ---
 
-### 5.9.3 Dynamic Scheduling: 动态替换完成的请求
+### 5.11.3 Dynamic Scheduling: 动态替换完成的请求
 
 场景: 某个 prompt 生成 `<eos>`
 
@@ -1557,7 +1557,7 @@ Continuous Batching (只需重建 mask):
 
 ---
 
-### 5.9.4 混合 Prefill 和 Decode: 最大化 throughput
+### 5.11.4 混合 Prefill 和 Decode: 最大化 throughput
 
 挑战:
 ```
@@ -1618,7 +1618,7 @@ GPU 利用率: 1000/1000 = 100% ```
 
 ---
 
-### 5.9.5 完整的 Continuous Batching 流程图
+### 5.11.5 完整的 Continuous Batching 流程图
 
 ```
 步骤 1: 初始 batch
@@ -1658,7 +1658,7 @@ GPU 利用率: 1000/1000 = 100% ```
 
 ---
 
-### 5.9.6 Continuous Batching vs 传统方法对比
+### 5.11.6 Continuous Batching vs 传统方法对比
 
 Static Batching:
 ```
@@ -1700,7 +1700,7 @@ Continuous Batching (vLLM):
 
 ---
 
-## 5.10 vLLM 架构全景 
+## 5.11 vLLM 架构全景 
 >  来源: [Berkeley EECS-2025-192 - Deconstructing vLLM](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
 >
 > 核心价值: 系统性理解 vLLM 的三层架构——Interface、Model Authoring、Runtime,为后续章节铺垫架构知识。
@@ -1710,7 +1710,7 @@ Continuous Batching (vLLM):
 > - 调试问题、性能优化、扩展开发的基础
 > - 为第6章 (KV Cache)、第7章 (调度)、第10章 (部署) 铺垫
 
-### 5.10.1 vLLM 的三层架构
+### 5.11.1 vLLM 的三层架构
 
 Layer 1: Interfaces (用户交互层)
 
@@ -1780,7 +1780,7 @@ Scheduler → CacheEngine → Worker (GPU)
 
 ---
 
-### 5.10.2 用户请求的完整流程
+### 5.11.2 用户请求的完整流程
 
 步骤 1: 用户发送请求
 
@@ -1834,7 +1834,7 @@ OpenAI Server → 用户
 
 ---
 
-### 5.10.3 架构图
+### 5.11.3 架构图
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -1861,7 +1861,7 @@ OpenAI Server → 用户
 
 ---
 
-### 5.10.4 与后续章节的关联
+### 5.11.4 与后续章节的关联
 
 第6章 KV Cache 优化:
 - BlockManager 的详细实现 (6.3.2)
@@ -1880,7 +1880,7 @@ OpenAI Server → 用户
 
 ---
 
-### 5.10.5 实战: 启动 vLLM 并观察架构
+### 5.11.5 实战: 启动 vLLM 并观察架构
 
 启动 vLLM server:
 
@@ -1914,7 +1914,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 ---
 
-### 5.10.6 架构理解检查点
+### 5.11.6 架构理解检查点
 
 完成本章后,你应该能够:
 
