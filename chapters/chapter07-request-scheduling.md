@@ -1,9 +1,9 @@
 # 第7章: 请求调度策略
 
-> **💰 成本影响** (基于行业数据)
-> - **吞吐提升**: Continuous Batching 可将吞吐量提升 3-10 倍
-> - **延迟改善**: P95 延迟可降低 50-70%
-> - **GPU 利用率**: 从 30-40% 提升到 80-90%
+> **💰 成本影响** (经验区间,需基准测试验证)
+> - **吞吐提升**: Continuous Batching 往往显著提升吞吐
+> - **延迟改善**: P95 延迟通常可改善,但幅度依负载与实现
+> - **GPU 利用率**: 可提升,但需要结合模型与流量分布评估
 
 ## 简介
 
@@ -115,7 +115,7 @@ GPU 资源:
 1. ✅ **最小化延迟**: P50、P95、P99 延迟尽可能低
 2. ✅ **最大化吞吐量**: 在给定硬件上服务更多用户
 3. ✅ **公平性**: 避免长请求饿死短请求
-4. ✅ **资源利用**: GPU 利用率 >80%
+4. ✅ **资源利用**: GPU 利用率尽可能高
 
 **次要目标**:
 - 简单性: 易于理解和调试
@@ -159,7 +159,7 @@ class FIFOScheduler:
 
 **缺点**:
 - ❌ 吞吐量低 (一次只处理一个请求)
-- ❌ GPU 利用率低 (~30-40%)
+- ❌ GPU 利用率偏低
 - ❌ 长请求阻塞后续所有请求
 
 **适用场景**:
@@ -202,12 +202,12 @@ Padded A: [pad×40][10 tokens]
 Padded B: [50 tokens]
 Padded C: [pad×30][20 tokens]
 
-浪费: (40 + 0 + 30) / 100 = 70% padding!
+浪费(示意): (40 + 0 + 30) / 100 = 70% padding
 ```
 
 **优点**:
 - ✅ 提高吞吐量 (相比 FIFO)
-- ✅ GPU 利用率提升 (~60-70%)
+- ✅ GPU 利用率提升
 
 **缺点**:
 - ❌ 大量 padding 浪费
@@ -224,11 +224,11 @@ Padded C: [pad×30][20 tokens]
 
 | 策略 | 吞吐量 | 延迟 | GPU 利用率 | 实现复杂度 | 适用场景 |
 |------|-------|------|-----------|-----------|---------|
-| **FIFO** | 低 | 最低 (单请求) | 30-40% | 简单 | 低并发 |
-| **Static Batching** | 中 | 高 (等待 batch) | 60-70% | 简单 | 离线批处理 |
-| **Continuous Batching** | 高 | 低 | 80-95% | 中等 | 生产环境 |
+| **FIFO** | 低 | 最低 (单请求) | 偏低 | 简单 | 低并发 |
+| **Static Batching** | 中 | 高 (等待 batch) | 中等 | 简单 | 离线批处理 |
+| **Continuous Batching** | 高 | 低 | 通常更高 | 中等 | 生产环境 |
 
-**结论**: Continuous Batching 是生产环境的最佳选择
+**结论**: Continuous Batching 在多数生产环境中是常见选择
 
 ---
 
@@ -256,14 +256,14 @@ Request C: 20 tokens (已生成 150,还需 30)
   → GPU 计算浪费
 ```
 
-**浪费量化**:
+**浪费量化(示意)**:
 ```
 假设 batch_size = 8,每个请求平均生成 100 tokens
 
 Static Batching:
-- 需要等待所有 8 个请求完成
-- P95 延迟 = 最慢请求的完成时间
-- Padding 比例 = 50-70%
+- 需要等待所有请求完成
+- P95 延迟常由最慢请求主导
+- Padding 比例可能较高
 ```
 
 ---
@@ -333,7 +333,7 @@ def continuous_batching_step(scheduled, running, completed):
 **迭代级调度 (Iteration-level Scheduling)**:
 
 ```
-时间线 (每次迭代 ~10ms):
+时间线 (每次迭代耗时依硬件与模型而定):
 
 Iter 1:
   Running: [Req A (100→101), Req B (50→51), Req C (200→201)]
@@ -367,7 +367,7 @@ Iter 5:
 ```
 
 **关键观察**:
-- GPU 时刻保持满载 (3 个请求)
+- GPU 尽量保持高负载
 - 完成的请求立即被替换
 - Prefill 和 Decode 混合处理
 - 无 padding 浪费
@@ -376,7 +376,7 @@ Iter 5:
 
 ### 7.3.4 性能提升分析
 
-**吞吐量提升**:
+**吞吐量提升(示意)**:
 ```
 假设:
 - GPU 每次迭代可处理 1024 tokens
@@ -389,40 +389,34 @@ Static Batching:
 - 吞吐量: 8 requests / 100 iterations = 0.08 req/iter
 
 Continuous Batching:
-- 迭代 1-10: Req A-D (prefill)
-- 迭代 11-20: Req E-H (decode)
-- 迭代 21: Req A 完成,加入 Req I (prefill)
-- 迭代 22-30: Req E-I (decode)
-- ...
-- 吞吐量: ~0.25 req/iter (3x 提升!)
+- 通过动态替换完成请求,减少空槽
+- 吞吐量通常高于静态批处理,但具体提升需基准测试
 ```
 
-**延迟改善**:
+**延迟改善(示意)**:
 ```
 假设:
 - 100 个请求排队
 - Batch size: 8
 
 Static Batching:
-- 第 100 个请求需要等待 12 个 batch
-- P95 延迟: 12 × 100 iterations = 1200 iterations
+- 第 100 个请求需要等待多个 batch
+- P95 延迟由最慢批次主导(示意)
 
 Continuous Batching:
-- 第 100 个请求等待 ~3 个 batch
-- P95 延迟: 3 × 100 iterations = 300 iterations
-
-改善: 1200 / 300 = 4x
+- 排队等待通常更短
+- P95 延迟通常改善,幅度依负载而定
 ```
 
-**GPU 利用率**:
+**GPU 利用率(示意)**:
 ```
 Static Batching:
-  - Padding: 50-70%
-  - GPU 利用率: 30-50%
+  - Padding 可能较高
+  - GPU 利用率中等
 
 Continuous Batching:
-  - Padding: 0-5%
-  - GPU 利用率: 80-95%
+  - Padding 通常显著降低
+  - GPU 利用率通常更高
 ```
 
 ---
@@ -517,7 +511,7 @@ def allocate_dynamic(request):
 ```
 
 **优势**:
-- 节省显存 (30-50%)
+- 节省显存 (幅度依场景而定)
 - 提高并发数
 - 支持 max_new_tokens 很大的场景
 
@@ -579,20 +573,20 @@ class Scheduler:
 
 ---
 
-### 7.4.4 Overlap Scheduling (Mini-SGLang) ⚡️ 2025 新增
+### 7.4.4 Overlap Scheduling (Mini-SGLang) ⚡️
 
 > **💡 深度来源**: [Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/) + [Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
 >
-> **核心问题**: Berkeley 论文指出 CPU overhead 导致 GPU 闲置 → Overlap Scheduling 是解决方案
+> **核心问题**: CPU overhead 可能导致 GPU 闲置 → Overlap Scheduling 是一种应对方式
 >
-> **性能提升**: 消除 GPU stalls,提升吞吐量 20-30%
+> **性能影响**: 可减少 GPU stalls,具体提升需基准测试
 
 ---
 
 #### 7.4.4.1 CPU 开销导致 GPU 闲置问题
 
 **Berkeley EECS-2025-192 的发现**:
-- CPU 开销占推理时间的 **10-20%**
+- CPU 开销在某些场景中占据可观比例
 - 主要来源:
   - Kernel launch (启动 GPU kernel)
   - Memory copy (CPU↔GPU 数据传输)
@@ -609,7 +603,7 @@ class Scheduler:
   Step 5: CPU 等待 GPU 完成
   Step 6: 回到 Step 1
   ```
-- 结果: **GPU 利用率低**,有明显的 GPU stalls
+ - 结果: **GPU 利用率偏低**,可能出现 GPU stalls
 
 **Nsight Systems 分析** (无 overlap):
 ```
@@ -695,25 +689,23 @@ class OverlapScheduler:
 
 #### 7.4.4.4 性能提升
 
-**吞吐量提升**:
+**吞吐量提升(示意)**:
 ```
 无 Overlap:
-- CPU 开销: 15%
-- GPU stalls: 10%
-- 有效计算: 75%
-- 吞吐量: 100 req/s
+- CPU 开销: 依实现而定
+- GPU stalls: 可能存在
+- 有效计算: 依负载而定
 
 有 Overlap:
-- CPU 开销: 5% (并行化)
-- GPU stalls: 0% (无闲置)
-- 有效计算: 95%
-- 吞吐量: 126 req/s (1.26x 提升)
+- CPU 与 GPU 并行化
+- GPU stalls 通常减少
+- 吞吐量可能提升
 ```
 
-**延迟改善**:
+**延迟改善(示意)**:
 ```
-P95 延迟降低 20-30%
-- CPU 准备时间不阻塞 GPU
+P95 延迟通常可改善
+- CPU 准备时间不再完全阻塞 GPU
 - 请求更快开始处理
 ```
 
@@ -723,8 +715,7 @@ P95 延迟降低 20-30%
 
 **当前状态** (v0.6.x):
 - ✅ 支持 iteration-level scheduling
-- ⚠️ 部分支持 overlap (experimental)
-- 🚧 未来版本会完全支持
+- ⚠️ overlap 支持程度与版本/配置相关
 
 **如何启用** (实验性):
 ```python
@@ -742,7 +733,7 @@ llm = LLM(
 
 > **💡 来源**: SGLang v0.2 核心特性
 >
-> **问题**: 预留 max_new_tokens 的空间浪费大量内存
+> **问题**: 预留 max_new_tokens 的空间可能浪费内存
 >
 > **解决**: 根据实际使用情况动态调整预留大小
 
@@ -754,10 +745,10 @@ max_new_tokens = 2048
 # 传统做法: 预留 2048 tokens 的空间
 reserved = 2048
 
-# 实际情况: 大多数请求只生成 500 tokens
+# 实际情况: 很多请求生成的 tokens 少于上限
 actual = 500
 
-# 浪费: 2048 - 500 = 1548 tokens (75% 浪费!)
+# 浪费: 2048 - 500 = 1548 tokens (示意)
 ```
 
 **Dynamic Memory Management**:
@@ -808,7 +799,7 @@ class DynamicMemoryManager:
         return {
             'beta': self.beta,
             'avg_usage_ratio': sum(self.actual_usage_history) / len(self.actual_usage_history),
-            'memory_saved_pct': (1 - self.beta) * 100
+            'memory_saved_pct': (1 - self.beta) * 100  # 仅示意
         }
 ```
 
@@ -822,7 +813,7 @@ class DynamicMemoryManager:
 
   3. Dynamic Memory Management:
      预留: 1000 + (0.5 × 2048) = 1000 + 1024 = 2024 tokens
-     (β=0.5,节省 33% 内存)
+     (β=0.5,节省 33% 内存,示意)
 
 请求进行中:
   1. 请求已生成 600 tokens
@@ -834,13 +825,13 @@ class DynamicMemoryManager:
   1. 请求在 600 tokens 时遇到 EOS
   2. 释放所有 KV Cache (1000 + 600 = 1600 tokens)
   3. 记录实际使用率: 600 / 2048 = 29.3%
-  4. 更新 β: 0.5 → 0.35 (根据历史平均)
+  4. 更新 β: 0.5 → 0.35 (根据历史平均,示意)
   5. 下次请求只预留: 1000 + (0.35 × 2048) = 1716 tokens
 ```
 
-**性能提升**:
+**性能提升(示意)**:
 ```
-内存节省:
+内存节省(示意):
   场景        | 传统做法 | 动态管理 | 节省
   Chat (500)  | 3048     | 2024     | 33%
   RAG (800)   | 3048     | 2240     | 27%
@@ -848,7 +839,7 @@ class DynamicMemoryManager:
 
 吞吐量提升:
   更大的 batch size (因为内存节省)
-  实测: 1.5-2x throughput 提升
+  提升幅度需基准测试验证
 ```
 
 ---
@@ -1095,7 +1086,7 @@ vllm serve meta-llama/Llama-2-7b-hf \
 
 ## 7.7 Prefill-Decode 分离 (PD 分离) ⚠️ 技术评估中
 
-> **💡 2025 年技术趋势**: PD 分离在 2025 年从概念快速演进为生产标准。vLLM、SGLang 等主流框架都已支持,几乎所有厂商都在采用这种架构。
+> **💡 技术趋势**: PD 分离在近年快速发展,部分框架已提供支持,但是否采用仍取决于负载特征与工程复杂度。
 
 ### 7.7.1 什么是 PD 分离
 
@@ -1112,12 +1103,12 @@ vllm serve meta-llama/Llama-2-7b-hf \
 **两种阶段的计算模式差异**:
 ```
 Prefill:
-  GPU 利用: 计算 90%, 带宽 10%
+  GPU 利用: 计算占比更高
   瓶颈: 算力 (FLOPS)
   最优 GPU: H100 (高算力)
 
 Decode:
-  GPU 利用: 计算 30%, 带宽 70%
+  GPU 利用: 带宽占比更高
   瓶颈: 内存带宽
   最优 GPU: A100 (高带宽,低成本)
 ```
@@ -1125,25 +1116,16 @@ Decode:
 **为什么需要分离?**
 - 同一个硬件无法同时优化两种模式
 - 分离后可以针对性优化
-- 资源利用率提升 2-3 倍
+- 资源利用率可能提升 (依负载而定)
 
 ---
 
 ### 7.7.2 PD 分离的架构演进
 
-**2025 年初**: 概念提出
-- 学术论文发表
-- 社区开始讨论
-
-**2025 年中**: vLLM、SGLang 等社区合作实现
-- vLLM 添加 PD 分离支持
-- SGLang 推出 RadixAttention
-
-**2025 年底**: 成为生产标准架构
-- 几乎所有厂商都在采用
-- 最佳实践逐步完善
-
-**从概念到生产只用了一年**
+**演进路径(概述)**:
+- 学术与社区提出架构思路
+- 部分框架尝试落地实现
+- 逐步出现可运维的工程实践
 
 ---
 
@@ -1303,14 +1285,14 @@ python -m sglang.launch_server \
 **生产经验**: 稳定性、性能监控
 ```
 关键指标:
-  - Prefill Worker: GPU 利用率 >80%
-  - Decode Worker: 内存带宽利用率 >70%
-  - KV Cache 传输: 延迟 <10ms
+  - Prefill Worker: GPU 利用率高
+  - Decode Worker: 内存带宽利用率高
+  - KV Cache 传输: 延迟尽量低
 
 告警阈值:
-  - Prefill 队列长度 >100: 考虑扩容
-  - Decode 队列长度 >500: 考虑扩容
-  - KV Cache 传输延迟 >50ms: 检查网络
+  - Prefill 队列长度偏高: 考虑扩容
+  - Decode 队列长度偏高: 考虑扩容
+  - KV Cache 传输延迟偏高: 检查网络
 ```
 
 ---
@@ -1371,7 +1353,7 @@ python -m sglang.launch_server \
 
 ### 7.7.7 实战案例
 
-**案例 1: 单机 GPU 的 PD 分离**
+**案例 1: 单机 GPU 的 PD 分离 (示意)**
 ```
 硬件: 单机 4 × A100 40GB
 
@@ -1380,11 +1362,11 @@ python -m sglang.launch_server \
   GPU 2-3: Decode Worker (2 个)
 
 性能:
-  吞吐量: 1.8x 提升 (相比无分离)
-  P95 延迟: 降低 40%
+  吞吐量: 可能提升 (依负载而定)
+  P95 延迟: 可能改善
 ```
 
-**案例 2: 跨机器的 PD 分离部署**
+**案例 2: 跨机器的 PD 分离部署 (示意)**
 ```
 硬件:
   机器 A: 4 × H100 (Prefill)
@@ -1393,19 +1375,19 @@ python -m sglang.launch_server \
 网络: InfiniBand (100 Gbps)
 
 性能:
-  吞吐量: 2.5x 提升
-  成本: 降低 30% (A100 比 H100 便宜)
+  吞吐量: 可能提升
+  成本: 可能降低 (取决于硬件价格与利用率)
 ```
 
-**案例 3: 异构 GPU (H100 + H200) 的实践**
+**案例 3: 异构 GPU (H100 + H200) 的实践 (示意)**
 ```
 硬件:
   H100: Prefill (算力优化)
   H200: Decode (带宽优化,大内存)
 
 性能:
-  吞吐量: 3x 提升
-  支持更长序列 (H200 141GB 内存)
+  吞吐量: 可能提升
+  支持更长序列 (取决于显存容量)
 ```
 
 ---
@@ -1468,8 +1450,8 @@ python -m sglang.launch_server \
 - 调度器是推理系统的核心,决定性能上限
 - Continuous Batching 通过动态调整,消除 padding 浪费
 - Overlap Scheduling 通过 CPU-GPU 并行,消除 GPU stalls
-- Dynamic Memory Management 通过动态分配,节省 30-50% 内存
-- PD 分离是 2025 年的生产标准,带来 2-3x 性能提升
+- Dynamic Memory Management 通过动态分配节省内存,幅度依场景而定
+- PD 分离可能提升资源利用率,是否采用取决于负载与复杂度
 - 不同场景需要不同的调度策略
 
 **下一章**: 第8章 量化技术——如何通过量化节省显存并提升推理速度。
