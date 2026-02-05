@@ -1018,7 +1018,7 @@ MMU重新翻译: 页2 → 帧3
 
 ## 5.6 Chunked Prefill: 处理长 prompt
 
-### 5.4.1 问题: 大 prompt 超过显存
+### 5.6. 问题: 大 prompt 超过显存
 
 场景: Cursor 添加整个代码仓库到 prompt
 
@@ -1039,7 +1039,7 @@ GPU: RTX 4090 24GB
 
 ---
 
-### 5.4.2 解决方案: 分块处理
+### 5.6. 解决方案: 分块处理
 
 思路: 将 n 个 token 的 prompt 分成 ⌈n/m⌉ 个 chunks
 
@@ -1056,7 +1056,7 @@ Chunk 2: [t4, t5, t6]
 
 ---
 
-### 5.4.3 KV Cache 在 chunked prefill 中的作用
+### 5.6. KV Cache 在 chunked prefill 中的作用
 
 Chunk 1:
 ```
@@ -1103,7 +1103,7 @@ mask2 = [
 
 ---
 
-### 5.4.4 图解分块处理流程
+### 5.6. 图解分块处理流程
 
 无 chunked prefill:
 ```
@@ -1144,7 +1144,7 @@ GPU 内存紧张: chunk_size = 2048
 
 >  核心思想: 将KV Cache分成固定大小的blocks,就像OS将内存分成pages一样。
 
-### 5.7.1 传统KV Cache的问题
+### 5.6. 传统KV Cache的问题
 
 连续内存分配:
 
@@ -1158,7 +1158,7 @@ Request A的KV Cache:
   3. 如果需要超过2048 tokens,需要重新分配更大的空间
 ```
 
-### 5.7.2 Paged KV Cache的核心设计
+### 5.6. Paged KV Cache的核心设计
 
 分块存储:
 
@@ -1194,7 +1194,7 @@ block_table = {
 }
 ```
 
-### 5.7.3 PagedAttention如何工作
+### 5.6. PagedAttention如何工作
 
 Attention计算的挑战:
 
@@ -1240,7 +1240,7 @@ PagedAttention算法:
 2. 内存灵活性: blocks可以分散在任意位置
 3. 增量计算: 只加载需要的blocks
 
-### 5.7.4 PagedAttention的优势
+### 5.6. PagedAttention的优势
 
 解决内部碎片化:
 
@@ -1308,7 +1308,7 @@ vLLM (PagedAttention):
 
 ## 5.8 批处理的挑战: 从静态到动态
 
-### 5.5.1 静态批处理
+### 5.8.1 静态批处理
 
 目标: 提高吞吐量 (throughput)
 
@@ -1338,7 +1338,7 @@ prompt3 = "<pad><pad><pad><pad><pad><pad><pad><pad><pad>Hey"
 
 ---
 
-### 5.5.2 Padding 的问题: 计算浪费
+### 5.8.2 Padding 的问题: 计算浪费
 
 Padding 位置: 左侧 (添加`<pad>` token)
 
@@ -1366,7 +1366,7 @@ mask1 = [
 
 ---
 
-### 5.5.3 不同序列长度的困境
+### 5.8.3 不同序列长度的困境
 
 场景: batch 中有多个 prompt,长度差异大
 
@@ -1422,7 +1422,7 @@ Padding 数量 = (n-1) × (B-1)
 
 ---
 
-### 5.5.4 示例: 为什么 padding 成本随 batch 和长度二次增长
+### 5.8.4 示例: 为什么 padding 成本随 batch 和长度二次增长
 
 参数:
 ```
@@ -1456,7 +1456,7 @@ Padding 数量:
 ## 5.9 Continuous Batching 入门 
 >  核心洞察: 去掉 batch 维度,用 attention mask 控制 token 交互,让 GPU 时刻满载。
 
-### 5.6.1 核心思想: 去掉 batch 维度
+### 5.9.1 核心思想: 去掉 batch 维度
 
 问题根源: batch 维度引入了 padding
 
@@ -1481,7 +1481,7 @@ shape: [5]  # 只有 seq_len!
 
 ---
 
-### 5.6.2 Ragged Batching: 用 attention mask 控制交互
+### 5.9.2 Ragged Batching: 用 attention mask 控制交互
 
 方法:
 1. 将多个 prompt 拼接成一个序列
@@ -1525,7 +1525,7 @@ B2:   [ ]  [ ]  [ ]  []  []
 
 ---
 
-### 5.6.3 Dynamic Scheduling: 动态替换完成的请求
+### 5.9.3 Dynamic Scheduling: 动态替换完成的请求
 
 场景: 某个 prompt 生成 `<eos>`
 
@@ -1557,7 +1557,7 @@ Continuous Batching (只需重建 mask):
 
 ---
 
-### 5.6.4 混合 Prefill 和 Decode: 最大化 throughput
+### 5.9.4 混合 Prefill 和 Decode: 最大化 throughput
 
 挑战:
 ```
@@ -1618,7 +1618,7 @@ GPU 利用率: 1000/1000 = 100% ```
 
 ---
 
-### 5.6.5 完整的 Continuous Batching 流程图
+### 5.9.5 完整的 Continuous Batching 流程图
 
 ```
 步骤 1: 初始 batch
@@ -1658,7 +1658,7 @@ GPU 利用率: 1000/1000 = 100% ```
 
 ---
 
-### 5.6.6 Continuous Batching vs 传统方法对比
+### 5.9.6 Continuous Batching vs 传统方法对比
 
 Static Batching:
 ```
