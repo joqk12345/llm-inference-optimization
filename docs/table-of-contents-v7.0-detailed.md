@@ -960,7 +960,7 @@ Ampere     Hopper     Hopper     Blackwell
 
 > 核心洞察：理解训练和推理的工作负载差异，是理解优化策略的第一步。
 
-- 5.3. 训练：计算密集型的并行工作负载
+- 5.1.1 训练：计算密集型的并行工作负载
   - **训练流程**：
     - 输入数据 → Forward Pass → Loss Calculation → Backward Pass → Weight Update
   - **特点**：
@@ -974,7 +974,7 @@ Ampere     Hopper     Hopper     Blackwell
     - 时间：数周到数月
     - 成本：数百万美元
 
-- 5.3. 推理：内存带宽密集型的串行工作负载
+- 5.1.2 推理：内存带宽密集型的串行工作负载
   - **推理流程**：
     - 用户Prompt → Prefill（并行）→ Decode（串行）→ 返回结果
   - **特点**：
@@ -983,7 +983,7 @@ Ampere     Hopper     Hopper     Blackwell
     - GPU利用率低：大量时间在移动数据而非计算
     - 持续运行：7×24小时服务
 
-- 5.3. 为什么优化推理更关键
+- 5.1.3 为什么优化推理更关键
   - **商业现实**：
     - 训练成本：一次性投入（数百万美元）
     - 推理成本：持续运营（每月数百万美元）
@@ -993,7 +993,7 @@ Ampere     Hopper     Hopper     Blackwell
 
 #### 5.2 LLM如何生成文本
 
-- 5.10. 自回归生成的基本过程
+- 5.2.1 自回归生成的基本过程
   - **LLM的本质**： fancy next token predictors
   - **生成过程**：
     - 输入整个prompt → 生成第一个token
@@ -1001,19 +1001,19 @@ Ampere     Hopper     Hopper     Blackwell
     - 直到决定生成结束
   - **观察**：第一个token出现慢（TTFT），之后token逐个出现
 
-- 5.10. Prefill阶段：并行处理prompt
+- 5.2.2 Prefill阶段：并行处理prompt
   - **定义**：处理初始prompt，生成第一个token
   - **特点**：计算密集，可以并行处理
   - **时间**：TTFT（Time To First Token）
   - **示例**：prompt有100个token，一次forward pass处理全部
 
-- 5.10. Decode阶段：逐token生成
+- 5.2.3 Decode阶段：逐token生成
   - **定义**：逐个生成后续token
   - **特点**：内存带宽密集，每次只生成1个token
   - **时间**：TBT（Time Between Tokens）
   - **示例**：生成100个token需要100次forward pass
 
-- 5.10. 图解完整流程
+- 5.2.4 图解完整流程
   - 可视化：Prefill → Decode[1] → Decode[2] → ... → Decode[n]
   - 标注每个阶段的特点和优化方向
 
@@ -1021,13 +1021,13 @@ Ampere     Hopper     Hopper     Blackwell
 
 > **💡 为什么重要**：Attention是唯一让不同token产生交互的地方。理解Attention，就理解了LLM的核心。
 
-- 5.10. Token的表示：向量与hidden dimension
+- 5.3.1 Token的表示：向量与hidden dimension
   - **Tokenization**：文本 → token序列
   - **Embedding**：每个token → d维向量（hidden dimension）
   - **Tensor形状**：[batch_size, sequence_length, hidden_dim]
   - **示例**：7个token → [1, 7, d]（batch=1）
 
-- 5.10. Query、Key、Value投影
+- 5.3.2 Query、Key、Value投影
   - **三个权重矩阵**：Wq、Wk、Wv
   - **投影操作**：Q = x·Wq, K = x·Wk, V = x·Wv
   - **输出形状**：[1, n, A]（A = attention head dimension）
@@ -1036,7 +1036,7 @@ Ampere     Hopper     Hopper     Blackwell
     - K：这个token能提供什么？
     - V：这个token的实际内容
 
-- 5.10. Attention计算：QK^T与二次复杂度
+- 5.3.3 Attention计算：QK^T与二次复杂度
   - **计算步骤**：
     1. Q·K^T → 相似度矩阵 [n, n]
     2. 除以√d（缩放）
@@ -1045,7 +1045,7 @@ Ampere     Hopper     Hopper     Blackwell
   - **复杂度**：O(n²·d)
   - **关键洞察**：Attention的二次复杂度是性能瓶颈
 
-- 5.10. Attention Mask：控制token交互
+- 5.3.4 Attention Mask：控制token交互
   - **什么是Mask**：布尔矩阵，决定哪些token可以交互
   - **形状**：与QK^T相同 [n, n]
   - **作用**：Mask=False的位置，attention权重=0
@@ -1053,7 +1053,7 @@ Ampere     Hopper     Hopper     Blackwell
     - 绿色方块 = True（可以交互）
     - 白色方块 = False（不能交互）
 
-- 5.10. Causal Mask：因果关系的可视化
+- 5.3.5 Causal Mask：因果关系的可视化
   - **定义**：每个token只能与之前的token交互
   - **直觉**：因必须在果之前
   - **Mask形状**：下三角矩阵
@@ -1077,7 +1077,7 @@ Ampere     Hopper     Hopper     Blackwell
 
 #### 5.4 从朴素生成到KV Cache
 
-- 5.10. 朴素方法：每次重新计算（O(n²)）
+- 5.4.1 朴素方法：每次重新计算（O(n²)）
   - **问题场景**：生成第n+1个token
   - **朴素做法**：
     1. 将所有n+1个token重新输入模型
@@ -1086,12 +1086,12 @@ Ampere     Hopper     Hopper     Blackwell
   - **计算复杂度**：O((n+1)²) → 随序列长度二次增长
   - **可视化浪费**：灰色token的K、V被重复计算
 
-- 5.10. 重复计算问题的可视化
+- 5.4.2 重复计算问题的可视化
   - **关键观察**：新token（如"will"）不影响旧token的attention计算
   - **原因**：Causal mask，未来token不影响过去
   - **图示**：最后一个token只关心自己的预测，不影响其他token
 
-- 5.10. KV Cache的核心思想
+- 5.4.3 KV Cache的核心思想
   - **核心洞察**：旧token的K、V已经计算过，缓存起来！
   - **做法**：
     - Prefill阶段：计算并存储所有token的K、V
@@ -1099,13 +1099,13 @@ Ampere     Hopper     Hopper     Blackwell
   - **效果**：避免重复计算
   - **代价**：显存占用 O(n)
 
-- 5.10. 计算复杂度降低：从O(n²)到O(n)
+- 5.4.4 计算复杂度降低：从O(n²)到O(n)
   - **无KV Cache**：每个token O(n²)
   - **有KV Cache**：第一个token O(n²)，后续token O(n)
   - **平均复杂度**：O(n)
   - **加速效果**：序列越长，加速越明显
 
-- 5.10. 显存代价：每个token需要多少显存？
+- 5.4.5 显存代价：每个token需要多少显存？
   - **单token的cache大小**：2·L·H·A（K和V）
     - L = 层数（如32）
     - H = heads数（如32）
@@ -1116,7 +1116,7 @@ Ampere     Hopper     Hopper     Blackwell
     - 10000 tokens = 160 MB
   - **权衡**：用显存换计算
 
-- 5.10.6 不同Attention变体的内存优化
+- 5.4.6 不同Attention变体的内存优化
   - **MQA (Multi-Query Attention)**：
     - 所有heads共享一组K、V
     - 内存减少：H倍
@@ -1134,7 +1134,7 @@ Ampere     Hopper     Hopper     Blackwell
 
 > 为什么重要：理解内存碎片化问题，才能理解PagedAttention的设计动机。
 
-- 5.10.1 内存碎片化：隐形的性能杀手
+- 5.5.1 内存碎片化：隐形的性能杀手
   - **场景**：在A100 40GB上运行LLaMA-2-13B
     - 模型权重：26 GB
     - KV Cache可用：12 GB
@@ -1142,7 +1142,7 @@ Ampere     Hopper     Hopper     Blackwell
   - **问题**：实际只能运行2-3个请求！
   - **原因**：内存碎片化浪费了60-80%的KV Cache内存
 
-- 5.10.2 内部碎片化
+- 5.5.2 内部碎片化
   - **定义**：已分配但未使用的内存
   - **原因**：预分配策略
     - 传统做法：为每个请求预分配最大可能需要的内存
@@ -1155,7 +1155,7 @@ Ampere     Hopper     Hopper     Blackwell
     - 实际使用：100 + 200 + 300 = 600 slots
     - 浪费：(6144 - 600) / 6144 = 90%
 
-- 5.10.3 外部碎片化
+- 5.5.3 外部碎片化
   - **定义**：内存总量足够，但无法分配连续的大块
   - **原因**：Buddy Allocator等内存分配器的行为
   - **示例**：
@@ -1165,7 +1165,7 @@ Ampere     Hopper     Hopper     Blackwell
       - 但无法分配64 MB的连续块
     - **结果**：外部碎片化
 
-- 5.10.4 传统解决方案的困境
+- 5.5.4 传统解决方案的困境
   - **静态分配**：简单，但大量内部碎片
   - **动态分配**：减少内部碎片，但严重外部碎片
   - **结论**：需要新的内存管理策略！
@@ -1174,7 +1174,7 @@ Ampere     Hopper     Hopper     Blackwell
 
 > 核心洞察：PagedAttention的设计思想直接借鉴了操作系统的虚拟内存机制。
 
-- 5.10.1 操作系统面临的内存管理问题
+- 5.6.1 操作系统面临的内存管理问题
   - **场景**：运行总大小超过物理内存的程序
   - **传统做法**：无法运行
   - **虚拟内存解决方案**：
@@ -1183,13 +1183,13 @@ Ampere     Hopper     Hopper     Blackwell
     - 只将需要的页保持在内存中
     - 其他页存储在磁盘上
 
-- 5.10.2 虚拟内存的核心概念
+- 5.6.2 虚拟内存的核心概念
   - **页**：虚拟地址空间中的固定大小块
   - **页帧**：物理内存中的固定大小块
   - **页表**：记录页到帧的映射
   - **MMU**：硬件单元，负责地址翻译
 
-- 5.10.3 地址翻译流程
+- 5.6.3 地址翻译流程
   - **程序访问**：虚拟地址10000
   - **MMU计算**：页号=2，偏移=1808
   - **查页表**：页2 → 缺失（在磁盘）
@@ -1201,13 +1201,13 @@ Ampere     Hopper     Hopper     Blackwell
     4. 重启指令
   - **访问成功**
 
-- 5.10.4 虚拟内存的优势
+- 5.6.4 虚拟内存的优势
   - **解决外部碎片化**：所有分配都是固定大小的页
   - **解决内部碎片化**：只分配实际需要的页
   - **透明性**：程序不需要知道实际物理内存大小
   - **灵活性**：可以运行比物理内存大的程序
 
-- 5.10.5 从操作系统到LLM推理
+- 5.6.5 从操作系统到LLM推理
   - **类比映射**：
     - 虚拟地址空间 → 请求的逻辑KV Cache
     - 物理内存 → GPU的KV Cache存储
@@ -1222,19 +1222,19 @@ Ampere     Hopper     Hopper     Blackwell
 
 #### 5.7 Chunked Prefill：处理长prompt
 
-- 5.10.1 问题：大prompt超过显存
+- 5.7.1 问题：大prompt超过显存
   - **场景**：Cursor添加整个代码仓库到prompt
   - **问题**：n个token的激活值超过GPU显存
   - **约束**：每次forward pass最多处理m个token
 
-- 5.10.2 解决方案：分块处理
+- 5.7.2 解决方案：分块处理
   - **思路**：将n个token的prompt分成⌈n/m⌉个chunks
   - **示例**：n=7, m=4 → 分成2个chunks
     - Chunk 1：tokens[0:4]
     - Chunk 2：tokens[4:7]
   - **关键**：如何保持信息连续性？
 
-- 5.10.3 KV Cache在chunked prefill中的作用
+- 5.7.3 KV Cache在chunked prefill中的作用
   - **Chunk 1**：
     - 处理tokens[0:4]
     - 计算并缓存K、V
@@ -1244,7 +1244,7 @@ Ampere     Hopper     Hopper     Blackwell
     - 拼接：KV_cached + KV_new
   - **Attention mask调整**：确保跨chunk的token正确交互
 
-- 5.10.4 图解分块处理流程
+- 5.7.4 图解分块处理流程
   - **无chunked prefill**：一次性处理，memory不够
   - **有chunked prefill**：
     - Chunk 1: [tokens 0-3] → cache KV
@@ -1255,7 +1255,7 @@ Ampere     Hopper     Hopper     Blackwell
 
 > 核心思想：将KV Cache分成固定大小的blocks，就像OS将内存分成pages一样。
 
-- 5.10.1 传统KV Cache的问题
+- 5.8.1 传统KV Cache的问题
   - **连续内存分配**：
     - Request A的KV Cache: [Token 0-2047] 连续存储
   - **问题**：
@@ -1263,7 +1263,7 @@ Ampere     Hopper     Hopper     Blackwell
     2. 如果只生成100 tokens，浪费1948个位置
     3. 如果需要超过2048 tokens，需要重新分配
 
-- 5.10.2 Paged KV Cache的核心设计
+- 5.8.2 Paged KV Cache的核心设计
   - **分块存储**：
     - Block 0: [Token 0-15]
     - Block 1: [Token 16-31]
@@ -1275,7 +1275,7 @@ Ampere     Hopper     Hopper     Blackwell
     - 每个Block固定大小（如16 tokens）
     - Blocks可以分散在GPU内存的任意位置
 
-- 5.10.3 PagedAttention如何工作
+- 5.8.3 PagedAttention如何工作
   - **算法流程**：
     1. 初始化：output=0, running_max=-∞, running_sum=0
     2. 遍历每个block j：
@@ -1290,7 +1290,7 @@ Ampere     Hopper     Hopper     Blackwell
     - 内存灵活性：blocks可分散在任意位置
     - 增量计算：只加载需要的blocks
 
-- 5.10.4 PagedAttention的优势
+- 5.8.4 PagedAttention的优势
   - **解决内部碎片**：
     - 按需分配blocks
     - 最后一block的浪费：最多B-1个slots
@@ -1304,7 +1304,7 @@ Ampere     Hopper     Hopper     Blackwell
     - 内存浪费：<4%（原来60-80%）
     - 吞吐提升：2-3x
 
-- 5.10.5 性能对比
+- 5.8.5 性能对比
   - **传统系统**（Orca, TGI）：
     - 内存浪费：60-80%
     - 吞吐：基准
@@ -1316,13 +1316,13 @@ Ampere     Hopper     Hopper     Blackwell
 
 #### 5.9 批处理的挑战：从静态到动态
 
-- 5.10.1 静态批处理
+- 5.9.1 静态批处理
   - **目标**：提高吞吐量（throughput）
   - **方法**：将多个prompt打包成一个batch
   - **约束**：所有prompt必须有相同长度
   - **解决方案**：左侧padding，右侧对齐
 
-- 5.10.2 Padding的问题：计算浪费
+- 5.9.2 Padding的问题：计算浪费
   - **Padding位置**：左侧（添加`<pad>` token）
   - **Attention mask**：padding位置设为False
   - **问题**：padding token占用了计算资源，但没有实际贡献
@@ -1330,7 +1330,7 @@ Ampere     Hopper     Hopper     Blackwell
     - Prompt 1: `<pad><pad><pad><token1><token2><token3><eos>`
     - Prompt 2: `<token1><token2><token3><token4><token5><token6><token7>`
 
-- 5.10.3 不同序列长度的困境
+- 5.9.3 不同序列长度的困境
   - **场景**：batch中有多个prompt，长度差异大
   - **问题1**：短prompt完成后，长prompt还在生成
     - 短prompt的计算浪费（padding）
@@ -1339,7 +1339,7 @@ Ampere     Hopper     Hopper     Blackwell
     - 正在decode的prompt每次只加1个token
     - Padding数量 = (n-1) × (B-1)
 
-- 5.10.4 示例：为什么padding成本随batch和长度二次增长
+- 5.9.4 示例：为什么padding成本随batch和长度二次增长
   - **参数**：
     - B = 8（batch中8个prompt在decode）
     - n = 100（新prompt有100个token）
@@ -1625,7 +1625,7 @@ Ampere     Hopper     Hopper     Blackwell
 
 vLLM插件系统提供了更好的解决方案。
 
-- 5.10.7.1 为什么需要插件系统
+- 5.11.7.1 为什么需要插件系统
 
   **生产环境的常见需求**：
   - 修改调度策略（如自定义priority计算）
@@ -1654,7 +1654,7 @@ vLLM插件系统提供了更好的解决方案。
   - **运行时激活**：通过环境变量控制
   - **易于维护**：升级vLLM时插件仍可工作
 
-- 5.10.7.2 插件系统 vs Fork vs Monkey Patch
+- 5.11.7.2 插件系统 vs Fork vs Monkey Patch
 
   | 方案 | 维护成本 | 升级兼容性 | 可靠性 | 灵活性 |
   |------|---------|-----------|--------|--------|
@@ -1667,7 +1667,7 @@ vLLM插件系统提供了更好的解决方案。
   - **Fork**：仅当需要大规模架构修改时
   - **Monkey Patch**：仅用于快速实验，不适合生产
 
-- 5.10.7.3 VLLMPatch基础
+- 5.11.7.3 VLLMPatch基础
 
   **核心概念**：
   - `VLLMPatch`：插件基类，用于声明要修改的类
@@ -1731,7 +1731,7 @@ vLLM插件系统提供了更好的解决方案。
        ]
   ```
 
-- 5.10.7.4 实战：创建自定义插件
+- 5.11.7.4 实战：创建自定义插件
 
   **场景**：修改vLLM的调度策略，让高优先级请求总是被优先处理
 
@@ -1847,7 +1847,7 @@ vLLM插件系统提供了更好的解决方案。
   outputs = llm.generate(prompts_high + prompts_normal)
   ```
 
-- 5.10.7.5 版本管理与兼容性
+- 5.11.7.5 版本管理与兼容性
 
   **版本兼容性检查**：
   - 使用`@min_vllm_version`装饰器
@@ -1895,7 +1895,7 @@ vLLM插件系统提供了更好的解决方案。
   3. 更新`@min_vllm_version`约束
   4. 必要时更新插件代码
 
-- 5.10.7.6 生产环境最佳实践
+- 5.11.7.6 生产环境最佳实践
 
   **1. 插件项目结构**
 

@@ -171,71 +171,71 @@
 ### 第5章 LLM推理基础
 
 #### 5.1 训练vs推理：工作负载的本质差异
-- 5.3. 训练：计算密集型的并行工作负载
-- 5.3. 推理：内存带宽密集型的串行工作负载
-- 5.3. 为什么优化推理更关键
+- 5.1.1 训练：计算密集型的并行工作负载
+- 5.1.2 推理：内存带宽密集型的串行工作负载
+- 5.1.3 为什么优化推理更关键
 
 #### 5.2 LLM如何生成文本
-- 5.11. 自回归生成的基本过程
-- 5.11. Prefill阶段：并行处理prompt
-- 5.11. Decode阶段：逐token生成
-- 5.11. 图解完整流程
+- 5.2.1 自回归生成的基本过程
+- 5.2.2 Prefill阶段：并行处理prompt
+- 5.2.3 Decode阶段：逐token生成
+- 5.2.4 图解完整流程
 
 #### 5.3 Attention机制详解
-- 5.11. Token的表示：向量与hidden dimension
-- 5.11. Query、Key、Value投影
-- 5.11. Attention计算：QK^T与二次复杂度
-- 5.11. Attention Mask：控制token交互
-- 5.11. Causal Mask：因果关系的可视化
+- 5.3.1 Token的表示：向量与hidden dimension
+- 5.3.2 Query、Key、Value投影
+- 5.3.3 Attention计算：QK^T与二次复杂度
+- 5.3.4 Attention Mask：控制token交互
+- 5.3.5 Causal Mask：因果关系的可视化
 - 5.3.6 为什么Attention是唯一让token交互的地方
 
 #### 5.4 从朴素生成到KV Cache
-- 5.11. 朴素方法：每次重新计算（O(n²)）
-- 5.11. 重复计算问题的可视化
-- 5.11. KV Cache的核心思想
-- 5.11. 计算复杂度降低：从O(n²)到O(n)
-- 5.11. 显存代价：每个token需要多少显存？
-- 5.11.6 不同Attention变体的内存优化
+- 5.4.1 朴素方法：每次重新计算（O(n²)）
+- 5.4.2 重复计算问题的可视化
+- 5.4.3 KV Cache的核心思想
+- 5.4.4 计算复杂度降低：从O(n²)到O(n)
+- 5.4.5 显存代价：每个token需要多少显存？
+- 5.4.6 不同Attention变体的内存优化
 
 #### 5.5 KV Cache的内存管理挑战
-- 5.11.1 内存碎片化：隐形的性能杀手
-- 5.11.2 内部碎片化
-- 5.11.3 外部碎片化
-- 5.11.4 传统解决方案的困境
+- 5.5.1 内存碎片化：隐形的性能杀手
+- 5.5.2 内部碎片化
+- 5.5.3 外部碎片化
+- 5.5.4 传统解决方案的困境
 
 #### 5.6 操作系统类比：虚拟内存与分页
-- 5.11.1 操作系统面临的内存管理问题
-- 5.11.2 虚拟内存的核心概念
-- 5.11.3 地址翻译流程
-- 5.11.4 虚拟内存的优势
-- 5.11.5 从操作系统到LLM推理
+- 5.6.1 操作系统面临的内存管理问题
+- 5.6.2 虚拟内存的核心概念
+- 5.6.3 地址翻译流程
+- 5.6.4 虚拟内存的优势
+- 5.6.5 从操作系统到LLM推理
 
 #### 5.7 Chunked Prefill：处理长prompt
-- 5.11.1 问题：大prompt超过显存
-- 5.11.2 解决方案：分块处理
-- 5.11.3 KV Cache在chunked prefill中的作用
-- 5.11.4 图解分块处理流程
+- 5.7.1 问题：大prompt超过显存
+- 5.7.2 解决方案：分块处理
+- 5.7.3 KV Cache在chunked prefill中的作用
+- 5.7.4 图解分块处理流程
 
 #### 5.8 PagedAttention入门
-- 5.11.1 传统KV Cache的问题
-- 5.11.2 Paged KV Cache的核心设计
-- 5.11.3 PagedAttention如何工作
-- 5.11.4 PagedAttention的优势
-- 5.11.5 性能对比
+- 5.8.1 传统KV Cache的问题
+- 5.8.2 Paged KV Cache的核心设计
+- 5.8.3 PagedAttention如何工作
+- 5.8.4 PagedAttention的优势
+- 5.8.5 性能对比
 
 #### 5.9 批处理的挑战：从静态到动态
-- 5.11.1 静态批处理
-- 5.11.2 Padding的问题：计算浪费
-- 5.11.3 不同序列长度的困境
-- 5.11.4 示例：为什么padding成本随batch和长度二次增长
+- 5.9.1 静态批处理
+- 5.9.2 Padding的问题：计算浪费
+- 5.9.3 不同序列长度的困境
+- 5.9.4 示例：为什么padding成本随batch和长度二次增长
 
 #### 5.10 Continuous Batching入门
-- 5.11.1 核心思想：去掉batch维度
-- 5.11.2 Ragged Batching：用attention mask控制交互
-- 5.11.3 Dynamic Scheduling：动态替换完成的请求
-- 5.11.4 混合Prefill和Decode：最大化throughput
-- 5.11.5 完整的Continuous Batching流程图
-- 5.11.6 Continuous Batching vs 传统方法对比
+- 5.10.1 核心思想：去掉batch维度
+- 5.10.2 Ragged Batching：用attention mask控制交互
+- 5.10.3 Dynamic Scheduling：动态替换完成的请求
+- 5.10.4 混合Prefill和Decode：最大化throughput
+- 5.10.5 完整的Continuous Batching流程图
+- 5.10.6 Continuous Batching vs 传统方法对比
 
 #### 5.11 vLLM架构全景
 - 5.11.1 vLLM的三层架构
