@@ -1,4 +1,4 @@
-# 第5章: LLM推理基础
+# 第5章：LLM推理基础
 
 >  教学理念 (参考: Hugging Face "Continuous batching from first principles"、Hamza Elshafie "Paged Attention from First Principles")
 >
@@ -8,7 +8,14 @@
 
 ## 简介
 
-在深入 vLLM 的复杂优化技术之前,我们需要先理解 LLM 推理的基础原理。很多工程师直接跳到高级优化技巧,却忽略了基础知识——这就像在没学会走路之前就想跑步。
+在深入 vLLM 的复杂优化技术之前，我们需要先理解 LLM 推理的基础原理。很多工程师直接跳到“调参与技巧”，却忽略了第一性原理：prefill 与 decode 是两种不同的工作负载；Attention 的二次复杂度决定了 KV Cache 的必要性；而“端到端延迟/成本”往往由系统瓶颈迁移决定，而不是由某个单点优化决定。
+
+为了把这一章写成“可反复复用的认知框架”，你可以用同一套问题来读：
+
+- **背景**：为什么推理看起来简单（生成 token）但优化极难（带宽、缓存、调度、尾延迟）？
+- **决策**：当你要优化时，先动 KV、先动调度、先动量化，分别在什么条件下成立？
+- **落地**：你如何用 TTFT/TPOT、P50/P95/P99、吞吐与显存曲线把结论量化出来？
+- **踩坑**：为什么“跑分快”不等于“线上更便宜”？为什么长上下文会把系统从 compute-bound 推向 memory-bound？
 
 本章将带你从零开始,逐步理解:
 - 训练vs推理: 为什么推理是内存密集型而训练是计算密集型
@@ -21,7 +28,7 @@
 - 为什么需要 Continuous Batching
 - vLLM 的三层架构全景
 
-学完本章,你将能够解释为什么 vLLM 比传统方法快 24 倍,并理解PagedAttention如何通过借鉴操作系统虚拟内存技术解决内存碎片化问题。
+学完本章，你将能够解释 vLLM 为什么能在很多场景里显著快于朴素实现，并理解 PagedAttention 如何借鉴操作系统虚拟内存的思想缓解 KV 管理中的碎片化与复用问题。
 
 ---
 
@@ -1296,8 +1303,8 @@ vLLM论文数据:
   - 实际吞吐: 基准
 
 vLLM (PagedAttention):
-  - 内存浪费: <4%
-  - 吞吐提升: 2-3x
+  - 内存浪费: 显著降低（论文/benchmark 口径，实际取决于分配策略与负载）
+  - 吞吐: 往往更高（常见能带来明显提升，但幅度需以压测为准）
 ```
 
 为什么能提升吞吐?
@@ -1692,7 +1699,7 @@ Continuous Batching (vLLM):
 优点:
    无 padding
    GPU 利用率最高 (可达 95%+)
-   吞吐量提升 3-5 倍
+   吞吐量可能显著提升（幅度取决于负载与实现）
    支持动态调度
 
 缺点:
@@ -1704,14 +1711,14 @@ Continuous Batching (vLLM):
 ---
 
 ## 5.11 vLLM 架构全景 
->  来源: [Berkeley EECS-2025-192 - Deconstructing vLLM](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
->
-> 核心价值: 系统性理解 vLLM 的三层架构——Interface、Model Authoring、Runtime,为后续章节铺垫架构知识。
->
-> 为什么重要:
-> - 从"会用 vLLM"到"理解 vLLM"的关键转变
-> - 调试问题、性能优化、扩展开发的基础
-> - 为第6章 (KV Cache)、第7章 (调度)、第10章 (部署) 铺垫
+**参考链接（可选）**: [Berkeley EECS-2025-192 - Deconstructing vLLM](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
+
+**核心价值**: 系统性理解 vLLM 的三层架构——Interface、Model Authoring、Runtime,为后续章节铺垫架构知识。
+
+**为什么重要**:
+- 从"会用 vLLM"到"理解 vLLM"的关键转变
+- 调试问题、性能优化、扩展开发的基础
+- 为第6章 (KV Cache)、第7章 (调度)、第10章 (部署) 铺垫
 
 ### 5.11.1 vLLM 的三层架构
 
@@ -1929,7 +1936,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 ---
 
-##  章节检查清单
+## ✅ 章节检查清单
 
 完成本章后,你应该能够:
 
@@ -1944,7 +1951,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 ---
 
-##  动手练习
+## 📚 动手练习
 
 练习 5.1: 计算 KV Cache 显存占用
 
@@ -1980,9 +1987,9 @@ Llama-2-7B 的配置:
 
 ---
 
-##  总结
+## 🎯 总结
 
-关键要点:
+关键要点：
 - 训练vs推理: 训练是计算密集型,推理是内存带宽密集型
 - LLM 推理分为 Prefill (计算密集) 和 Decode (带宽密集) 两个阶段
 - Attention 是唯一让 token 交互的操作,复杂度为 O(n²)
@@ -1996,12 +2003,10 @@ Llama-2-7B 的配置:
 - Continuous Batching 通过去除 padding 和动态调度,大幅提升 GPU 利用率
 - vLLM 的三层架构 (Interface、Model Authoring、Runtime) 提供了清晰的抽象
 
-下一章: 第6章 KV Cache 优化——深入理解 PagedAttention 和内存管理的更多细节。
+下一章：第6章 KV Cache 优化——深入理解 PagedAttention 和内存管理的更多细节。
 
 ---
 
-参考资源:
+## 📎 参考资料
 - [Paged Attention from First Principles: A View Inside vLLM](https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vllm/) by Hamza Elshafie
 - [Efficient Memory Management for Large Language Model Serving with PagedAttention](https://arxiv.org/abs/2309.06180) - vLLM原始论文
-
-有问题?加入 [第5章 Discord 频道](https://discord.gg/TODO) 讨论!
