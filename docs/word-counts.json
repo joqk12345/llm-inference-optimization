@@ -2,12 +2,12 @@
   "chapters": [
     {
       "file": "chapters/chapter01-introduction.md",
-      "bytes": 27356,
-      "lines": 489,
-      "chars": 10885,
-      "non_ws": 9859,
-      "cjk": 7091,
-      "words": 839
+      "bytes": 30988,
+      "lines": 546,
+      "chars": 12288,
+      "non_ws": 11154,
+      "cjk": 8044,
+      "words": 920
     },
     {
       "file": "chapters/chapter02-technology-landscape.md",
@@ -102,11 +102,11 @@
   ],
   "total": {
     "file": "TOTAL",
-    "bytes": 454315,
-    "lines": 16118,
-    "chars": 296938,
-    "non_ws": 231774,
-    "cjk": 66568,
-    "words": 36497
+    "bytes": 457947,
+    "lines": 16175,
+    "chars": 298341,
+    "non_ws": 233069,
+    "cjk": 67521,
+    "words": 36578
   }
 }

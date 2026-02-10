@@ -7,7 +7,7 @@
 
 | file | bytes | lines | chars | non_ws | cjk | words |
 | --- | --- | --- | --- | --- | --- | --- |
-| `chapters/chapter01-introduction.md` | 27356 | 489 | 10885 | 9859 | 7091 | 839 |
+| `chapters/chapter01-introduction.md` | 30988 | 546 | 12288 | 11154 | 8044 | 920 |
 | `chapters/chapter02-technology-landscape.md` | 27294 | 558 | 11929 | 10528 | 6391 | 1114 |
 | `chapters/chapter03-gpu-basics.md` | 21767 | 528 | 10290 | 8936 | 4881 | 1085 |
 | `chapters/chapter04-environment-setup.md` | 34626 | 1416 | 26519 | 20743 | 2875 | 2996 |
@@ -18,4 +18,4 @@
 | `chapters/chapter09-speculative-sampling.md` | 36267 | 1075 | 19075 | 15176 | 7157 | 2295 |
 | `chapters/chapter10-production-deployment.md` | 74240 | 2861 | 55939 | 41512 | 6588 | 5800 |
 | `chapters/chapter11-advanced-topics.md` | 50117 | 1930 | 35397 | 28341 | 6866 | 3890 |
-| **TOTAL** | 454315 | 16118 | 296938 | 231774 | 66568 | 36497 |
+| **TOTAL** | 457947 | 16175 | 298341 | 233069 | 67521 | 36578 |
