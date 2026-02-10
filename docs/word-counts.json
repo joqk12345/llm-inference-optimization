@@ -1,0 +1,117 @@
+{
+  "generated_at": "2026-02-10T00:14:38Z",
+  "git": {
+    "sha": "b2f2ee7a1cf2e2a2bd688a5e777a8a54a670abc2",
+    "commit_date": "2026-02-10T07:57:27+08:00"
+  },
+  "chapters": [
+    {
+      "file": "chapters/chapter01-introduction.md",
+      "bytes": 27356,
+      "lines": 489,
+      "chars": 10885,
+      "non_ws": 9859,
+      "cjk": 7091,
+      "words": 839
+    },
+    {
+      "file": "chapters/chapter02-technology-landscape.md",
+      "bytes": 27294,
+      "lines": 558,
+      "chars": 11929,
+      "non_ws": 10528,
+      "cjk": 6391,
+      "words": 1114
+    },
+    {
+      "file": "chapters/chapter03-gpu-basics.md",
+      "bytes": 21767,
+      "lines": 528,
+      "chars": 10290,
+      "non_ws": 8936,
+      "cjk": 4881,
+      "words": 1085
+    },
+    {
+      "file": "chapters/chapter04-environment-setup.md",
+      "bytes": 34626,
+      "lines": 1416,
+      "chars": 26519,
+      "non_ws": 20743,
+      "cjk": 2875,
+      "words": 2996
+    },
+    {
+      "file": "chapters/chapter05-llm-inference-basics.md",
+      "bytes": 48319,
+      "lines": 2012,
+      "chars": 33098,
+      "non_ws": 25232,
+      "cjk": 6198,
+      "words": 5478
+    },
+    {
+      "file": "chapters/chapter06-kv-cache-optimization.md",
+      "bytes": 34375,
+      "lines": 1367,
+      "chars": 25370,
+      "non_ws": 19521,
+      "cjk": 4213,
+      "words": 4026
+    },
+    {
+      "file": "chapters/chapter07-request-scheduling.md",
+      "bytes": 44777,
+      "lines": 1631,
+      "chars": 30615,
+      "non_ws": 22717,
+      "cjk": 6351,
+      "words": 3864
+    },
+    {
+      "file": "chapters/chapter08-quantization.md",
+      "bytes": 55177,
+      "lines": 2251,
+      "chars": 37821,
+      "non_ws": 29209,
+      "cjk": 7957,
+      "words": 5110
+    },
+    {
+      "file": "chapters/chapter09-speculative-sampling.md",
+      "bytes": 36267,
+      "lines": 1075,
+      "chars": 19075,
+      "non_ws": 15176,
+      "cjk": 7157,
+      "words": 2295
+    },
+    {
+      "file": "chapters/chapter10-production-deployment.md",
+      "bytes": 74240,
+      "lines": 2861,
+      "chars": 55939,
+      "non_ws": 41512,
+      "cjk": 6588,
+      "words": 5800
+    },
+    {
+      "file": "chapters/chapter11-advanced-topics.md",
+      "bytes": 50117,
+      "lines": 1930,
+      "chars": 35397,
+      "non_ws": 28341,
+      "cjk": 6866,
+      "words": 3890
+    }
+  ],
+  "total": {
+    "file": "TOTAL",
+    "bytes": 454315,
+    "lines": 16118,
+    "chars": 296938,
+    "non_ws": 231774,
+    "cjk": 66568,
+    "words": 36497
+  }
+}
