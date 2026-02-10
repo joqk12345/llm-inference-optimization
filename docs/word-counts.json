@@ -1,9 +1,4 @@
 {
-  "generated_at": "2026-02-10T00:15:05Z",
-  "git": {
-    "sha": "5aae20bfdbd9228f3a0ab6a7caba83b9d2ecc3e3",
-    "commit_date": "2026-02-10T08:14:46+08:00"
-  },
   "chapters": [
     {
       "file": "chapters/chapter01-introduction.md",

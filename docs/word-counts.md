@@ -1,9 +1,5 @@
 # Chapter 1-11 字数统计
 
-- Commit: `5aae20bfdbd9228f3a0ab6a7caba83b9d2ecc3e3`
-- Commit date: `2026-02-10T08:14:46+08:00`
-- Generated at (UTC): `2026-02-10T00:15:05Z`
-
 说明：
 - `non_ws` = 去除空白后的字符数（更接近“字数”口径）
 - `cjk` = 汉字数量（U+4E00..U+9FFF）

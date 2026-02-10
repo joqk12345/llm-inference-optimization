@@ -94,23 +94,30 @@ def _sum_stats(rows: Iterable[ChapterStats]) -> ChapterStats:
 
 
 def _render_markdown(rows: list[ChapterStats], total: ChapterStats, meta: dict) -> str:
-    sha = meta.get("git", {}).get("sha") or "unknown"
-    commit_date = meta.get("git", {}).get("commit_date") or "unknown"
-    generated_at = meta.get("generated_at") or "unknown"
+    header = ["# Chapter 1-11 字数统计", ""]
 
-    header = [
-        "# Chapter 1-11 字数统计",
-        "",
-        f"- Commit: `{sha}`",
-        f"- Commit date: `{commit_date}`",
-        f"- Generated at (UTC): `{generated_at}`",
-        "",
-        "说明：",
-        "- `non_ws` = 去除空白后的字符数（更接近“字数”口径）",
-        "- `cjk` = 汉字数量（U+4E00..U+9FFF）",
-        "- `words` = 按空白分词的词数（对中文不敏感，仅作参考）",
-        "",
-    ]
+    if meta.get("git"):
+        sha = meta.get("git", {}).get("sha") or "unknown"
+        commit_date = meta.get("git", {}).get("commit_date") or "unknown"
+        generated_at = meta.get("generated_at") or "unknown"
+        header.extend(
+            [
+                f"- Commit: `{sha}`",
+                f"- Commit date: `{commit_date}`",
+                f"- Generated at (UTC): `{generated_at}`",
+                "",
+            ]
+        )
+
+    header.extend(
+        [
+            "说明：",
+            "- `non_ws` = 去除空白后的字符数（更接近“字数”口径）",
+            "- `cjk` = 汉字数量（U+4E00..U+9FFF）",
+            "- `words` = 按空白分词的词数（对中文不敏感，仅作参考）",
+            "",
+        ]
+    )
 
     cols = ["file", "bytes", "lines", "chars", "non_ws", "cjk", "words"]
     lines = ["| " + " | ".join(cols) + " |", "| " + " | ".join(["---"] * len(cols)) + " |"]
@@ -171,6 +178,11 @@ def main() -> int:
         action="store_true",
         help="Write outputs to files. Without this flag, prints markdown to stdout.",
     )
+    parser.add_argument(
+        "--include-meta",
+        action="store_true",
+        help="Include commit/time metadata in outputs (useful for local reports; CI typically keeps this off).",
+    )
     args = parser.parse_args()
 
     root = Path(".").resolve()
@@ -195,16 +207,16 @@ def main() -> int:
         rows.append(_compute_stats(p, display_path=rel))
     total = _sum_stats(rows)
 
-    generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-    sha = os.environ.get("GITHUB_SHA") or _run_git(["rev-parse", "HEAD"]) or "unknown"
-    commit_date = _run_git(["show", "-s", "--format=%cI", "HEAD"]) or "unknown"
-
     meta = {
-        "generated_at": generated_at,
-        "git": {"sha": sha, "commit_date": commit_date},
         "chapters": [asdict(r) for r in rows],
         "total": asdict(total),
     }
+    if args.include_meta:
+        generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        sha = os.environ.get("GITHUB_SHA") or _run_git(["rev-parse", "HEAD"]) or "unknown"
+        commit_date = _run_git(["show", "-s", "--format=%cI", "HEAD"]) or "unknown"
+        meta["generated_at"] = generated_at
+        meta["git"] = {"sha": sha, "commit_date": commit_date}
 
     md = _render_markdown(rows, total, meta)
 
