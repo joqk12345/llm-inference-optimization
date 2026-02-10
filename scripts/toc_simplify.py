@@ -7,6 +7,25 @@ from datetime import date
 from pathlib import Path
 
 
+def _clean_heading(line: str) -> str:
+    # Remove editorial markers in headings for the clean TOC.
+    # Examples: "⭐ 新增", "⭐⭐⭐ 2025新增"
+    line = line.replace("⭐", "")
+    # Remove warning/notes suffixes like: "⚠️ NVIDIA官方支持", "⚠️ 技术评估中".
+    # For clean TOC, keep only the structural title.
+    line = re.sub(r"\s*⚠️.*$", "", line)
+    line = re.sub(r"\s*⚠.*$", "", line)
+    # Remove standalone "新增" (and common variants), then normalize whitespace.
+    line = re.sub(r"\b2025\s*新增\b", "", line)
+    line = re.sub(r"\b新增\b", "", line)
+    # Remove common standalone emoji markers if they appear in headings.
+    line = re.sub(r"[💡💰📌✅❌🚧]", "", line)
+    line = re.sub(r"[ \t]{2,}", " ", line).rstrip()
+    # Fix common spacing around punctuation after stripping markers.
+    line = re.sub(r"\s+([：:])", r"\1", line)
+    return line
+
+
 def simplify_toc(text: str) -> str:
     out: list[str] = []
     lines = text.splitlines()
@@ -27,7 +46,7 @@ def simplify_toc(text: str) -> str:
             break
 
         if line.startswith("## ") or line.startswith("### ") or line.startswith("#### "):
-            emit(line.rstrip())
+            emit(_clean_heading(line.rstrip()))
             emit("")
 
     # Trim trailing blank line.
@@ -77,4 +96,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
