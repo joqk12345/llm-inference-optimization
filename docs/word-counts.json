@@ -2,12 +2,12 @@
   "chapters": [
     {
       "file": "chapters/chapter01-introduction.md",
-      "bytes": 30988,
-      "lines": 546,
-      "chars": 12288,
-      "non_ws": 11154,
-      "cjk": 8044,
-      "words": 920
+      "bytes": 23417,
+      "lines": 422,
+      "chars": 9429,
+      "non_ws": 8549,
+      "cjk": 6028,
+      "words": 706
     },
     {
       "file": "chapters/chapter02-technology-landscape.md",
@@ -29,84 +29,84 @@
     },
     {
       "file": "chapters/chapter04-environment-setup.md",
-      "bytes": 34626,
-      "lines": 1416,
-      "chars": 26519,
-      "non_ws": 20743,
-      "cjk": 2875,
-      "words": 2996
+      "bytes": 34556,
+      "lines": 1412,
+      "chars": 26415,
+      "non_ws": 20697,
+      "cjk": 2892,
+      "words": 2994
     },
     {
       "file": "chapters/chapter05-llm-inference-basics.md",
-      "bytes": 48319,
-      "lines": 2012,
-      "chars": 33098,
-      "non_ws": 25232,
-      "cjk": 6198,
-      "words": 5478
+      "bytes": 48441,
+      "lines": 2011,
+      "chars": 33103,
+      "non_ws": 25250,
+      "cjk": 6254,
+      "words": 5465
     },
     {
       "file": "chapters/chapter06-kv-cache-optimization.md",
-      "bytes": 34375,
-      "lines": 1367,
-      "chars": 25370,
-      "non_ws": 19521,
-      "cjk": 4213,
-      "words": 4026
+      "bytes": 34793,
+      "lines": 1364,
+      "chars": 25197,
+      "non_ws": 19432,
+      "cjk": 4508,
+      "words": 3937
     },
     {
       "file": "chapters/chapter07-request-scheduling.md",
-      "bytes": 44777,
-      "lines": 1631,
-      "chars": 30615,
-      "non_ws": 22717,
-      "cjk": 6351,
-      "words": 3864
+      "bytes": 44604,
+      "lines": 1613,
+      "chars": 30127,
+      "non_ws": 22369,
+      "cjk": 6512,
+      "words": 3726
     },
     {
       "file": "chapters/chapter08-quantization.md",
-      "bytes": 55177,
-      "lines": 2251,
-      "chars": 37821,
-      "non_ws": 29209,
-      "cjk": 7957,
-      "words": 5110
+      "bytes": 55472,
+      "lines": 2241,
+      "chars": 37380,
+      "non_ws": 28894,
+      "cjk": 8326,
+      "words": 4990
     },
     {
       "file": "chapters/chapter09-speculative-sampling.md",
-      "bytes": 36267,
-      "lines": 1075,
-      "chars": 19075,
-      "non_ws": 15176,
-      "cjk": 7157,
-      "words": 2295
+      "bytes": 35835,
+      "lines": 1064,
+      "chars": 18722,
+      "non_ws": 14908,
+      "cjk": 7121,
+      "words": 2223
     },
     {
       "file": "chapters/chapter10-production-deployment.md",
-      "bytes": 74240,
-      "lines": 2861,
-      "chars": 55939,
-      "non_ws": 41512,
-      "cjk": 6588,
-      "words": 5800
+      "bytes": 74386,
+      "lines": 2850,
+      "chars": 55460,
+      "non_ws": 41150,
+      "cjk": 6895,
+      "words": 5698
     },
     {
       "file": "chapters/chapter11-advanced-topics.md",
-      "bytes": 50117,
-      "lines": 1930,
-      "chars": 35397,
-      "non_ws": 28341,
-      "cjk": 6866,
-      "words": 3890
+      "bytes": 50499,
+      "lines": 1923,
+      "chars": 35246,
+      "non_ws": 28199,
+      "cjk": 7133,
+      "words": 3854
     }
   ],
   "total": {
     "file": "TOTAL",
-    "bytes": 457947,
-    "lines": 16175,
-    "chars": 298341,
-    "non_ws": 233069,
-    "cjk": 67521,
-    "words": 36578
+    "bytes": 451064,
+    "lines": 15986,
+    "chars": 293298,
+    "non_ws": 228912,
+    "cjk": 66941,
+    "words": 35792
   }
 }
