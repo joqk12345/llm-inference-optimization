@@ -7,15 +7,15 @@
 
 | file | bytes | lines | chars | non_ws | cjk | words |
 | --- | --- | --- | --- | --- | --- | --- |
-| `chapters/chapter01-introduction.md` | 30988 | 546 | 12288 | 11154 | 8044 | 920 |
+| `chapters/chapter01-introduction.md` | 23417 | 422 | 9429 | 8549 | 6028 | 706 |
 | `chapters/chapter02-technology-landscape.md` | 27294 | 558 | 11929 | 10528 | 6391 | 1114 |
 | `chapters/chapter03-gpu-basics.md` | 21767 | 528 | 10290 | 8936 | 4881 | 1085 |
-| `chapters/chapter04-environment-setup.md` | 34626 | 1416 | 26519 | 20743 | 2875 | 2996 |
-| `chapters/chapter05-llm-inference-basics.md` | 48319 | 2012 | 33098 | 25232 | 6198 | 5478 |
-| `chapters/chapter06-kv-cache-optimization.md` | 34375 | 1367 | 25370 | 19521 | 4213 | 4026 |
-| `chapters/chapter07-request-scheduling.md` | 44777 | 1631 | 30615 | 22717 | 6351 | 3864 |
-| `chapters/chapter08-quantization.md` | 55177 | 2251 | 37821 | 29209 | 7957 | 5110 |
-| `chapters/chapter09-speculative-sampling.md` | 36267 | 1075 | 19075 | 15176 | 7157 | 2295 |
-| `chapters/chapter10-production-deployment.md` | 74240 | 2861 | 55939 | 41512 | 6588 | 5800 |
-| `chapters/chapter11-advanced-topics.md` | 50117 | 1930 | 35397 | 28341 | 6866 | 3890 |
-| **TOTAL** | 457947 | 16175 | 298341 | 233069 | 67521 | 36578 |
+| `chapters/chapter04-environment-setup.md` | 34556 | 1412 | 26415 | 20697 | 2892 | 2994 |
+| `chapters/chapter05-llm-inference-basics.md` | 48441 | 2011 | 33103 | 25250 | 6254 | 5465 |
+| `chapters/chapter06-kv-cache-optimization.md` | 34793 | 1364 | 25197 | 19432 | 4508 | 3937 |
+| `chapters/chapter07-request-scheduling.md` | 44604 | 1613 | 30127 | 22369 | 6512 | 3726 |
+| `chapters/chapter08-quantization.md` | 55472 | 2241 | 37380 | 28894 | 8326 | 4990 |
+| `chapters/chapter09-speculative-sampling.md` | 35835 | 1064 | 18722 | 14908 | 7121 | 2223 |
+| `chapters/chapter10-production-deployment.md` | 74386 | 2850 | 55460 | 41150 | 6895 | 5698 |
+| `chapters/chapter11-advanced-topics.md` | 50499 | 1923 | 35246 | 28199 | 7133 | 3854 |
+| **TOTAL** | 451064 | 15986 | 293298 | 228912 | 66941 | 35792 |
