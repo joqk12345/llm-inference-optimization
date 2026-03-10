@@ -1,6 +1,6 @@
-# Chapter 2: GPU Basics - Code Examples
+# Chapter 3: GPU Basics - Code Examples
 
-This directory contains practical code examples for Chapter 2.
+This directory contains practical code examples for Chapter 3.
 
 ## 📁 Files
 
@@ -14,16 +14,16 @@ This directory contains practical code examples for Chapter 2.
 
 ```bash
 # Build the Docker image
-docker build -t llm-book-chapter02 .
+docker build -t llm-book-chapter03 .
 
 # Run the memory calculator
-docker run --gpus all -it llm-book-chapter02 python memory_calculator.py
+docker run --gpus all -it llm-book-chapter03 python memory_calculator.py
 
 # Monitor GPU usage
-docker run --gpus all -it llm-book-chapter02 python gpu_monitor.py
+docker run --gpus all -it llm-book-chapter03 python gpu_monitor.py
 
 # Diagnose bottlenecks
-docker run --gpus all -it llm-book-chapter02 python bottleneck_diagnostic.py
+docker run --gpus all -it llm-book-chapter03 python bottleneck_diagnostic.py
 ```
 
 ## 📝 Examples
@@ -75,10 +75,10 @@ Status: Compute Bound ✓
 
 ### Example 3: Diagnose Bottlenecks
 
-Run a real inference workload and diagnose the bottleneck:
+Run a lightweight synthetic workload and diagnose the likely bottleneck:
 
 ```bash
-python bottleneck_diagnostic.py --model llama-3-8b --prompt "Hello, world!" --iterations 100
+python bottleneck_diagnostic.py --iterations 50
 ```
 
 **Output**:
@@ -159,8 +159,6 @@ After running these examples, you should understand:
 Once you're comfortable with these examples:
 1. Try different models and quantization settings
 2. Experiment with batch sizes
-3. Move to Chapter 3: Environment Setup
+3. Move to Chapter 4: Environment Setup
 
 ---
-
-**Need help? Join the [Chapter 2 Discord channel](https://discord.gg/TODO)!**

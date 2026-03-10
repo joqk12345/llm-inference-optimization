@@ -7,7 +7,7 @@
 2. **GitHub仓库上线** - https://github.com/joqk12345/llm-inference-optimization
 3. **第2章完整内容** - `chapters/chapter02-gpu-basics.md`
 4. **完整图书目录** - `docs/table-of-contents.md`
-5. **配套代码示例** - `code/chapter02/`
+5. **配套代码示例** - `code/chapter03/`
 6. **所有文档模板** - FAQ、贡献指南、成功案例等
 
 ### 📊 当前进度

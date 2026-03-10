@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GPU Memory Calculator for LLMs
-Chapter 2: GPU Basics - Code Example
+Chapter 3: GPU Basics - Code Example
 
 This script calculates the memory requirements for running an LLM inference.
 """
