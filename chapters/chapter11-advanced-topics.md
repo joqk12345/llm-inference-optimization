@@ -19,9 +19,11 @@
 - Flash Attention等底层优化技术
 - 技术发展的未来趋势
 
+> **数值说明**: 本章出现的阈值、比例与性能数字多为示意或经验值,需结合硬件、负载与模型校准。
+
 ---
 
-## 11.1 Agent基础设施 ⚠️ 开源生态缺失
+## 11.1 Agent基础设施 ⚠️ 生态仍不成熟
 
 **背景**：当系统从“单轮生成”走向“多步任务”（检索、工具调用、执行、回写、重试），推理基础设施不再是唯一复杂点。你需要一个能运行工具、隔离权限、可观测、可恢复的 Agent 运行环境。
 
@@ -39,11 +41,11 @@
 
 ### 11.1.1 为什么Agent Infra很重要
 
-**2025年的爆发**:
+**近期的爆发**:
 
 ```
 商业产品:
-  - Google: NotebookLM、Gemini Flash、Gemini Nano
+  - Google: NotebookLM、Gemini Flash、Gemini Nano (示例)
   - 国内: AutoJam、多宝书记
 
 展示价值:
@@ -51,9 +53,9 @@
   - 可以少雇一些inference
 ```
 
-**核心价值**(张博涵@浙大):
-- Gemini完全可做科研助手
-- 可以少雇一些inference
+**核心价值**(示意):
+- Agent可承担部分科研与生产任务
+- 能在一定程度上降低人工推理成本
 
 **独特挑战**:
 - 不像传统推理只有text input/output
@@ -61,9 +63,9 @@
 
 ### 11.1.2 Agent System的缺失
 
-**当前状态**(朱立耕@NVIDIA):
+**当前状态**(示意):
 ```
-开源agent system是负数
+开源agent system仍不成熟
 
 现状:
   - 在公司内部搭建Jupyter agent都很难
@@ -102,8 +104,8 @@ response = agent.http_fetch("https://api.example.com/data")
 # 超时、重试、错误处理
 response = agent.http_fetch(
     url,
-    timeout=10,
-    retries=3,
+    timeout=10,  # 示例
+    retries=3,   # 示例
     on_error="retry_with_backoff"
 )
 ```
@@ -159,13 +161,13 @@ metadata:
 spec:
   image: agent-runtime:latest
   resources:
-    cpu: "4"
-    memory: "16Gi"
-    gpu: "1"
+    cpu: "4"       # 示例
+    memory: "16Gi" # 示例
+    gpu: "1"       # 示例
   autoScaling:
     enabled: true
-    minReplicas: 2
-    maxReplicas: 10
+    minReplicas: 2  # 示例
+    maxReplicas: 10 # 示例
 ```
 
 **云原生部署**:
@@ -278,7 +280,7 @@ services:
 **核心洞察**:
 - KV-cache hit rate是生产级agent最重要的单一指标
 - 直接影响latency(TTFT)和cost
-- Agent的输入输出比例100:1(vs chatbot 1:1)
+- Agent的输入输出比例可能显著高于普通对话
 
 **三大实践**:
 
@@ -381,8 +383,8 @@ prefix = "<|im_start|>assistant\n<|tool|>{\"name\": \"browser_"
 **原则3: File System as Ultimate Context** ⭐⭐
 
 **长context的三大痛点**:
-1. **Observations巨大**: 网页、PDF可能数万tokens
-2. **性能下降**: 超过一定长度后模型性能degrade
+1. **Observations巨大**: 网页、PDF可能包含大量tokens
+2. **性能下降**: 超过一定长度后模型性能可能下降
 3. **成本高昂**: 即使有cache,长context仍贵
 
 **Solution**: 文件系统作为外部memory
@@ -397,7 +399,7 @@ context.append({
     "type": "web_page",
     "url": url,
     "file_path": file_path,  # 需要时可读取
-    "summary": summarize(web_content)  # 100 tokens
+    "summary": summarize(web_content)  # 示例
 })
 
 # 压缩原则:
@@ -410,8 +412,8 @@ context.append({
 **原则4: Manipulate Attention Through Recitation** ⭐⭐
 
 **问题**:
-- 典型Agent任务: ~50步tool calls
-- Context快速增长到数万tokens
+- 典型Agent任务: 多步tool calls
+- Context快速增长到大量tokens
 - 模型容易"lost-in-the-middle"或偏移目标
 
 **Solution**: todo.md机制
@@ -421,7 +423,7 @@ context.append({
 todo_content = """
 # Task: Research and book flight to Tokyo
 
-- [ ] Search flights to Tokyo (Mar 1-7, 2025)
+- [ ] Search flights to Tokyo (示例日期)
 - [ ] Compare prices across airlines
 - [ ] Check hotel availability
 - [x] Get user preferences (budget, dates)
@@ -561,22 +563,22 @@ templates = [
 ### 11.2.1 训练vs推理的算力差异
 
 **训练**(朱立耕@NVIDIA):
-- Flops per byte ≈ 10^5
+- Flops per byte: 训练阶段通常更高(示意)
 - 计算密集
 
 **推理**:
-- Flops per byte ≈ 80
+- Flops per byte: 推理阶段通常更低(示意)
 - 带宽密集
 
-**差距**: 2-3个数量级
+**差距**: 数量级差异(示意)
 
 **启示**: 应该用不同的硬件
 
 ```
-训练: 需要高计算能力 → H100
-推理: 需要高带宽 → H200、L40s
+训练: 需要高计算能力 → 选择更强算力硬件
+推理: 需要高带宽 → 选择带宽更优硬件
 
-不要用H100做推理! 浪费!
+避免在推理上过度配置计算型硬件,以免成本浪费。
 ```
 
 ### 11.2.2 异构部署的机会
@@ -585,10 +587,10 @@ templates = [
 - 大家都在SPMD时不会考虑
 - 物理上在同一集群但权限不同
 
-**现在的机会**(朱立耕@NVIDIA):
-- H100训练 + H200推理
-- 国产卡推理 + NV训练
-- 可以把这些卡更好利用起来
+**现在的机会**(示意):
+- 训练与推理硬件分工
+- 结合不同成本与性能特征的硬件
+- 提升整体硬件利用率
 
 **为什么现在可以**:
 - RL把training和rollout分开了
@@ -600,16 +602,14 @@ templates = [
 **H100**:
 - 训练优化
 - 高计算能力
-- TFLOPS: ~4000 (FP16)
 
 **H200/L40s**:
 - 推理优化
 - 高带宽
-- Memory Bandwidth: ~4.8 TB/s (H200)
 
-**国产卡**(朱立耕@NVIDIA):
-- 推理场景可选择硬件多
-- 训练仍是NV的privilege
+**多种硬件选择**:
+- 推理场景硬件可选项更丰富
+- 训练硬件选择更依赖生态与工具链
 
 ### 11.2.4 容灾和混部的机会
 
@@ -628,12 +628,12 @@ templates = [
 # 潮汐队列: 白天推理,夜间RL
 daytime:
   - 优先级: 推理
-  - 资源分配: 80%推理, 20%RL
+  - 资源分配: 以推理为主(示意)
   - 用途: 服务用户请求
 
 nighttime:
   - 优先级: RL训练
-  - 资源分配: 20%推理, 80%RL
+  - 资源分配: 以RL为主(示意)
   - 用途: 模型训练和rollout
 
 # SMP和RL的大集群混用
@@ -668,7 +668,7 @@ spec:
   hardwareType: H100
   purpose: training
   resources:
-    nvidia.com/gpu: 8
+    nvidia.com/gpu: 8  # 示例
     gpu.memory: "80Gi"
 ---
 # inference-cluster.yaml
@@ -680,7 +680,7 @@ spec:
   hardwareType: H200
   purpose: inference
   resources:
-    nvidia.com/gpu: 8
+    nvidia.com/gpu: 8  # 示例
     gpu.memory: "141Gi"
 ```
 
@@ -758,7 +758,7 @@ class MoELayer:
 **MoE的优势**:
 - **稀疏激活**: 每个token只使用部分专家
 - **模型容量大**: 总参数量多,但计算量少
-- **成本优化**: 推理成本降低30-50%
+- **成本优化**: 推理成本可能降低(依负载而定)
 
 ### 11.3.2 MoE推理的特殊挑战
 
@@ -767,8 +767,8 @@ class MoELayer:
 ```python
 # 问题: 某些专家被频繁调用,某些专家很少被调用
 expert_call_counts = {
-    "expert_0": 10000,  # 热点专家
-    "expert_1": 50,     # 冷门专家
+    "expert_0": 10000,  # 示例: 热点专家
+    "expert_1": 50,     # 示例: 冷门专家
     # ...
 }
 
@@ -857,7 +857,7 @@ def expert_affinity_routing(tokens: List[Token]):
 
 ```python
 # DeepSeek-V3: 671B参数
-# Checkpoint大小: ~1.3TB (BF16)
+# Checkpoint大小: TB级 (示意)
 
 # 问题:
 # 1. 保存时间长
@@ -900,8 +900,8 @@ def handle_expert_failure(failed_expert_id: int):
 ```bash
 # 使用vLLM部署Mixtral 8x7B
 vllm serve mistralai/Mixtral-8x7B-Instruct-v0.1 \
-  --tensor-parallel-size 4 \
-  --max-model-len 8192 \
+  --tensor-parallel-size 4 \  # 示例
+  --max-model-len 8192 \       # 示例
   --enable-prefix-caching
 
 # 性能调优
@@ -961,11 +961,11 @@ class LLaVA:
 **挑战**: 图像编码计算量大
 
 ```
-图像: 512x512 = 262K pixels
-Patches: 16x16 = 1024 patches
-Vision Encoder: ViT-L/14 (~300M参数)
+图像: 典型分辨率(示意)
+Patches: 视patch大小而定
+Vision Encoder: 典型大模型(示意)
 
-计算: 300M params × 1024 patches ≈ 300B FLOPs
+计算: 视模型规模与patch数而定
 ```
 
 **优化策略**:
@@ -991,8 +991,7 @@ Vision Encoder: ViT-L/14 (~300M参数)
    # INT8量化
    quantized_vision_encoder = quantize(vision_encoder, dtype=torch.int8)
 
-   # 性能提升: 2x
-   # 精度损失: <1%
+   # 性能提升与精度损失需基准测试验证
    ```
 
 3. **批处理多张图像**
@@ -1001,7 +1000,7 @@ Vision Encoder: ViT-L/14 (~300M参数)
    images = [image1, image2, image3, ...]
    batch_features = vision_encoder(images)  # [batch, num_patches, dim]
 
-   # 比单张编码快4-8x
+   # 批处理通常更快
    ```
 
 ### 11.4.3 多模态推理流水线
@@ -1124,7 +1123,7 @@ import torch
 from vllm import LLM
 
 # 原始模型
-llm = LLM(model="meta-llama/Llama-3.1-8B")
+llm = LLM(model="meta-llama/Llama-3.1-8B")  # 示例
 
 # 应用torch.compile
 # 注意: vLLM内部已经优化,可能不需要额外compile
@@ -1140,15 +1139,11 @@ compiled_model = torch.compile(
 ### 11.5.3 与vLLM结合
 
 ```python
-# vLLM 0.6.0+ 支持torch.compile
-VLLM_USE_TORCH_COMPILE=1 vllm serve meta-llama/Llama-3.1-8B
+# vLLM 对 torch.compile 的支持随版本演进
+VLLM_USE_TORCH_COMPILE=1 vllm serve meta-llama/Llama-3.1-8B  # 示例
 
-# 性能提升:
-# - P50 latency: -5%
-# - P95 latency: -3%
-# - Throughput: +2%
-
-# 注意: 提升幅度有限,vLLM已经高度优化
+# 性能影响需基准测试验证
+# 注意: 提升幅度依模型与负载而定
 ```
 
 ---
@@ -1352,7 +1347,7 @@ __global__ void simple_add_kernel(float* A, float* B, float* C, int N) {
 
 // Host code
 extern "C" void launch_simple_add(float* A, float* B, float* C, int N) {
-    int threads_per_block = 256;
+    int threads_per_block = 256;  // 示例
     int blocks = (N + threads_per_block - 1) / threads_per_block;
 
     simple_add_kernel<<<blocks, threads_per_block>>>(A, B, C, N);
@@ -1482,7 +1477,7 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=8000,
-        workers=4,  # 多worker
+        workers=4,  # 示例
         loop="uvloop",  # 高性能event loop
     )
 ```
@@ -1750,10 +1745,8 @@ kv_cache_cluster = Cluster(
 **实际情况**: 通信开销可能抵消收益。
 
 ```python
-# 单GPU: 100 tokens/s
-# 2 GPU (TP): 180 tokens/s (80%效率)
-# 4 GPU (TP): 300 tokens/s (75%效率)
-# 8 GPU (TP): 400 tokens/s (50%效率)
+# 单GPU: 基准(示意)
+# 多GPU (TP): 依通信与并行效率而定
 
 # 为什么?
 # - 跨GPU通信开销
@@ -1836,8 +1829,8 @@ assert result == "6"
 目标: 体验异构部署的优势
 
 任务:
-1. 在H100上训练小模型
-2. 在H200上部署推理
+1. 在高算力GPU上训练小模型
+2. 在高带宽GPU上部署推理
 3. 对比性能差异
 
 验收:
@@ -1858,9 +1851,9 @@ assert result == "6"
 4. 对比优化前后成本
 
 验收:
-- KV-cache hit rate > 80%
-- 平均context长度减少50%
-- 成本降低40%
+- KV-cache hit rate 提升
+- 平均context长度降低
+- 成本降低
 
 ---
 
@@ -1883,11 +1876,11 @@ class SimpleAgent:
     def execute_code(self, code: str) -> str:
         """执行Python代码"""
         self.kc.execute(code)
-        msg = self.kc.get_shell_msg(timeout=10)
+        msg = self.kc.get_shell_msg(timeout=10)  # 示例
 
         if msg['content']['status'] == 'ok':
             # 获取输出
-            msg = self.kc.get_iopub_msg(timeout=10)
+            msg = self.kc.get_iopub_msg(timeout=10)  # 示例
             if msg['content']['ename']:
                 return f"Error: {msg['content']['evalue']}"
             return str(msg['content'].get('text', ''))

@@ -198,8 +198,7 @@ LLM 的本质: "Fancy next token predictors" (花哨的下一个词预测器)
 示例:
 ```
 Prompt: 100 tokens
-GPU RTX 4090:
-- Prefill 时间: ~200ms (一次处理 100 个 tokens)
+单次 Prefill 的耗时通常明显低于完整生成阶段,但具体数值取决于模型规模、硬件与实现。
 ```
 
 ---
@@ -240,9 +239,9 @@ GPU RTX 4090:
 示例:
 ```
 生成 100 tokens:
-- 每个 token: ~20ms
-- 总时间: 100 × 20ms = 2000ms
-- 是 Prefill 的 10 倍!
+- Decode 阶段会逐 token 串行生成
+- 总耗时通常显著高于一次 Prefill
+- 具体倍数取决于模型规模、KV Cache 实现与硬件带宽
 ```
 
 ---

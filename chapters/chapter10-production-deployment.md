@@ -28,6 +28,8 @@
 - ✅ 实施有效的成本优化策略
 - ✅ 处理生产环境的常见问题
 
+> **数值说明**: 本章出现的阈值、价格、成本与性能数字均为示例或经验值,需结合你的硬件、负载与SLA目标进行校准。
+
 ---
 
 ## 10.1 生产环境 vs 开发环境
@@ -44,7 +46,7 @@
 
 | 维度 | 开发环境 | 生产环境 |
 |------|---------|---------|
-| **可用性要求** | 可以接受停机 | 99.9%+ SLA |
+| **可用性要求** | 可以接受停机 | 有SLA目标(示例: 99.9%) |
 | **负载特征** | 低并发,测试流量 | 高并发,真实用户 |
 | **监控** | 基本日志即可 | 完整可观测性体系 |
 | **安全** | 宽松 | 严格的认证授权 |
@@ -103,19 +105,16 @@
 
 | 指标 | 定义 | 目标值 | 监控方式 |
 |------|------|--------|---------|
-| **可用性** | 服务正常运行时间比例 | 99.9% | 健康检查 + 告警 |
-| **延迟** | 请求响应时间 | TTFT < 2s | Prometheus |
-| **吞吐量** | 每秒处理的token数 | >1000 tok/s | 指标监控 |
-| **错误率** | 失败请求比例 | <0.1% | 日志分析 |
+| **可用性** | 服务正常运行时间比例 | 按SLA目标 | 健康检查 + 告警 |
+| **延迟** | 请求响应时间 | 按SLA目标 | Prometheus |
+| **吞吐量** | 每秒处理的token数 | 依模型与硬件 | 指标监控 |
+| **错误率** | 失败请求比例 | 尽量低 | 日志分析 |
 
 **可用性与成本的关系**:
 
 ```
-99%   可用性 = 3.65天/年停机   → 成本: 1x
-99.9% 可用性 = 8.76小时/年停机  → 成本: 2x
-99.99%可用性 = 52.56分钟/年停机 → 成本: 5x
-
-对于大多数LLM服务,99.9%是合理的平衡点
+更高的可用性目标通常意味着更高的架构与运维成本。
+具体SLA应结合业务风险、流量规模与预算综合确定。
 ```
 
 ---
@@ -137,7 +136,7 @@
 **适用场景**:
 - 开发测试环境
 - 小规模内部工具
-- 低并发场景(<10 QPS)
+- 低并发场景
 
 ```bash
 # 单机部署示例
@@ -509,8 +508,7 @@ description: "高优先级vLLM服务"
   - 端到端延迟
 
 目标:
-  - TTFT < 2s (P95)
-  - TPOT < 100ms (P95)
+  - TTFT / TPOT 需与SLA一致
 ```
 
 ```python
@@ -521,8 +519,7 @@ description: "高优先级vLLM服务"
   - GPU利用率
 
 目标:
-  - >1000 tokens/s/GPU (Llama-3-8B)
-  - GPU利用率 > 60%
+  - tokens/s 与GPU利用率需结合模型与硬件设定
 ```
 
 ```python
@@ -533,8 +530,7 @@ description: "高优先级vLLM服务"
   - OOM频率
 
 目标:
-  - 错误率 < 0.1%
-  - 超时率 < 1%
+  - 错误率与超时率尽量低,按SLA设定
 ```
 
 **系统指标**:
@@ -788,10 +784,11 @@ python benchmark_serving.py \
   --request-rate 10
 
 # 输出关键指标
-# TTFT: 1.2s
-# TPOT: 80ms
-# Throughput: 1234 tokens/s
-# GPU Util: 65%
+# 示例输出(依模型与硬件而定):
+# TTFT: ...
+# TPOT: ...
+# Throughput: ...
+# GPU Util: ...
 ```
 
 **使用Nsight Systems**:
@@ -816,7 +813,7 @@ nsys-ui report.qdrep
 **诊断决策树**:
 
 ```
-GPU利用率 < 60%?
+GPU利用率偏低?
   ├─ 是 → 内存使用率高?
   │   ├─ 是 → 内存受限
   │   │   解决: 减少batch size, 量化
@@ -831,7 +828,7 @@ GPU利用率 < 60%?
 **问题1: TTFT过长**
 
 ```yaml
-症状: 首个token返回时间 > 3s
+症状: 首个token返回时间偏高
 
 原因:
   - KV Cache未命中
@@ -853,7 +850,7 @@ GPU利用率 < 60%?
 **问题2: 吞吐量低**
 
 ```yaml
-症状: tokens/s < 预期值的50%
+症状: tokens/s 明显低于预期
 
 原因:
   - Batch size太小
@@ -892,7 +889,7 @@ GPU利用率 < 60%?
   vllm serve ... --max-num-batched-tokens 8192
 ```
 
-### 10.5.4 调优参数参考
+### 10.5.4 调优参数参考(示例)
 
 | 参数 | 默认值 | 推荐范围 | 说明 |
 |------|--------|---------|------|
@@ -968,25 +965,23 @@ nsys stats vllm_report.qdrep --report csv > stats.csv
 
 ```yaml
 GPU Utilization:
-  - 理想值: >80%
-  - <60% → 内存或CPU瓶颈
+  - 理想值: 偏高
+  - 偏低 → 可能存在内存或CPU瓶颈
 
 Memory Bandwidth:
-  - H100峰值: 3.35 TB/s
-  - A100峰值: 2.0 TB/s
-  - RTX 4090: ~1 TB/s
-  - 达到>50%峰值 = 内存带宽受限
+  - 不同硬件峰值带宽不同
+  - 达到峰值的一定比例通常意味着带宽成为瓶颈
 
 Compute Throughput:
   - Tensor Core利用率
-  - 理想值: >60%
+  - 理想值: 偏高
 
 CUDA Kernel Duration:
-  - Top kernels占用>50%时间
+  - Top kernels占用较大时间比例
   - 优化slow kernels
 
 CPU Overhead:
-  - 理想值: <10%总时间
+  - 理想值: 较低
   - 过高 → 优化Python代码
 ```
 
@@ -1140,25 +1135,27 @@ guidellm benchmark \
 
 ### 10.6.1 云GPU选择策略
 
+> **说明**: 以下价格与规格仅为示例,实际以云厂商与地区报价为准。
+
 **成本vs性能权衡**:
 
 | GPU | 成本/小时 | 性能 | 适用场景 |
 |-----|----------|------|---------|
-| RTX 4090 | $1-2 | 中 | 开发、小模型 |
-| A100 (40GB) | $3-5 | 高 | 生产环境 |
-| A100 (80GB) | $5-7 | 很高 | 大模型 |
-| H100 | $8-12 | 顶级 | 高性能需求 |
+| RTX 4090 | 示例区间 | 中 | 开发、小模型 |
+| A100 (40GB) | 示例区间 | 高 | 生产环境 |
+| A100 (80GB) | 示例区间 | 很高 | 大模型 |
+| H100 | 示例区间 | 顶级 | 高性能需求 |
 
 **选择决策树**:
 
 ```
 模型大小 < 30B?
-  ├─ 是 → 预算 < $500/月?
-  │   ├─ 是 → RTX 4090 (自建或Lambda Labs)
+  ├─ 是 → 预算有限?
+  │   ├─ 是 → RTX 4090 (自建或低成本云GPU)
   │   └─ 否 → A100 40GB (云GPU)
-  └─ 否 → 预算 < $2000/月?
-      ├─ 是 → A100 80GB
-      └─ 否 → H100
+  └─ 否 → 预算充足?
+      ├─ 否 → A100 80GB
+      └─ 是 → H100
 ```
 
 ### 10.6.2 Spot实例使用
@@ -1319,7 +1316,7 @@ from datetime import datetime
 def calculate_cost_per_token():
     """计算每1000 tokens的成本"""
 
-    # GPU小时成本(假设A100 $3/小时)
+    # GPU小时成本(示例值,以实际报价为准)
     gpu_cost_per_hour = 3.0
 
     # 获取GPU数量和利用率
@@ -1358,7 +1355,7 @@ def log_request_cost(tokens: int, time_seconds: float):
 
 **核心观点（经验口径）**: 围绕 KV-Cache 设计 Agent 系统,通常是最具杠杆的成本优化路径之一（但不是银弹）
 
-#### 10.6.5.1 成本对比:Cached vs Uncached
+#### 10.6.5.1 成本对比: Cached vs Uncached
 
 **成本口径（通用）**:
 - 在不少商用 API/内部计费体系中,cache hit 的 token 成本往往显著低于未命中的 token（具体价差以供应商公开价或你的内部计费为准）
@@ -1366,13 +1363,8 @@ def log_request_cost(tokens: int, time_seconds: float):
 
 **Agent系统的成本放大效应**:
 ```
-典型Agent任务: 50步tool calls
-每步context增长: ~500 tokens
-总token数: 25,000 tokens (大部分是prefill)
-
-无优化成本: 25K × $3/MTok = $0.075/任务
-优化后成本: prefix cached → ~$0.01/任务
-节省: 7.5倍
+典型Agent任务往往包含大量重复前缀与多步调用。
+在高复用场景下,缓存可显著降低成本与延迟。
 ```
 
 #### 10.6.5.2 四大优化手段
@@ -1479,44 +1471,44 @@ class SessionAwareRouter:
 
 | 场景 | 优化前 | 优化后 | 节省 |
 |------|--------|--------|------|
-| 简单任务(10步) | $0.02 | $0.005 | 75% |
-| 中等任务(30步) | $0.05 | $0.015 | 70% |
-| 复杂任务(50步) | $0.075 | $0.025 | 67% |
-| 超长任务(100步) | $0.15 | $0.06 | 60% |
+| 简单任务 | 相对较高 | 相对较低 | 可能显著 |
+| 中等任务 | 相对较高 | 相对较低 | 可能显著 |
+| 复杂任务 | 相对较高 | 相对较低 | 通常更明显 |
+| 超长任务 | 相对较高 | 相对较低 | 通常更明显 |
 
-**关键洞察**: 任务越复杂,优化效果越明显——因为context累积更多。
+**关键洞察**: 任务越复杂,优化收益往往越明显——因为上下文累积更多。
 
 ### 10.6.6 轻量级参考实现:Mini-SGLang
 
 > **💡 深度来源**: [Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/)
 >
-> **核心价值**: 5k行代码实现完整推理引擎,适合学习和研究原型
+> **核心价值**: 以相对较小代码规模实现完整推理引擎,适合学习和研究原型
 >
 > **适用场景**: 教育学习、快速研究验证、内核开发调试
 
 #### 10.6.6.1 为什么需要轻量级实现?
 
 **问题**:
-- **vLLM代码规模**: 300k+行Python代码
+- **vLLM代码规模**: 数十万行量级
   - 新手学习曲线陡峭
   - 修改风险高(破坏隐式不变量)
   - 研究原型难以快速验证
 
-- **SGLang代码规模**: 300k行Python代码
+- **SGLang代码规模**: 数十万行量级
   - 功能完整,但复杂度高
   - 不适合教学场景
 
 **Mini-SGLang的答案**:
-- **仅5k行Python代码**(比vLLM简单60倍)
+- **更少的代码规模**(便于理解与改动)
 - **保留核心优化**:
   - Radix Attention (KV Cache复用)
   - Overlap Scheduling (CPU-GPU并行)
   - Chunked Prefill (内存控制)
   - Tensor Parallelism (分布式服务)
   - JIT CUDA kernels (FlashAttention-3, FlashInfer)
-- **性能相当**: 与完整SGLang接近
+- **性能表现**: 需基准测试验证
 
-#### 10.6.6.2 5k行代码实现的核心功能
+#### 10.6.6.2 轻量级实现的核心功能
 
 **代码结构**:
 ```
@@ -1563,7 +1555,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 ```python
 class RadixCache:
-    """5k行实现的Radix Tree"""
+    """轻量实现的Radix Tree"""
 
     def __init__(self):
         self.root = RadixNode()
@@ -1628,7 +1620,7 @@ class TensorParallelRunner:
 
 | 维度 | vLLM | Mini-SGLang |
 |------|------|-------------|
-| 代码行数 | 300k+ | 5k |
+| 代码行数 | 数十万行 | 数千行 |
 | 学习曲线 | 陡峭 | 平缓 |
 | 核心功能 | ✅ | ✅ |
 | 生产就绪 | ✅ | ❌ (教育/研究) |
@@ -1664,7 +1656,7 @@ class CostTracker:
 
     def __init__(self):
         self.requests = []
-        self.gpu_cost_per_hour = 3.0  # A100 $3/小时
+        self.gpu_cost_per_hour = 3.0  # 示例值,以实际报价为准
 
     def track_request(self,
                      request_id: str,
@@ -1746,16 +1738,16 @@ def calculate_roi(
         "annual_roi_percent": annual_roi
     }
 
-# 示例: 启用Prefix Caching的ROI
+# 示例: 启用Prefix Caching的ROI(示意)
 roi = calculate_roi(
-    optimization_cost=2000,  # 开发时间成本
-    before_cost_per_hour=10,  # 优化前
-    after_cost_per_hour=3,    # 优化后(70%节省)
+    optimization_cost=2000,  # 示例值
+    before_cost_per_hour=10,  # 示例值
+    after_cost_per_hour=3,    # 示例值
     hours_per_month=730
 )
 
 print(roi)
-# {'monthly_savings': 5110, 'payback_period_months': 0.39, 'annual_roi_percent': 2960%}
+# 输出为示例
 ```
 
 **ROI仪表盘**:
@@ -2517,15 +2509,12 @@ class ElasticRLScheduler:
 **实际情况**: 架构和优化比硬件更重要。
 
 ```
-场景1: 8个RTX 4090 vs 2个H100
-- RTX方案: 8×24GB=192GB, 带宽~8 TB/s
-- H100方案: 2×80GB=160GB, 带宽~6 TB/s
-- 结论: 取决于模型大小和通信开销
+场景1: 多卡中端 vs 少量高端
+- 结论: 取决于模型大小、通信开销与部署复杂度
 
 场景2: 优化前 vs 优化后
-- 优化前: 4个A100, 1000 tokens/s
-- 优化后(启用Prefix Caching): 2个A100, 1500 tokens/s
-- 结论: 优化比增加GPU更有效
+- 优化后通常可在更少资源下达到相似或更好效果
+- 结论: 优化往往比单纯增加GPU更有效
 ```
 
 ### ❌ "K8s能自动处理所有故障"
@@ -2647,8 +2636,8 @@ curl http://localhost:8000/v1/models
 
 验收:
 - Grafana显示实时指标
-- GPU利用率超过90%时告警
-- TTFT P95超过3秒时告警
+- GPU利用率超过阈值时告警
+- TTFT P95超过阈值时告警
 
 ---
 
@@ -2681,7 +2670,7 @@ curl http://localhost:8000/v1/models
 
 验收:
 - Training节点正常运行
-- Rollout服务响应<100ms
+- Rollout服务响应满足SLA
 - 模型reward收敛
 
 ---
