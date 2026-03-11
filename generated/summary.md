@@ -6,7 +6,7 @@
 - [前言：项目说明](/README)
 
 ## 第一部分：动机与路径篇（第1-2章）
-- [第1章 AI推理的文明级意义](/chapters/chapter01-introduction)
+- [第1章 AI推理的宏观意义](/chapters/chapter01-introduction)
 - [第2章：技术全景与趋势](/chapters/chapter02-technology-landscape)
 
 ## 第二部分：基础篇（第3-5章）

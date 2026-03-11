@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-11T00:25:58.934Z",
+  "generatedAt": "2026-03-11T00:28:21.556Z",
   "nodeCount": 104,
   "edgeCount": 364,
   "nodes": [
@@ -42,12 +42,12 @@
     },
     {
       "id": "chapters-chapter01-introduction",
-      "label": "第1章 AI推理的文明级意义",
+      "label": "第1章 AI推理的宏观意义",
       "type": "article",
       "file": "chapters/chapter01-introduction.md",
       "metadata": {
         "id": "chapters-chapter01-introduction",
-        "title": "第1章 AI推理的文明级意义",
+        "title": "第1章 AI推理的宏观意义",
         "slug": "chapters-chapter01-introduction",
         "date": "2026-03-11",
         "type": "article",
