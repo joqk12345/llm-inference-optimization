@@ -7,6 +7,8 @@
 ### arxiv.org
 
 - [第5章：LLM推理基础](/chapters/chapter05-llm-inference-basics) -> https://arxiv.org/abs/2309.06180
+- [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) -> https://arxiv.org/abs/2602.06036
+- [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) -> https://arxiv.org/html/2602.06036v1
 
 ### blog.vllm.ai
 
@@ -97,3 +99,5 @@
 - [SGLang INT4 QAT案例研究 - 端到端RL实践](/docs/cases/sglang-int4-qat-rl-analysis) => [第8章：量化技术](/chapters/chapter08-quantization)
 - [SGLang INT4 QAT案例研究 - 端到端RL实践](/docs/cases/sglang-int4-qat-rl-analysis) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
 - [LMSYS QAT案例研究 - 基于gpt-oss MXFP4](/docs/cases/lmsys-qat-mxfp4-analysis) => [第8章：量化技术](/chapters/chapter08-quantization)
+- [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) => [第9章：投机采样](/chapters/chapter09-speculative-sampling)
+- [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) => [第11章：高级话题](/chapters/chapter11-advanced-topics)

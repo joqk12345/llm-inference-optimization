@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-03-11T00:28:21.556Z",
-  "nodeCount": 104,
-  "edgeCount": 364,
+  "generatedAt": "2026-03-11T15:11:27.681Z",
+  "nodeCount": 107,
+  "edgeCount": 380,
   "nodes": [
     {
       "id": "readme",
@@ -400,7 +400,8 @@
         "related": [
           "chapters-chapter07-request-scheduling",
           "chapters-chapter08-quantization",
-          "chapters-chapter11-advanced-topics"
+          "chapters-chapter11-advanced-topics",
+          "docs-cases-dflash-block-diffusion-analysis"
         ],
         "references": [],
         "status": "published",
@@ -1158,6 +1159,46 @@
       }
     },
     {
+      "id": "docs-cases-dflash-block-diffusion-analysis",
+      "label": "DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding",
+      "type": "case-study",
+      "file": "docs/cases/dflash-block-diffusion-analysis.md",
+      "metadata": {
+        "id": "docs-cases-dflash-block-diffusion-analysis",
+        "title": "DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding",
+        "slug": "docs-cases-dflash-block-diffusion-analysis",
+        "date": "2026-03-11",
+        "type": "case-study",
+        "topics": [
+          "case-studies",
+          "speculative-decoding"
+        ],
+        "concepts": [
+          "speculative-decoding",
+          "throughput-engineering",
+          "latency-budget"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "optimization-techniques"
+        ],
+        "learning_stage": "core-techniques",
+        "optimization_axes": [
+          "latency",
+          "throughput",
+          "quality"
+        ],
+        "related": [
+          "chapters-chapter09-speculative-sampling",
+          "chapters-chapter11-advanced-topics"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 214,
+        "source_scope": "secondary"
+      }
+    },
+    {
       "id": "topic:llm-inference",
       "label": "llm-inference",
       "type": "topic"
@@ -1610,6 +1651,24 @@
       "metadata": {
         "url": "https://github.com/openai/gpt-oss",
         "domain": "github.com"
+      }
+    },
+    {
+      "id": "url:https://arxiv.org/abs/2602.06036",
+      "label": "arxiv.org",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://arxiv.org/abs/2602.06036",
+        "domain": "arxiv.org"
+      }
+    },
+    {
+      "id": "url:https://arxiv.org/html/2602.06036v1",
+      "label": "arxiv.org",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://arxiv.org/html/2602.06036v1",
+        "domain": "arxiv.org"
       }
     }
   ],
@@ -2202,6 +2261,11 @@
     {
       "source": "chapters-chapter09-speculative-sampling",
       "target": "chapters-chapter11-advanced-topics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "docs-cases-dflash-block-diffusion-analysis",
       "type": "related"
     },
     {
@@ -3362,6 +3426,81 @@
     {
       "source": "docs-cases-lmsys-qat-mxfp4-analysis",
       "target": "chapters-chapter08-quantization",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "topic:case-studies",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "topic:speculative-decoding",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "concept:speculative-decoding",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "concept:throughput-engineering",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "concept:latency-budget",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "chapters-chapter09-speculative-sampling",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "url:https://arxiv.org/abs/2602.06036",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "chapters-chapter09-speculative-sampling",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "chapters-chapter09-speculative-sampling",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "url:https://arxiv.org/html/2602.06036v1",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "chapters-chapter11-advanced-topics",
       "type": "extends"
     },
     {

@@ -23,6 +23,7 @@ related:
   - "chapters-chapter07-request-scheduling"
   - "chapters-chapter08-quantization"
   - "chapters-chapter11-advanced-topics"
+  - "docs-cases-dflash-block-diffusion-analysis"
 references: []
 status: "published"
 display_order: 10

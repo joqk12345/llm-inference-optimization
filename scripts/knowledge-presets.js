@@ -12,7 +12,8 @@ const SECONDARY_FILES = [
   'docs/cases/boaz-barak-ai-economics.md',
   'docs/cases/qingke-ai-infra-2025-analysis.md',
   'docs/cases/sglang-int4-qat-rl-analysis.md',
-  'docs/cases/lmsys-qat-mxfp4-analysis.md'
+  'docs/cases/lmsys-qat-mxfp4-analysis.md',
+  'docs/cases/dflash-block-diffusion-analysis.md'
 ];
 
 const PRESET_METADATA = {
@@ -114,7 +115,12 @@ const PRESET_METADATA = {
     architecture_layer: ['optimization-techniques'],
     learning_stage: 'core-techniques',
     optimization_axes: ['latency', 'throughput', 'quality'],
-    related: ['chapters-chapter07-request-scheduling', 'chapters-chapter08-quantization', 'chapters-chapter11-advanced-topics']
+    related: [
+      'chapters-chapter07-request-scheduling',
+      'chapters-chapter08-quantization',
+      'chapters-chapter11-advanced-topics',
+      'docs-cases-dflash-block-diffusion-analysis'
+    ]
   },
   'chapters/chapter10-production-deployment.md': {
     type: 'article',
@@ -305,6 +311,16 @@ const PRESET_METADATA = {
     learning_stage: 'core-techniques',
     optimization_axes: ['memory', 'cost', 'quality'],
     related: ['chapters-chapter08-quantization']
+  },
+  'docs/cases/dflash-block-diffusion-analysis.md': {
+    type: 'case-study',
+    topics: ['case-studies', 'speculative-decoding'],
+    concepts: ['speculative-decoding', 'throughput-engineering', 'latency-budget'],
+    tools: [],
+    architecture_layer: ['optimization-techniques'],
+    learning_stage: 'core-techniques',
+    optimization_axes: ['latency', 'throughput', 'quality'],
+    related: ['chapters-chapter09-speculative-sampling', 'chapters-chapter11-advanced-topics']
   }
 };
 
