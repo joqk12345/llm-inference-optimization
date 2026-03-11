@@ -15,7 +15,7 @@
 | `chapters/chapter06-kv-cache-optimization.md` | 35423 | 1394 | 25817 | 19972 | 4512 | 3991 |
 | `chapters/chapter07-request-scheduling.md` | 45293 | 1643 | 30798 | 22962 | 6520 | 3778 |
 | `chapters/chapter08-quantization.md` | 56118 | 2273 | 38012 | 29440 | 8332 | 5046 |
-| `chapters/chapter09-speculative-sampling.md` | 36461 | 1093 | 19334 | 15446 | 7127 | 2273 |
+| `chapters/chapter09-speculative-sampling.md` | 36510 | 1094 | 19383 | 15491 | 7127 | 2275 |
 | `chapters/chapter10-production-deployment.md` | 75095 | 2883 | 56151 | 41751 | 6903 | 5756 |
 | `chapters/chapter11-advanced-topics.md` | 51207 | 1956 | 35940 | 28803 | 7139 | 3912 |
-| **TOTAL** | 457901 | 16307 | 299971 | 234756 | 67013 | 36353 |
+| **TOTAL** | 457950 | 16308 | 300020 | 234801 | 67013 | 36355 |

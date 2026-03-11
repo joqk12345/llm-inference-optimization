@@ -74,12 +74,12 @@
     },
     {
       "file": "chapters/chapter09-speculative-sampling.md",
-      "bytes": 36461,
-      "lines": 1093,
-      "chars": 19334,
-      "non_ws": 15446,
+      "bytes": 36510,
+      "lines": 1094,
+      "chars": 19383,
+      "non_ws": 15491,
       "cjk": 7127,
-      "words": 2273
+      "words": 2275
     },
     {
       "file": "chapters/chapter10-production-deployment.md",
@@ -102,11 +102,11 @@
   ],
   "total": {
     "file": "TOTAL",
-    "bytes": 457901,
-    "lines": 16307,
-    "chars": 299971,
-    "non_ws": 234756,
+    "bytes": 457950,
+    "lines": 16308,
+    "chars": 300020,
+    "non_ws": 234801,
     "cjk": 67013,
-    "words": 36353
+    "words": 36355
   }
 }
