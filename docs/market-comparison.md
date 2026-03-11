@@ -1,3 +1,27 @@
+---
+id: "docs-market-comparison"
+title: "市场竞品对比分析"
+slug: "docs-market-comparison"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "market-analysis"
+concepts:
+  - "cost-optimization"
+tools: []
+architecture_layer:
+  - "motivation-and-economics"
+learning_stage: "orientation"
+optimization_axes:
+  - "cost"
+  - "quality"
+related:
+  - "readme"
+  - "chapters-chapter02-technology-landscape"
+references: []
+status: "published"
+display_order: 207
+---
 # 市场竞品对比分析
 
 **最后更新**: 2026-01-28

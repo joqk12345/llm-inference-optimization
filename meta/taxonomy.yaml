@@ -1,0 +1,64 @@
+types:
+  - article
+  - reference
+  - concept
+  - case-study
+
+topics:
+  - llm-inference
+  - inference-economics
+  - technology-trends
+  - gpu-architecture
+  - environment-setup
+  - inference-mechanics
+  - kv-cache
+  - request-scheduling
+  - quantization
+  - speculative-decoding
+  - production-deployment
+  - advanced-systems
+  - benchmarks-and-roi
+  - troubleshooting
+  - market-analysis
+  - reference-materials
+  - case-studies
+  - community
+
+concepts:
+  - memory-bandwidth
+  - kv-cache
+  - paged-attention
+  - prefix-caching
+  - continuous-batching
+  - prefill-decode-disaggregation
+  - quantization
+  - int4-qat
+  - precision-alignment
+  - speculative-decoding
+  - observability
+  - roi-monitoring
+  - cost-optimization
+  - latency-budget
+  - throughput-engineering
+  - agent-infrastructure
+  - heterogeneous-deployment
+  - moe-inference
+  - multimodal-inference
+
+tools:
+  - docker
+  - cuda
+  - vllm
+  - sglang
+  - kubernetes
+  - prometheus
+  - grafana
+  - modelopt
+  - huggingface
+  - triton
+  - torch-compile
+  - nsight-systems
+
+status:
+  - draft
+  - published

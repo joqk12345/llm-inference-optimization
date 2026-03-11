@@ -1,3 +1,32 @@
+---
+id: "docs-cases-lmsys-qat-mxfp4-analysis"
+title: "LMSYS QAT案例研究 - 基于gpt-oss MXFP4"
+slug: "docs-cases-lmsys-qat-mxfp4-analysis"
+date: "2026-03-11"
+type: "case-study"
+topics:
+  - "case-studies"
+  - "quantization"
+concepts:
+  - "quantization"
+  - "int4-qat"
+  - "precision-alignment"
+tools:
+  - "modelopt"
+  - "sglang"
+architecture_layer:
+  - "optimization-techniques"
+learning_stage: "core-techniques"
+optimization_axes:
+  - "memory"
+  - "cost"
+  - "quality"
+related:
+  - "chapters-chapter08-quantization"
+references: []
+status: "published"
+display_order: 213
+---
 # LMSYS QAT案例研究 - 基于gpt-oss MXFP4
 
 **来源**: https://lmsys.org/blog/2025-08-28-gpt-oss-qat/

@@ -1,0 +1,11 @@
+stages:
+  - name: orientation
+    description: Build motivation, terminology, and decision context.
+  - name: foundations
+    description: Understand hardware, runtime, and inference mechanics.
+  - name: core-techniques
+    description: Learn the main optimization levers used in production systems.
+  - name: production
+    description: Turn techniques into operable production infrastructure.
+  - name: advanced
+    description: Explore frontier system patterns and emerging deployment models.

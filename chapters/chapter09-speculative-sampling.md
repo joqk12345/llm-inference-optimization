@@ -1,3 +1,33 @@
+---
+id: "chapters-chapter09-speculative-sampling"
+title: "第9章：投机采样"
+slug: "chapters-chapter09-speculative-sampling"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "speculative-decoding"
+concepts:
+  - "speculative-decoding"
+  - "latency-budget"
+tools:
+  - "vllm"
+  - "sglang"
+architecture_layer:
+  - "optimization-techniques"
+learning_stage: "core-techniques"
+optimization_axes:
+  - "latency"
+  - "throughput"
+  - "quality"
+related:
+  - "chapters-chapter07-request-scheduling"
+  - "chapters-chapter08-quantization"
+  - "chapters-chapter11-advanced-topics"
+  - "docs-cases-dflash-block-diffusion-analysis"
+references: []
+status: "published"
+display_order: 10
+---
 # 第9章：投机采样
 
 > **💰 成本影响**（常见量级，强依赖草稿模型质量/接受率/实现与工作负载）

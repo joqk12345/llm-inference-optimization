@@ -1,3 +1,26 @@
+---
+id: "docs-refs"
+title: "参考资料汇总"
+slug: "docs-refs"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "reference-materials"
+concepts: []
+tools: []
+architecture_layer:
+  - "frontier-and-ecosystem"
+learning_stage: "advanced"
+optimization_axes:
+  - "operability"
+  - "quality"
+related:
+  - "appendix-a-tools-resources"
+  - "chapters-chapter10-production-deployment"
+references: []
+status: "published"
+display_order: 203
+---
 # 参考资料汇总
 
 > 本文档记录《LLM推理优化实战》一书编写过程中引用的所有参考资料。
@@ -88,6 +111,16 @@
 - **Eagle Series**
   - 引用章节：9.3.4
   - 核心内容：Eagle, Eagle 2, Eagle 3投机采样
+
+- **DFlash: Transformer can be a Good Conditional Diffusion Denoiser for Fast Speculative Decoding**
+  - 作者：Yuejiao Chen, Ziyan Jiang, Cheng Hou, Kai Zhang, Jiajie Jin, Huan Peng, Jiashu Miao, An Yang, Haitao Mi
+  - 发布日期：2026年2月5日
+  - 核心内容：
+    - 用 block diffusion drafter 替代传统自回归 drafter
+    - 在 OPT-6.7B / Llama-2-7B 上实现约 1.99x / 2.14x 端到端加速
+    - 平均比 EAGLE-3 再快约 20.1%
+  - 引用章节：9.3, 9.7, 11.9
+  - URL: https://arxiv.org/abs/2602.06036
 
 - **vLLM Speculators v0.3.0**
   - 引用章节：9.7.7

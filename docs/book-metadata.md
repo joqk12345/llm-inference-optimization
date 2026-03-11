@@ -1,3 +1,29 @@
+---
+id: "docs-book-metadata"
+title: "书籍元数据"
+slug: "docs-book-metadata"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "reference-materials"
+  - "market-analysis"
+concepts:
+  - "cost-optimization"
+tools: []
+architecture_layer:
+  - "motivation-and-economics"
+learning_stage: "orientation"
+optimization_axes:
+  - "cost"
+  - "operability"
+related:
+  - "readme"
+  - "chapters-chapter01-introduction"
+  - "chapters-chapter02-technology-landscape"
+references: []
+status: "published"
+display_order: 200
+---
 # 书籍元数据
 
 **最后更新**: 2026-01-28

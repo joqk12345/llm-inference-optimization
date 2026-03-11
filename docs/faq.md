@@ -1,3 +1,29 @@
+---
+id: "docs-faq"
+title: "Frequently Asked Questions"
+slug: "docs-faq"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "community"
+  - "reference-materials"
+concepts: []
+tools:
+  - "vllm"
+  - "docker"
+architecture_layer:
+  - "production-systems"
+learning_stage: "orientation"
+optimization_axes:
+  - "operability"
+related:
+  - "readme"
+  - "chapters-chapter04-environment-setup"
+  - "appendix-b-troubleshooting"
+references: []
+status: "published"
+display_order: 202
+---
 # Frequently Asked Questions
 
 ## General Questions

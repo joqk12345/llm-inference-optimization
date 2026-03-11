@@ -1,3 +1,36 @@
+---
+id: "chapters-chapter11-advanced-topics"
+title: "第11章：高级话题"
+slug: "chapters-chapter11-advanced-topics"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "advanced-systems"
+concepts:
+  - "agent-infrastructure"
+  - "heterogeneous-deployment"
+  - "moe-inference"
+  - "multimodal-inference"
+tools:
+  - "vllm"
+  - "triton"
+  - "torch-compile"
+architecture_layer:
+  - "frontier-and-ecosystem"
+learning_stage: "advanced"
+optimization_axes:
+  - "operability"
+  - "quality"
+  - "latency"
+  - "throughput"
+related:
+  - "chapters-chapter10-production-deployment"
+  - "chapters-chapter08-quantization"
+  - "chapters-chapter09-speculative-sampling"
+references: []
+status: "published"
+display_order: 12
+---
 # 第11章：高级话题
 
 > "唯一不变的是变化本身,而技术栈的深度让变化加速。" - 佚名

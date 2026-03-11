@@ -1,3 +1,28 @@
+---
+id: "readme"
+title: "LLM推理性能优化"
+slug: "readme"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "llm-inference"
+  - "inference-economics"
+concepts:
+  - "cost-optimization"
+tools: []
+architecture_layer:
+  - "motivation-and-economics"
+learning_stage: "orientation"
+optimization_axes:
+  - "cost"
+  - "latency"
+related:
+  - "chapters-chapter01-introduction"
+  - "chapters-chapter02-technology-landscape"
+references: []
+status: "published"
+display_order: 1
+---
 # LLM推理性能优化
 
 > 从原理到生产环境的性能优化实战

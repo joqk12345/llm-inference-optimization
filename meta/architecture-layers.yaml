@@ -1,0 +1,13 @@
+layers:
+  - name: motivation-and-economics
+    description: Why inference optimization matters and how it changes business and adoption curves.
+  - name: hardware-and-runtime
+    description: GPU fundamentals, runtime environment, and deployment prerequisites.
+  - name: inference-mechanics
+    description: Core mechanics of token generation, attention, and runtime memory behavior.
+  - name: optimization-techniques
+    description: Direct optimization levers for latency, throughput, memory, and quality.
+  - name: production-systems
+    description: Reliability, observability, operations, and production rollout patterns.
+  - name: frontier-and-ecosystem
+    description: Emerging architectures, ecosystem shifts, and forward-looking system design.

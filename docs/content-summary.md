@@ -1,10 +1,33 @@
+---
+id: "docs-content-summary"
+title: "内容摘要"
+slug: "docs-content-summary"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "reference-materials"
+concepts:
+  - "cost-optimization"
+tools: []
+architecture_layer:
+  - "motivation-and-economics"
+learning_stage: "orientation"
+optimization_axes:
+  - "cost"
+related:
+  - "readme"
+  - "chapters-chapter01-introduction"
+references: []
+status: "published"
+display_order: 201
+---
 # 内容摘要
 
 ---
 
 ## 📖 内容概述
 
-本书系统性地介绍大语言模型（LLM）推理优化的完整技术栈，从基础原理到生产部署，为工程师提供一条清晰的学习路径。全书分为四大部分：**动机与路径篇**（第1-2章）建立优化动机和技术全景，通过震撼数据（50,000倍效率革命）和真实案例（Toast 100倍ROI）说明推理优化的商业价值，并展望2025年五大技术趋势（DeepSeek V3、PD分离、RL Info、Agent爆发、从SPMD到MPMD）；**基础篇**（第3-4章）深入GPU架构原理（CPU vs GPU本质差异、显存计算公式、性能瓶颈诊断）和环境搭建（Docker、vLLM、CUDA配置），为后续技术学习打下坚实基础；**核心技术篇**（第5-8章）详细讲解四大优化技术：KV Cache优化（从Transformer原理到多版本实现）、请求调度策略（从Continuous Batching到Prefill-Decode分离）、量化技术（从PTQ到INT4 QAT实战，~1TB模型压缩到单H200）、投机采样（从原理到Eagle 3实战），每项技术都配备可运行的代码示例和性能benchmark；**生产部署篇**（第9-10章）覆盖生产级部署的完整体系，包括Kubernetes部署、监控与可观测性、成本优化与ROI监控、RL系统部署、Agent基础设施、异构硬件部署（H100+H200）等前沿话题。全书共10章、约160节、420小节，预计35,000-45,000字，形成从原理理解到实战落地的完整知识闭环。
+本书系统性地介绍大语言模型（LLM）推理优化的完整技术栈，从基础原理到生产部署，为工程师提供一条清晰的学习路径。全书分为四大部分：**动机与路径篇**（第1-2章）建立优化动机和技术全景，通过震撼数据（50,000倍效率革命）和真实案例（Toast 100倍ROI）说明推理优化的商业价值，并展望2025年五大技术趋势（DeepSeek V3、PD分离、RL Info、Agent爆发、从SPMD到MPMD）；**基础篇**（第3-4章）深入GPU架构原理（CPU vs GPU本质差异、显存计算公式、性能瓶颈诊断）和环境搭建（Docker、vLLM、CUDA配置），为后续技术学习打下坚实基础；**核心技术篇**（第5-8章）详细讲解四大优化技术：KV Cache优化（从Transformer原理到多版本实现）、请求调度策略（从Continuous Batching到Prefill-Decode分离）、量化技术（从PTQ到INT4 QAT实战，~1TB模型压缩到单H200）、投机采样（从原理到 Eagle 3 与 DFlash block diffusion 案例），每项技术都配备可运行的代码示例和性能benchmark；**生产部署篇**（第9-10章）覆盖生产级部署的完整体系，包括Kubernetes部署、监控与可观测性、成本优化与ROI监控、RL系统部署、Agent基础设施、异构硬件部署（H100+H200）等前沿话题。全书共10章、约160节、420小节，预计35,000-45,000字，形成从原理理解到实战落地的完整知识闭环。
 
 ## ✨ 内容特色
 

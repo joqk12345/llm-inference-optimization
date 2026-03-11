@@ -1,0 +1,92 @@
+[
+  {
+    "text": "前言",
+    "items": [
+      {
+        "text": "前言：项目说明",
+        "link": "/README"
+      }
+    ]
+  },
+  {
+    "text": "第一部分：动机与路径篇（第1-2章）",
+    "items": [
+      {
+        "text": "第1章 AI推理的宏观意义",
+        "link": "/chapters/chapter01-introduction"
+      },
+      {
+        "text": "第2章：技术全景与趋势",
+        "link": "/chapters/chapter02-technology-landscape"
+      }
+    ]
+  },
+  {
+    "text": "第二部分：基础篇（第3-5章）",
+    "items": [
+      {
+        "text": "第3章：GPU基础",
+        "link": "/chapters/chapter03-gpu-basics"
+      },
+      {
+        "text": "第4章：环境搭建",
+        "link": "/chapters/chapter04-environment-setup"
+      },
+      {
+        "text": "第5章：LLM推理基础",
+        "link": "/chapters/chapter05-llm-inference-basics"
+      }
+    ]
+  },
+  {
+    "text": "第三部分：核心技术篇（第6-9章）",
+    "items": [
+      {
+        "text": "第6章：KV Cache 优化",
+        "link": "/chapters/chapter06-kv-cache-optimization"
+      },
+      {
+        "text": "第7章：请求调度策略",
+        "link": "/chapters/chapter07-request-scheduling"
+      },
+      {
+        "text": "第8章：量化技术",
+        "link": "/chapters/chapter08-quantization"
+      },
+      {
+        "text": "第9章：投机采样",
+        "link": "/chapters/chapter09-speculative-sampling"
+      }
+    ]
+  },
+  {
+    "text": "第四部分：生产与进阶篇（第10-11章）",
+    "items": [
+      {
+        "text": "第10章：生产环境部署",
+        "link": "/chapters/chapter10-production-deployment"
+      },
+      {
+        "text": "第11章：高级话题",
+        "link": "/chapters/chapter11-advanced-topics"
+      }
+    ]
+  },
+  {
+    "text": "附录",
+    "items": [
+      {
+        "text": "附录A: 工具与资源",
+        "link": "/appendix-a-tools-resources"
+      },
+      {
+        "text": "附录B: 故障排查指南",
+        "link": "/appendix-b-troubleshooting"
+      },
+      {
+        "text": "附录C: 性能基准测试与ROI案例",
+        "link": "/appendix-c-benchmarks-roi"
+      }
+    ]
+  }
+]

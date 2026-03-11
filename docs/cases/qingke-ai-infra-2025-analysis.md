@@ -1,3 +1,36 @@
+---
+id: "docs-cases-qingke-ai-infra-2025-analysis"
+title: "2025\"青稞\"AI嘉年华 - Infra专题研讨会核心内容分析"
+slug: "docs-cases-qingke-ai-infra-2025-analysis"
+date: "2026-03-11"
+type: "case-study"
+topics:
+  - "case-studies"
+  - "advanced-systems"
+  - "production-deployment"
+concepts:
+  - "prefill-decode-disaggregation"
+  - "agent-infrastructure"
+  - "heterogeneous-deployment"
+tools:
+  - "vllm"
+  - "sglang"
+  - "kubernetes"
+architecture_layer:
+  - "frontier-and-ecosystem"
+learning_stage: "advanced"
+optimization_axes:
+  - "throughput"
+  - "operability"
+  - "cost"
+related:
+  - "chapters-chapter07-request-scheduling"
+  - "chapters-chapter10-production-deployment"
+  - "chapters-chapter11-advanced-topics"
+references: []
+status: "published"
+display_order: 211
+---
 # 2025"青稞"AI嘉年华 - Infra专题研讨会核心内容分析
 
 **来源**: 2025年"青稞"AI嘉年华基础设施专题研讨会嘉宾发言逐字稿

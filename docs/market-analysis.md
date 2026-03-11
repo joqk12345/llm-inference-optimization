@@ -1,3 +1,28 @@
+---
+id: "docs-market-analysis"
+title: "市场需求与发展趋势"
+slug: "docs-market-analysis"
+date: "2026-03-11"
+type: "case-study"
+topics:
+  - "market-analysis"
+concepts:
+  - "cost-optimization"
+  - "roi-monitoring"
+tools: []
+architecture_layer:
+  - "motivation-and-economics"
+learning_stage: "orientation"
+optimization_axes:
+  - "cost"
+related:
+  - "readme"
+  - "chapters-chapter01-introduction"
+  - "chapters-chapter10-production-deployment"
+references: []
+status: "published"
+display_order: 206
+---
 # 市场需求与发展趋势
 
 **最后更新**: 2026-01-28

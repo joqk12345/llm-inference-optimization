@@ -1,3 +1,33 @@
+---
+id: "chapters-chapter07-request-scheduling"
+title: "第7章：请求调度策略"
+slug: "chapters-chapter07-request-scheduling"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "request-scheduling"
+concepts:
+  - "continuous-batching"
+  - "prefill-decode-disaggregation"
+  - "throughput-engineering"
+tools:
+  - "vllm"
+  - "sglang"
+architecture_layer:
+  - "optimization-techniques"
+learning_stage: "core-techniques"
+optimization_axes:
+  - "throughput"
+  - "latency"
+  - "operability"
+related:
+  - "chapters-chapter05-llm-inference-basics"
+  - "chapters-chapter06-kv-cache-optimization"
+  - "chapters-chapter10-production-deployment"
+references: []
+status: "published"
+display_order: 8
+---
 # 第7章：请求调度策略
 
 > **💰 成本影响**（常见量级，强依赖流量分布/上下文长度/实现细节）

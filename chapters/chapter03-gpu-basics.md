@@ -1,3 +1,29 @@
+---
+id: "chapters-chapter03-gpu-basics"
+title: "第3章：GPU基础"
+slug: "chapters-chapter03-gpu-basics"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "gpu-architecture"
+concepts:
+  - "memory-bandwidth"
+  - "throughput-engineering"
+tools: []
+architecture_layer:
+  - "hardware-and-runtime"
+learning_stage: "foundations"
+optimization_axes:
+  - "throughput"
+  - "memory"
+  - "latency"
+related:
+  - "chapters-chapter04-environment-setup"
+  - "chapters-chapter05-llm-inference-basics"
+references: []
+status: "published"
+display_order: 4
+---
 # 第3章：GPU基础
 
 > **💰 商业动机**：推理成本的第一性约束来自硬件。相同模型与相同框架下，硬件选型与配置不当，推理成本和尾延迟常常会被放大到 3-5 倍。理解 GPU 的瓶颈（算力 vs 带宽 vs 显存）是后续所有优化（KV、调度、量化、投机采样、PD 分离）的基础。

@@ -1,3 +1,29 @@
+---
+id: "chapters-chapter02-technology-landscape"
+title: "第2章：技术全景与趋势"
+slug: "chapters-chapter02-technology-landscape"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "llm-inference"
+  - "technology-trends"
+concepts:
+  - "cost-optimization"
+tools: []
+architecture_layer:
+  - "motivation-and-economics"
+learning_stage: "orientation"
+optimization_axes:
+  - "cost"
+  - "operability"
+related:
+  - "chapters-chapter01-introduction"
+  - "chapters-chapter10-production-deployment"
+  - "chapters-chapter11-advanced-topics"
+references: []
+status: "published"
+display_order: 3
+---
 # 第2章：技术全景与趋势
 
 > **💰 商业动机**：技术全景决定选型质量。选错架构，往往不是“慢一点”，而是后续需要推倒重来，浪费数月时间和数十万美元成本。更现实的是：当推理变成核心成本项时，技术路线会直接影响定价、毛利和增长速度。
