@@ -3,7 +3,7 @@ name: pages
 on:
   push:
     branches:
-      - main
+      - "**"
   workflow_dispatch:
 
 permissions:
@@ -43,6 +43,7 @@ jobs:
           path: .vitepress/dist
 
   deploy:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
