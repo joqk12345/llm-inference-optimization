@@ -1,3 +1,31 @@
+---
+id: "appendix-c-benchmarks-roi"
+title: "附录C: 性能基准测试与ROI案例"
+slug: "appendix-c-benchmarks-roi"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "benchmarks-and-roi"
+concepts:
+  - "roi-monitoring"
+  - "cost-optimization"
+  - "throughput-engineering"
+tools: []
+architecture_layer:
+  - "production-systems"
+learning_stage: "production"
+optimization_axes:
+  - "cost"
+  - "latency"
+  - "throughput"
+  - "quality"
+related:
+  - "chapters-chapter01-introduction"
+  - "chapters-chapter10-production-deployment"
+references: []
+status: "published"
+display_order: 15
+---
 # 附录C: 性能基准测试与ROI案例
 
 > "没有度量,就没有优化。" - Peter Drucker

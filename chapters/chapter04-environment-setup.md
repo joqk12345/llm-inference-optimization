@@ -1,3 +1,30 @@
+---
+id: "chapters-chapter04-environment-setup"
+title: "第4章：环境搭建"
+slug: "chapters-chapter04-environment-setup"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "environment-setup"
+concepts: []
+tools:
+  - "docker"
+  - "cuda"
+  - "vllm"
+architecture_layer:
+  - "hardware-and-runtime"
+learning_stage: "foundations"
+optimization_axes:
+  - "operability"
+  - "latency"
+related:
+  - "chapters-chapter03-gpu-basics"
+  - "chapters-chapter05-llm-inference-basics"
+  - "appendix-b-troubleshooting"
+references: []
+status: "published"
+display_order: 5
+---
 # 第4章：环境搭建
 
 > **💰 商业动机**：环境问题是最“无聊”但也最昂贵的推理成本。环境不当导致的故障，往往会把一次部署变成 4-8 小时的排查；而可复现的环境与清晰的排障路径，通常能把问题压缩到 30 分钟内定位并解决。

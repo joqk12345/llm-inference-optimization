@@ -1,3 +1,26 @@
+---
+id: "docs-content-summary"
+title: "内容摘要"
+slug: "docs-content-summary"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "reference-materials"
+concepts:
+  - "cost-optimization"
+tools: []
+architecture_layer:
+  - "motivation-and-economics"
+learning_stage: "orientation"
+optimization_axes:
+  - "cost"
+related:
+  - "readme"
+  - "chapters-chapter01-introduction"
+references: []
+status: "published"
+display_order: 201
+---
 # 内容摘要
 
 ---

@@ -1,3 +1,31 @@
+---
+id: "chapters-chapter05-llm-inference-basics"
+title: "第5章：LLM推理基础"
+slug: "chapters-chapter05-llm-inference-basics"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "inference-mechanics"
+concepts:
+  - "kv-cache"
+  - "paged-attention"
+  - "continuous-batching"
+tools:
+  - "vllm"
+architecture_layer:
+  - "inference-mechanics"
+learning_stage: "foundations"
+optimization_axes:
+  - "latency"
+  - "throughput"
+  - "memory"
+related:
+  - "chapters-chapter06-kv-cache-optimization"
+  - "chapters-chapter07-request-scheduling"
+references: []
+status: "published"
+display_order: 6
+---
 # 第5章：LLM推理基础
 
 >  教学理念 (参考: Hugging Face "Continuous batching from first principles"、Hamza Elshafie "Paged Attention from First Principles")

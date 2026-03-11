@@ -1,3 +1,27 @@
+---
+id: "docs-topic-background"
+title: "选题背景与特色"
+slug: "docs-topic-background"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "market-analysis"
+concepts:
+  - "cost-optimization"
+tools: []
+architecture_layer:
+  - "motivation-and-economics"
+learning_stage: "orientation"
+optimization_axes:
+  - "cost"
+related:
+  - "readme"
+  - "chapters-chapter01-introduction"
+  - "chapters-chapter02-technology-landscape"
+references: []
+status: "published"
+display_order: 205
+---
 # 选题背景与特色
 
 **最后更新**: 2026-01-28

@@ -1,3 +1,32 @@
+---
+id: "docs-keywords"
+title: "关键词"
+slug: "docs-keywords"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "reference-materials"
+concepts:
+  - "kv-cache"
+  - "continuous-batching"
+  - "quantization"
+  - "speculative-decoding"
+tools: []
+architecture_layer:
+  - "inference-mechanics"
+learning_stage: "foundations"
+optimization_axes:
+  - "quality"
+related:
+  - "chapters-chapter05-llm-inference-basics"
+  - "chapters-chapter06-kv-cache-optimization"
+  - "chapters-chapter07-request-scheduling"
+  - "chapters-chapter08-quantization"
+  - "chapters-chapter09-speculative-sampling"
+references: []
+status: "published"
+display_order: 204
+---
 # 关键词
 
 **最后更新**: 2026-01-28

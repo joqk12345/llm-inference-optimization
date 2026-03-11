@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Book Craft Knowledge Metadata",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "slug",
+    "date",
+    "type",
+    "topics",
+    "concepts",
+    "tools",
+    "architecture_layer",
+    "learning_stage",
+    "optimization_axes",
+    "related",
+    "references",
+    "status",
+    "display_order"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "slug": { "type": "string", "pattern": "^[a-z0-9\\-]+$" },
+    "date": { "type": "string", "format": "date" },
+    "type": {
+      "type": "string",
+      "enum": ["article", "reference", "concept", "case-study"]
+    },
+    "topics": { "type": "array", "items": { "type": "string" } },
+    "concepts": { "type": "array", "items": { "type": "string" } },
+    "tools": { "type": "array", "items": { "type": "string" } },
+    "architecture_layer": { "type": "array", "items": { "type": "string" } },
+    "learning_stage": { "type": "string" },
+    "optimization_axes": { "type": "array", "items": { "type": "string" } },
+    "related": { "type": "array", "items": { "type": "string" } },
+    "references": { "type": "array", "items": { "type": "string" } },
+    "status": { "type": "string", "enum": ["draft", "published"] },
+    "display_order": { "type": "number" }
+  },
+  "additionalProperties": true
+}

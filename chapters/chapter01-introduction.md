@@ -1,3 +1,30 @@
+---
+id: "chapters-chapter01-introduction"
+title: "第1章 AI推理的宏观意义"
+slug: "chapters-chapter01-introduction"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "llm-inference"
+  - "inference-economics"
+concepts:
+  - "cost-optimization"
+  - "latency-budget"
+tools: []
+architecture_layer:
+  - "motivation-and-economics"
+learning_stage: "orientation"
+optimization_axes:
+  - "cost"
+  - "latency"
+related:
+  - "readme"
+  - "chapters-chapter02-technology-landscape"
+  - "appendix-c-benchmarks-roi"
+references: []
+status: "published"
+display_order: 2
+---
 # 第1章 AI推理的宏观意义
 
 > **核心观点**：训练决定模型“能做什么”，推理决定这种能力“能被多少人、以多低成本、在多稳定的体验下”真正用起来。推理优化不是让模型快一点的工程细节，而是把智能从稀缺资源变成基础设施的关键路径。

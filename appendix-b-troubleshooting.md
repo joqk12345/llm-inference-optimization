@@ -1,3 +1,33 @@
+---
+id: "appendix-b-troubleshooting"
+title: "附录B: 故障排查指南"
+slug: "appendix-b-troubleshooting"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "troubleshooting"
+concepts:
+  - "observability"
+  - "latency-budget"
+tools:
+  - "vllm"
+  - "nsight-systems"
+architecture_layer:
+  - "production-systems"
+learning_stage: "production"
+optimization_axes:
+  - "operability"
+  - "latency"
+  - "memory"
+  - "throughput"
+related:
+  - "chapters-chapter04-environment-setup"
+  - "chapters-chapter07-request-scheduling"
+  - "chapters-chapter10-production-deployment"
+references: []
+status: "published"
+display_order: 14
+---
 # 附录B: 故障排查指南
 
 > "当所有方法都失效时,请阅读手册。" - 佚名

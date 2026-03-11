@@ -1,3 +1,26 @@
+---
+id: "docs-refs"
+title: "参考资料汇总"
+slug: "docs-refs"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "reference-materials"
+concepts: []
+tools: []
+architecture_layer:
+  - "frontier-and-ecosystem"
+learning_stage: "advanced"
+optimization_axes:
+  - "operability"
+  - "quality"
+related:
+  - "appendix-a-tools-resources"
+  - "chapters-chapter10-production-deployment"
+references: []
+status: "published"
+display_order: 203
+---
 # 参考资料汇总
 
 > 本文档记录《LLM推理优化实战》一书编写过程中引用的所有参考资料。

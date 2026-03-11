@@ -1,3 +1,36 @@
+---
+id: "chapters-chapter10-production-deployment"
+title: "第10章：生产环境部署"
+slug: "chapters-chapter10-production-deployment"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "production-deployment"
+concepts:
+  - "observability"
+  - "roi-monitoring"
+  - "cost-optimization"
+tools:
+  - "kubernetes"
+  - "prometheus"
+  - "grafana"
+architecture_layer:
+  - "production-systems"
+learning_stage: "production"
+optimization_axes:
+  - "operability"
+  - "cost"
+  - "latency"
+  - "throughput"
+related:
+  - "chapters-chapter07-request-scheduling"
+  - "chapters-chapter11-advanced-topics"
+  - "appendix-b-troubleshooting"
+  - "appendix-c-benchmarks-roi"
+references: []
+status: "published"
+display_order: 11
+---
 # 第10章：生产环境部署
 
 > "在开发环境能运行是运气,在生产环境稳定运行才是本事。" - 佚名

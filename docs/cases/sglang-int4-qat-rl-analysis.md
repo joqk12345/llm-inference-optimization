@@ -1,3 +1,33 @@
+---
+id: "docs-cases-sglang-int4-qat-rl-analysis"
+title: "SGLang INT4 QAT案例研究 - 端到端RL实践"
+slug: "docs-cases-sglang-int4-qat-rl-analysis"
+date: "2026-03-11"
+type: "case-study"
+topics:
+  - "case-studies"
+  - "quantization"
+concepts:
+  - "quantization"
+  - "int4-qat"
+  - "precision-alignment"
+tools:
+  - "sglang"
+  - "modelopt"
+architecture_layer:
+  - "optimization-techniques"
+learning_stage: "core-techniques"
+optimization_axes:
+  - "memory"
+  - "cost"
+  - "quality"
+related:
+  - "chapters-chapter08-quantization"
+  - "chapters-chapter10-production-deployment"
+references: []
+status: "published"
+display_order: 212
+---
 # SGLang INT4 QAT案例研究 - 端到端RL实践
 
 **来源**: SGLang RL Team, InfiXAI Team, Ant Group, slime Team, RadixArk Team

@@ -1,3 +1,27 @@
+---
+id: "docs-cases-boaz-barak-ai-economics"
+title: "第1章补充案例 - 非经济学家对AI和经济学的思考"
+slug: "docs-cases-boaz-barak-ai-economics"
+date: "2026-03-11"
+type: "case-study"
+topics:
+  - "case-studies"
+  - "inference-economics"
+concepts:
+  - "cost-optimization"
+tools: []
+architecture_layer:
+  - "motivation-and-economics"
+learning_stage: "orientation"
+optimization_axes:
+  - "cost"
+related:
+  - "chapters-chapter01-introduction"
+  - "chapters-chapter02-technology-landscape"
+references: []
+status: "published"
+display_order: 210
+---
 # 第1章补充案例 - 非经济学家对AI和经济学的思考
 
 **来源**：Boaz Barak (Windows on Theory)

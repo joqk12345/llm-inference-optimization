@@ -1,0 +1,3438 @@
+{
+  "generatedAt": "2026-03-11T00:25:58.934Z",
+  "nodeCount": 104,
+  "edgeCount": 364,
+  "nodes": [
+    {
+      "id": "readme",
+      "label": "LLM推理性能优化",
+      "type": "article",
+      "file": "README.md",
+      "metadata": {
+        "id": "readme",
+        "title": "LLM推理性能优化",
+        "slug": "readme",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "llm-inference",
+          "inference-economics"
+        ],
+        "concepts": [
+          "cost-optimization"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "motivation-and-economics"
+        ],
+        "learning_stage": "orientation",
+        "optimization_axes": [
+          "cost",
+          "latency"
+        ],
+        "related": [
+          "chapters-chapter01-introduction",
+          "chapters-chapter02-technology-landscape"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 1,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter01-introduction",
+      "label": "第1章 AI推理的文明级意义",
+      "type": "article",
+      "file": "chapters/chapter01-introduction.md",
+      "metadata": {
+        "id": "chapters-chapter01-introduction",
+        "title": "第1章 AI推理的文明级意义",
+        "slug": "chapters-chapter01-introduction",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "llm-inference",
+          "inference-economics"
+        ],
+        "concepts": [
+          "cost-optimization",
+          "latency-budget"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "motivation-and-economics"
+        ],
+        "learning_stage": "orientation",
+        "optimization_axes": [
+          "cost",
+          "latency"
+        ],
+        "related": [
+          "readme",
+          "chapters-chapter02-technology-landscape",
+          "appendix-c-benchmarks-roi"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 2,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter02-technology-landscape",
+      "label": "第2章：技术全景与趋势",
+      "type": "article",
+      "file": "chapters/chapter02-technology-landscape.md",
+      "metadata": {
+        "id": "chapters-chapter02-technology-landscape",
+        "title": "第2章：技术全景与趋势",
+        "slug": "chapters-chapter02-technology-landscape",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "llm-inference",
+          "technology-trends"
+        ],
+        "concepts": [
+          "cost-optimization"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "motivation-and-economics"
+        ],
+        "learning_stage": "orientation",
+        "optimization_axes": [
+          "cost",
+          "operability"
+        ],
+        "related": [
+          "chapters-chapter01-introduction",
+          "chapters-chapter10-production-deployment",
+          "chapters-chapter11-advanced-topics"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 3,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter03-gpu-basics",
+      "label": "第3章：GPU基础",
+      "type": "article",
+      "file": "chapters/chapter03-gpu-basics.md",
+      "metadata": {
+        "id": "chapters-chapter03-gpu-basics",
+        "title": "第3章：GPU基础",
+        "slug": "chapters-chapter03-gpu-basics",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "gpu-architecture"
+        ],
+        "concepts": [
+          "memory-bandwidth",
+          "throughput-engineering"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "hardware-and-runtime"
+        ],
+        "learning_stage": "foundations",
+        "optimization_axes": [
+          "throughput",
+          "memory",
+          "latency"
+        ],
+        "related": [
+          "chapters-chapter04-environment-setup",
+          "chapters-chapter05-llm-inference-basics"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 4,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter04-environment-setup",
+      "label": "第4章：环境搭建",
+      "type": "article",
+      "file": "chapters/chapter04-environment-setup.md",
+      "metadata": {
+        "id": "chapters-chapter04-environment-setup",
+        "title": "第4章：环境搭建",
+        "slug": "chapters-chapter04-environment-setup",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "environment-setup"
+        ],
+        "concepts": [],
+        "tools": [
+          "docker",
+          "cuda",
+          "vllm"
+        ],
+        "architecture_layer": [
+          "hardware-and-runtime"
+        ],
+        "learning_stage": "foundations",
+        "optimization_axes": [
+          "operability",
+          "latency"
+        ],
+        "related": [
+          "chapters-chapter03-gpu-basics",
+          "chapters-chapter05-llm-inference-basics",
+          "appendix-b-troubleshooting"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 5,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter05-llm-inference-basics",
+      "label": "第5章：LLM推理基础",
+      "type": "article",
+      "file": "chapters/chapter05-llm-inference-basics.md",
+      "metadata": {
+        "id": "chapters-chapter05-llm-inference-basics",
+        "title": "第5章：LLM推理基础",
+        "slug": "chapters-chapter05-llm-inference-basics",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "inference-mechanics"
+        ],
+        "concepts": [
+          "kv-cache",
+          "paged-attention",
+          "continuous-batching"
+        ],
+        "tools": [
+          "vllm"
+        ],
+        "architecture_layer": [
+          "inference-mechanics"
+        ],
+        "learning_stage": "foundations",
+        "optimization_axes": [
+          "latency",
+          "throughput",
+          "memory"
+        ],
+        "related": [
+          "chapters-chapter06-kv-cache-optimization",
+          "chapters-chapter07-request-scheduling"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 6,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter06-kv-cache-optimization",
+      "label": "第6章：KV Cache 优化",
+      "type": "article",
+      "file": "chapters/chapter06-kv-cache-optimization.md",
+      "metadata": {
+        "id": "chapters-chapter06-kv-cache-optimization",
+        "title": "第6章：KV Cache 优化",
+        "slug": "chapters-chapter06-kv-cache-optimization",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "kv-cache"
+        ],
+        "concepts": [
+          "kv-cache",
+          "paged-attention",
+          "prefix-caching"
+        ],
+        "tools": [
+          "vllm"
+        ],
+        "architecture_layer": [
+          "optimization-techniques"
+        ],
+        "learning_stage": "core-techniques",
+        "optimization_axes": [
+          "memory",
+          "latency",
+          "throughput",
+          "cost"
+        ],
+        "related": [
+          "chapters-chapter05-llm-inference-basics",
+          "chapters-chapter07-request-scheduling",
+          "chapters-chapter08-quantization"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 7,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter07-request-scheduling",
+      "label": "第7章：请求调度策略",
+      "type": "article",
+      "file": "chapters/chapter07-request-scheduling.md",
+      "metadata": {
+        "id": "chapters-chapter07-request-scheduling",
+        "title": "第7章：请求调度策略",
+        "slug": "chapters-chapter07-request-scheduling",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "request-scheduling"
+        ],
+        "concepts": [
+          "continuous-batching",
+          "prefill-decode-disaggregation",
+          "throughput-engineering"
+        ],
+        "tools": [
+          "vllm",
+          "sglang"
+        ],
+        "architecture_layer": [
+          "optimization-techniques"
+        ],
+        "learning_stage": "core-techniques",
+        "optimization_axes": [
+          "throughput",
+          "latency",
+          "operability"
+        ],
+        "related": [
+          "chapters-chapter05-llm-inference-basics",
+          "chapters-chapter06-kv-cache-optimization",
+          "chapters-chapter10-production-deployment"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 8,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter08-quantization",
+      "label": "第8章：量化技术",
+      "type": "article",
+      "file": "chapters/chapter08-quantization.md",
+      "metadata": {
+        "id": "chapters-chapter08-quantization",
+        "title": "第8章：量化技术",
+        "slug": "chapters-chapter08-quantization",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "quantization"
+        ],
+        "concepts": [
+          "quantization",
+          "int4-qat",
+          "precision-alignment"
+        ],
+        "tools": [
+          "vllm",
+          "sglang",
+          "modelopt"
+        ],
+        "architecture_layer": [
+          "optimization-techniques"
+        ],
+        "learning_stage": "core-techniques",
+        "optimization_axes": [
+          "memory",
+          "cost",
+          "quality",
+          "latency"
+        ],
+        "related": [
+          "chapters-chapter06-kv-cache-optimization",
+          "chapters-chapter09-speculative-sampling",
+          "chapters-chapter11-advanced-topics"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 9,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter09-speculative-sampling",
+      "label": "第9章：投机采样",
+      "type": "article",
+      "file": "chapters/chapter09-speculative-sampling.md",
+      "metadata": {
+        "id": "chapters-chapter09-speculative-sampling",
+        "title": "第9章：投机采样",
+        "slug": "chapters-chapter09-speculative-sampling",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "speculative-decoding"
+        ],
+        "concepts": [
+          "speculative-decoding",
+          "latency-budget"
+        ],
+        "tools": [
+          "vllm",
+          "sglang"
+        ],
+        "architecture_layer": [
+          "optimization-techniques"
+        ],
+        "learning_stage": "core-techniques",
+        "optimization_axes": [
+          "latency",
+          "throughput",
+          "quality"
+        ],
+        "related": [
+          "chapters-chapter07-request-scheduling",
+          "chapters-chapter08-quantization",
+          "chapters-chapter11-advanced-topics"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 10,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter10-production-deployment",
+      "label": "第10章：生产环境部署",
+      "type": "article",
+      "file": "chapters/chapter10-production-deployment.md",
+      "metadata": {
+        "id": "chapters-chapter10-production-deployment",
+        "title": "第10章：生产环境部署",
+        "slug": "chapters-chapter10-production-deployment",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "production-deployment"
+        ],
+        "concepts": [
+          "observability",
+          "roi-monitoring",
+          "cost-optimization"
+        ],
+        "tools": [
+          "kubernetes",
+          "prometheus",
+          "grafana"
+        ],
+        "architecture_layer": [
+          "production-systems"
+        ],
+        "learning_stage": "production",
+        "optimization_axes": [
+          "operability",
+          "cost",
+          "latency",
+          "throughput"
+        ],
+        "related": [
+          "chapters-chapter07-request-scheduling",
+          "chapters-chapter11-advanced-topics",
+          "appendix-b-troubleshooting",
+          "appendix-c-benchmarks-roi"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 11,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "chapters-chapter11-advanced-topics",
+      "label": "第11章：高级话题",
+      "type": "article",
+      "file": "chapters/chapter11-advanced-topics.md",
+      "metadata": {
+        "id": "chapters-chapter11-advanced-topics",
+        "title": "第11章：高级话题",
+        "slug": "chapters-chapter11-advanced-topics",
+        "date": "2026-03-11",
+        "type": "article",
+        "topics": [
+          "advanced-systems"
+        ],
+        "concepts": [
+          "agent-infrastructure",
+          "heterogeneous-deployment",
+          "moe-inference",
+          "multimodal-inference"
+        ],
+        "tools": [
+          "vllm",
+          "triton",
+          "torch-compile"
+        ],
+        "architecture_layer": [
+          "frontier-and-ecosystem"
+        ],
+        "learning_stage": "advanced",
+        "optimization_axes": [
+          "operability",
+          "quality",
+          "latency",
+          "throughput"
+        ],
+        "related": [
+          "chapters-chapter10-production-deployment",
+          "chapters-chapter08-quantization",
+          "chapters-chapter09-speculative-sampling"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 12,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "appendix-a-tools-resources",
+      "label": "附录A: 工具与资源",
+      "type": "reference",
+      "file": "appendix-a-tools-resources.md",
+      "metadata": {
+        "id": "appendix-a-tools-resources",
+        "title": "附录A: 工具与资源",
+        "slug": "appendix-a-tools-resources",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "reference-materials"
+        ],
+        "concepts": [],
+        "tools": [
+          "huggingface",
+          "vllm",
+          "sglang",
+          "docker"
+        ],
+        "architecture_layer": [
+          "frontier-and-ecosystem"
+        ],
+        "learning_stage": "advanced",
+        "optimization_axes": [
+          "operability",
+          "cost",
+          "memory"
+        ],
+        "related": [
+          "chapters-chapter04-environment-setup",
+          "chapters-chapter08-quantization",
+          "docs-refs"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 13,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "appendix-b-troubleshooting",
+      "label": "附录B: 故障排查指南",
+      "type": "reference",
+      "file": "appendix-b-troubleshooting.md",
+      "metadata": {
+        "id": "appendix-b-troubleshooting",
+        "title": "附录B: 故障排查指南",
+        "slug": "appendix-b-troubleshooting",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "troubleshooting"
+        ],
+        "concepts": [
+          "observability",
+          "latency-budget"
+        ],
+        "tools": [
+          "vllm",
+          "nsight-systems"
+        ],
+        "architecture_layer": [
+          "production-systems"
+        ],
+        "learning_stage": "production",
+        "optimization_axes": [
+          "operability",
+          "latency",
+          "memory",
+          "throughput"
+        ],
+        "related": [
+          "chapters-chapter04-environment-setup",
+          "chapters-chapter07-request-scheduling",
+          "chapters-chapter10-production-deployment"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 14,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "appendix-c-benchmarks-roi",
+      "label": "附录C: 性能基准测试与ROI案例",
+      "type": "reference",
+      "file": "appendix-c-benchmarks-roi.md",
+      "metadata": {
+        "id": "appendix-c-benchmarks-roi",
+        "title": "附录C: 性能基准测试与ROI案例",
+        "slug": "appendix-c-benchmarks-roi",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "benchmarks-and-roi"
+        ],
+        "concepts": [
+          "roi-monitoring",
+          "cost-optimization",
+          "throughput-engineering"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "production-systems"
+        ],
+        "learning_stage": "production",
+        "optimization_axes": [
+          "cost",
+          "latency",
+          "throughput",
+          "quality"
+        ],
+        "related": [
+          "chapters-chapter01-introduction",
+          "chapters-chapter10-production-deployment"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 15,
+        "source_scope": "core"
+      }
+    },
+    {
+      "id": "docs-book-metadata",
+      "label": "书籍元数据",
+      "type": "reference",
+      "file": "docs/book-metadata.md",
+      "metadata": {
+        "id": "docs-book-metadata",
+        "title": "书籍元数据",
+        "slug": "docs-book-metadata",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "reference-materials",
+          "market-analysis"
+        ],
+        "concepts": [
+          "cost-optimization"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "motivation-and-economics"
+        ],
+        "learning_stage": "orientation",
+        "optimization_axes": [
+          "cost",
+          "operability"
+        ],
+        "related": [
+          "readme",
+          "chapters-chapter01-introduction",
+          "chapters-chapter02-technology-landscape"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 200,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-content-summary",
+      "label": "内容摘要",
+      "type": "reference",
+      "file": "docs/content-summary.md",
+      "metadata": {
+        "id": "docs-content-summary",
+        "title": "内容摘要",
+        "slug": "docs-content-summary",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "reference-materials"
+        ],
+        "concepts": [
+          "cost-optimization"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "motivation-and-economics"
+        ],
+        "learning_stage": "orientation",
+        "optimization_axes": [
+          "cost"
+        ],
+        "related": [
+          "readme",
+          "chapters-chapter01-introduction"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 201,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-faq",
+      "label": "Frequently Asked Questions",
+      "type": "reference",
+      "file": "docs/faq.md",
+      "metadata": {
+        "id": "docs-faq",
+        "title": "Frequently Asked Questions",
+        "slug": "docs-faq",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "community",
+          "reference-materials"
+        ],
+        "concepts": [],
+        "tools": [
+          "vllm",
+          "docker"
+        ],
+        "architecture_layer": [
+          "production-systems"
+        ],
+        "learning_stage": "orientation",
+        "optimization_axes": [
+          "operability"
+        ],
+        "related": [
+          "readme",
+          "chapters-chapter04-environment-setup",
+          "appendix-b-troubleshooting"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 202,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-refs",
+      "label": "参考资料汇总",
+      "type": "reference",
+      "file": "docs/refs.md",
+      "metadata": {
+        "id": "docs-refs",
+        "title": "参考资料汇总",
+        "slug": "docs-refs",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "reference-materials"
+        ],
+        "concepts": [],
+        "tools": [],
+        "architecture_layer": [
+          "frontier-and-ecosystem"
+        ],
+        "learning_stage": "advanced",
+        "optimization_axes": [
+          "operability",
+          "quality"
+        ],
+        "related": [
+          "appendix-a-tools-resources",
+          "chapters-chapter10-production-deployment"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 203,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-keywords",
+      "label": "关键词",
+      "type": "reference",
+      "file": "docs/keywords.md",
+      "metadata": {
+        "id": "docs-keywords",
+        "title": "关键词",
+        "slug": "docs-keywords",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "reference-materials"
+        ],
+        "concepts": [
+          "kv-cache",
+          "continuous-batching",
+          "quantization",
+          "speculative-decoding"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "inference-mechanics"
+        ],
+        "learning_stage": "foundations",
+        "optimization_axes": [
+          "quality"
+        ],
+        "related": [
+          "chapters-chapter05-llm-inference-basics",
+          "chapters-chapter06-kv-cache-optimization",
+          "chapters-chapter07-request-scheduling",
+          "chapters-chapter08-quantization",
+          "chapters-chapter09-speculative-sampling"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 204,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-topic-background",
+      "label": "选题背景与特色",
+      "type": "reference",
+      "file": "docs/topic-background.md",
+      "metadata": {
+        "id": "docs-topic-background",
+        "title": "选题背景与特色",
+        "slug": "docs-topic-background",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "market-analysis"
+        ],
+        "concepts": [
+          "cost-optimization"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "motivation-and-economics"
+        ],
+        "learning_stage": "orientation",
+        "optimization_axes": [
+          "cost"
+        ],
+        "related": [
+          "readme",
+          "chapters-chapter01-introduction",
+          "chapters-chapter02-technology-landscape"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 205,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-market-analysis",
+      "label": "市场需求与发展趋势",
+      "type": "case-study",
+      "file": "docs/market-analysis.md",
+      "metadata": {
+        "id": "docs-market-analysis",
+        "title": "市场需求与发展趋势",
+        "slug": "docs-market-analysis",
+        "date": "2026-03-11",
+        "type": "case-study",
+        "topics": [
+          "market-analysis"
+        ],
+        "concepts": [
+          "cost-optimization",
+          "roi-monitoring"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "motivation-and-economics"
+        ],
+        "learning_stage": "orientation",
+        "optimization_axes": [
+          "cost"
+        ],
+        "related": [
+          "readme",
+          "chapters-chapter01-introduction",
+          "chapters-chapter10-production-deployment"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 206,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-market-comparison",
+      "label": "市场竞品对比分析",
+      "type": "reference",
+      "file": "docs/market-comparison.md",
+      "metadata": {
+        "id": "docs-market-comparison",
+        "title": "市场竞品对比分析",
+        "slug": "docs-market-comparison",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "market-analysis"
+        ],
+        "concepts": [
+          "cost-optimization"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "motivation-and-economics"
+        ],
+        "learning_stage": "orientation",
+        "optimization_axes": [
+          "cost",
+          "quality"
+        ],
+        "related": [
+          "readme",
+          "chapters-chapter02-technology-landscape"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 207,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-success-stories",
+      "label": "Reader Success Stories",
+      "type": "case-study",
+      "file": "docs/success-stories.md",
+      "metadata": {
+        "id": "docs-success-stories",
+        "title": "Reader Success Stories",
+        "slug": "docs-success-stories",
+        "date": "2026-03-11",
+        "type": "case-study",
+        "topics": [
+          "community",
+          "case-studies"
+        ],
+        "concepts": [
+          "roi-monitoring",
+          "cost-optimization"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "production-systems"
+        ],
+        "learning_stage": "production",
+        "optimization_axes": [
+          "cost",
+          "operability",
+          "throughput"
+        ],
+        "related": [
+          "chapters-chapter10-production-deployment",
+          "appendix-c-benchmarks-roi"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 208,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-contributors",
+      "label": "Contributor Hall of Fame",
+      "type": "reference",
+      "file": "docs/contributors.md",
+      "metadata": {
+        "id": "docs-contributors",
+        "title": "Contributor Hall of Fame",
+        "slug": "docs-contributors",
+        "date": "2026-03-11",
+        "type": "reference",
+        "topics": [
+          "community"
+        ],
+        "concepts": [],
+        "tools": [],
+        "architecture_layer": [
+          "frontier-and-ecosystem"
+        ],
+        "learning_stage": "advanced",
+        "optimization_axes": [
+          "operability"
+        ],
+        "related": [
+          "readme"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 209,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-cases-boaz-barak-ai-economics",
+      "label": "第1章补充案例 - 非经济学家对AI和经济学的思考",
+      "type": "case-study",
+      "file": "docs/cases/boaz-barak-ai-economics.md",
+      "metadata": {
+        "id": "docs-cases-boaz-barak-ai-economics",
+        "title": "第1章补充案例 - 非经济学家对AI和经济学的思考",
+        "slug": "docs-cases-boaz-barak-ai-economics",
+        "date": "2026-03-11",
+        "type": "case-study",
+        "topics": [
+          "case-studies",
+          "inference-economics"
+        ],
+        "concepts": [
+          "cost-optimization"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "motivation-and-economics"
+        ],
+        "learning_stage": "orientation",
+        "optimization_axes": [
+          "cost"
+        ],
+        "related": [
+          "chapters-chapter01-introduction",
+          "chapters-chapter02-technology-landscape"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 210,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-cases-qingke-ai-infra-2025-analysis",
+      "label": "2025\"青稞\"AI嘉年华 - Infra专题研讨会核心内容分析",
+      "type": "case-study",
+      "file": "docs/cases/qingke-ai-infra-2025-analysis.md",
+      "metadata": {
+        "id": "docs-cases-qingke-ai-infra-2025-analysis",
+        "title": "2025\"青稞\"AI嘉年华 - Infra专题研讨会核心内容分析",
+        "slug": "docs-cases-qingke-ai-infra-2025-analysis",
+        "date": "2026-03-11",
+        "type": "case-study",
+        "topics": [
+          "case-studies",
+          "advanced-systems",
+          "production-deployment"
+        ],
+        "concepts": [
+          "prefill-decode-disaggregation",
+          "agent-infrastructure",
+          "heterogeneous-deployment"
+        ],
+        "tools": [
+          "vllm",
+          "sglang",
+          "kubernetes"
+        ],
+        "architecture_layer": [
+          "frontier-and-ecosystem"
+        ],
+        "learning_stage": "advanced",
+        "optimization_axes": [
+          "throughput",
+          "operability",
+          "cost"
+        ],
+        "related": [
+          "chapters-chapter07-request-scheduling",
+          "chapters-chapter10-production-deployment",
+          "chapters-chapter11-advanced-topics"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 211,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-cases-sglang-int4-qat-rl-analysis",
+      "label": "SGLang INT4 QAT案例研究 - 端到端RL实践",
+      "type": "case-study",
+      "file": "docs/cases/sglang-int4-qat-rl-analysis.md",
+      "metadata": {
+        "id": "docs-cases-sglang-int4-qat-rl-analysis",
+        "title": "SGLang INT4 QAT案例研究 - 端到端RL实践",
+        "slug": "docs-cases-sglang-int4-qat-rl-analysis",
+        "date": "2026-03-11",
+        "type": "case-study",
+        "topics": [
+          "case-studies",
+          "quantization"
+        ],
+        "concepts": [
+          "quantization",
+          "int4-qat",
+          "precision-alignment"
+        ],
+        "tools": [
+          "sglang",
+          "modelopt"
+        ],
+        "architecture_layer": [
+          "optimization-techniques"
+        ],
+        "learning_stage": "core-techniques",
+        "optimization_axes": [
+          "memory",
+          "cost",
+          "quality"
+        ],
+        "related": [
+          "chapters-chapter08-quantization",
+          "chapters-chapter10-production-deployment"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 212,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "label": "LMSYS QAT案例研究 - 基于gpt-oss MXFP4",
+      "type": "case-study",
+      "file": "docs/cases/lmsys-qat-mxfp4-analysis.md",
+      "metadata": {
+        "id": "docs-cases-lmsys-qat-mxfp4-analysis",
+        "title": "LMSYS QAT案例研究 - 基于gpt-oss MXFP4",
+        "slug": "docs-cases-lmsys-qat-mxfp4-analysis",
+        "date": "2026-03-11",
+        "type": "case-study",
+        "topics": [
+          "case-studies",
+          "quantization"
+        ],
+        "concepts": [
+          "quantization",
+          "int4-qat",
+          "precision-alignment"
+        ],
+        "tools": [
+          "modelopt",
+          "sglang"
+        ],
+        "architecture_layer": [
+          "optimization-techniques"
+        ],
+        "learning_stage": "core-techniques",
+        "optimization_axes": [
+          "memory",
+          "cost",
+          "quality"
+        ],
+        "related": [
+          "chapters-chapter08-quantization"
+        ],
+        "references": [],
+        "status": "published",
+        "display_order": 213,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "topic:llm-inference",
+      "label": "llm-inference",
+      "type": "topic"
+    },
+    {
+      "id": "topic:inference-economics",
+      "label": "inference-economics",
+      "type": "topic"
+    },
+    {
+      "id": "concept:cost-optimization",
+      "label": "cost-optimization",
+      "type": "concept"
+    },
+    {
+      "id": "optimization-axis:cost",
+      "label": "cost",
+      "type": "optimization-axis"
+    },
+    {
+      "id": "optimization-axis:latency",
+      "label": "latency",
+      "type": "optimization-axis"
+    },
+    {
+      "id": "url:https://img.shields.io/badge/license-MIT-blue",
+      "label": "img.shields.io",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://img.shields.io/badge/license-MIT-blue",
+        "domain": "img.shields.io"
+      }
+    },
+    {
+      "id": "concept:latency-budget",
+      "label": "latency-budget",
+      "type": "concept"
+    },
+    {
+      "id": "topic:technology-trends",
+      "label": "technology-trends",
+      "type": "topic"
+    },
+    {
+      "id": "optimization-axis:operability",
+      "label": "operability",
+      "type": "optimization-axis"
+    },
+    {
+      "id": "topic:gpu-architecture",
+      "label": "gpu-architecture",
+      "type": "topic"
+    },
+    {
+      "id": "concept:memory-bandwidth",
+      "label": "memory-bandwidth",
+      "type": "concept"
+    },
+    {
+      "id": "concept:throughput-engineering",
+      "label": "throughput-engineering",
+      "type": "concept"
+    },
+    {
+      "id": "optimization-axis:throughput",
+      "label": "throughput",
+      "type": "optimization-axis"
+    },
+    {
+      "id": "optimization-axis:memory",
+      "label": "memory",
+      "type": "optimization-axis"
+    },
+    {
+      "id": "topic:environment-setup",
+      "label": "environment-setup",
+      "type": "topic"
+    },
+    {
+      "id": "tool:docker",
+      "label": "docker",
+      "type": "tool"
+    },
+    {
+      "id": "tool:cuda",
+      "label": "cuda",
+      "type": "tool"
+    },
+    {
+      "id": "tool:vllm",
+      "label": "vllm",
+      "type": "tool"
+    },
+    {
+      "id": "topic:inference-mechanics",
+      "label": "inference-mechanics",
+      "type": "topic"
+    },
+    {
+      "id": "concept:kv-cache",
+      "label": "kv-cache",
+      "type": "concept"
+    },
+    {
+      "id": "concept:paged-attention",
+      "label": "paged-attention",
+      "type": "concept"
+    },
+    {
+      "id": "concept:continuous-batching",
+      "label": "continuous-batching",
+      "type": "concept"
+    },
+    {
+      "id": "url:https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
+      "label": "www2.eecs.berkeley.edu",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
+        "domain": "www2.eecs.berkeley.edu"
+      }
+    },
+    {
+      "id": "url:https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vllm/",
+      "label": "hamzaelshafie.bearblog.dev",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vllm/",
+        "domain": "hamzaelshafie.bearblog.dev"
+      }
+    },
+    {
+      "id": "url:https://arxiv.org/abs/2309.06180",
+      "label": "arxiv.org",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://arxiv.org/abs/2309.06180",
+        "domain": "arxiv.org"
+      }
+    },
+    {
+      "id": "topic:kv-cache",
+      "label": "kv-cache",
+      "type": "topic"
+    },
+    {
+      "id": "concept:prefix-caching",
+      "label": "prefix-caching",
+      "type": "concept"
+    },
+    {
+      "id": "topic:request-scheduling",
+      "label": "request-scheduling",
+      "type": "topic"
+    },
+    {
+      "id": "concept:prefill-decode-disaggregation",
+      "label": "prefill-decode-disaggregation",
+      "type": "concept"
+    },
+    {
+      "id": "tool:sglang",
+      "label": "sglang",
+      "type": "tool"
+    },
+    {
+      "id": "url:https://lmsys.org/blog/2025-12-17-minisgl/",
+      "label": "lmsys.org",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://lmsys.org/blog/2025-12-17-minisgl/",
+        "domain": "lmsys.org"
+      }
+    },
+    {
+      "id": "topic:quantization",
+      "label": "quantization",
+      "type": "topic"
+    },
+    {
+      "id": "concept:quantization",
+      "label": "quantization",
+      "type": "concept"
+    },
+    {
+      "id": "concept:int4-qat",
+      "label": "int4-qat",
+      "type": "concept"
+    },
+    {
+      "id": "concept:precision-alignment",
+      "label": "precision-alignment",
+      "type": "concept"
+    },
+    {
+      "id": "tool:modelopt",
+      "label": "modelopt",
+      "type": "tool"
+    },
+    {
+      "id": "optimization-axis:quality",
+      "label": "quality",
+      "type": "optimization-axis"
+    },
+    {
+      "id": "topic:speculative-decoding",
+      "label": "speculative-decoding",
+      "type": "topic"
+    },
+    {
+      "id": "concept:speculative-decoding",
+      "label": "speculative-decoding",
+      "type": "concept"
+    },
+    {
+      "id": "topic:production-deployment",
+      "label": "production-deployment",
+      "type": "topic"
+    },
+    {
+      "id": "concept:observability",
+      "label": "observability",
+      "type": "concept"
+    },
+    {
+      "id": "concept:roi-monitoring",
+      "label": "roi-monitoring",
+      "type": "concept"
+    },
+    {
+      "id": "tool:kubernetes",
+      "label": "kubernetes",
+      "type": "tool"
+    },
+    {
+      "id": "tool:prometheus",
+      "label": "prometheus",
+      "type": "tool"
+    },
+    {
+      "id": "tool:grafana",
+      "label": "grafana",
+      "type": "tool"
+    },
+    {
+      "id": "url:https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus",
+      "label": "manus.im",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus",
+        "domain": "manus.im"
+      }
+    },
+    {
+      "id": "topic:advanced-systems",
+      "label": "advanced-systems",
+      "type": "topic"
+    },
+    {
+      "id": "concept:agent-infrastructure",
+      "label": "agent-infrastructure",
+      "type": "concept"
+    },
+    {
+      "id": "concept:heterogeneous-deployment",
+      "label": "heterogeneous-deployment",
+      "type": "concept"
+    },
+    {
+      "id": "concept:moe-inference",
+      "label": "moe-inference",
+      "type": "concept"
+    },
+    {
+      "id": "concept:multimodal-inference",
+      "label": "multimodal-inference",
+      "type": "concept"
+    },
+    {
+      "id": "tool:triton",
+      "label": "triton",
+      "type": "tool"
+    },
+    {
+      "id": "tool:torch-compile",
+      "label": "torch-compile",
+      "type": "tool"
+    },
+    {
+      "id": "url:https://blog.vllm.ai/2025/12/17/large-scale-serving.html",
+      "label": "blog.vllm.ai",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://blog.vllm.ai/2025/12/17/large-scale-serving.html",
+        "domain": "blog.vllm.ai"
+      }
+    },
+    {
+      "id": "url:https://blog.vllm.ai/2025/12/15/vllm-epd.html",
+      "label": "blog.vllm.ai",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://blog.vllm.ai/2025/12/15/vllm-epd.html",
+        "domain": "blog.vllm.ai"
+      }
+    },
+    {
+      "id": "url:https://github.com/vllm-project/vllm/issues/20323",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/vllm-project/vllm/issues/20323",
+        "domain": "github.com"
+      }
+    },
+    {
+      "id": "url:https://github.com/kvcache-aif/MoonCake",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/kvcache-aif/MoonCake",
+        "domain": "github.com"
+      }
+    },
+    {
+      "id": "topic:reference-materials",
+      "label": "reference-materials",
+      "type": "topic"
+    },
+    {
+      "id": "tool:huggingface",
+      "label": "huggingface",
+      "type": "tool"
+    },
+    {
+      "id": "topic:troubleshooting",
+      "label": "troubleshooting",
+      "type": "topic"
+    },
+    {
+      "id": "tool:nsight-systems",
+      "label": "nsight-systems",
+      "type": "tool"
+    },
+    {
+      "id": "topic:benchmarks-and-roi",
+      "label": "benchmarks-and-roi",
+      "type": "topic"
+    },
+    {
+      "id": "topic:market-analysis",
+      "label": "market-analysis",
+      "type": "topic"
+    },
+    {
+      "id": "topic:community",
+      "label": "community",
+      "type": "topic"
+    },
+    {
+      "id": "url:https://TODO",
+      "label": "todo",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://TODO",
+        "domain": "todo"
+      }
+    },
+    {
+      "id": "url:https://discord.gg/TODO",
+      "label": "discord.gg",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://discord.gg/TODO",
+        "domain": "discord.gg"
+      }
+    },
+    {
+      "id": "url:https://github.com/joqk12345/llm-inference-optimization/issues/new?template=question.md",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/joqk12345/llm-inference-optimization/issues/new?template=question.md",
+        "domain": "github.com"
+      }
+    },
+    {
+      "id": "topic:case-studies",
+      "label": "case-studies",
+      "type": "topic"
+    },
+    {
+      "id": "url:https://github.com/joqk12345/llm-inference-optimization/issues/new?template=success-story.md",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/joqk12345/llm-inference-optimization/issues/new?template=success-story.md",
+        "domain": "github.com"
+      }
+    },
+    {
+      "id": "url:https://github.com/joqk12345/llm-inference-optimization/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/joqk12345/llm-inference-optimization/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22",
+        "domain": "github.com"
+      }
+    },
+    {
+      "id": "url:https://github.com/sgl-project/sglang",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/sgl-project/sglang",
+        "domain": "github.com"
+      }
+    },
+    {
+      "id": "url:https://github.com/slime-dev/slime",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/slime-dev/slime",
+        "domain": "github.com"
+      }
+    },
+    {
+      "id": "url:https://github.com/IST-DasLab/marlin",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/IST-DasLab/marlin",
+        "domain": "github.com"
+      }
+    },
+    {
+      "id": "url:https://github.com/NVIDIA/TensorRT-Model-Optimizer",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/NVIDIA/TensorRT-Model-Optimizer",
+        "domain": "github.com"
+      }
+    },
+    {
+      "id": "url:https://github.com/openai/gpt-oss",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/openai/gpt-oss",
+        "domain": "github.com"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "readme",
+      "target": "topic:llm-inference",
+      "type": "related"
+    },
+    {
+      "source": "readme",
+      "target": "topic:inference-economics",
+      "type": "related"
+    },
+    {
+      "source": "readme",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "readme",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "readme",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter01-introduction",
+      "type": "related"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "related"
+    },
+    {
+      "source": "readme",
+      "target": "url:https://img.shields.io/badge/license-MIT-blue",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter01-introduction",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter03-gpu-basics",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter04-environment-setup",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter05-llm-inference-basics",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter06-kv-cache-optimization",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter08-quantization",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter09-speculative-sampling",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter01-introduction",
+      "target": "topic:llm-inference",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter01-introduction",
+      "target": "topic:inference-economics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter01-introduction",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter01-introduction",
+      "target": "concept:latency-budget",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter01-introduction",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter01-introduction",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter01-introduction",
+      "target": "readme",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter01-introduction",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter01-introduction",
+      "target": "appendix-c-benchmarks-roi",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter02-technology-landscape",
+      "target": "topic:llm-inference",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter02-technology-landscape",
+      "target": "topic:technology-trends",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter02-technology-landscape",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter02-technology-landscape",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter02-technology-landscape",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter02-technology-landscape",
+      "target": "chapters-chapter01-introduction",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter02-technology-landscape",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter02-technology-landscape",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "topic:gpu-architecture",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "concept:memory-bandwidth",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "concept:throughput-engineering",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "optimization-axis:memory",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "chapters-chapter04-environment-setup",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "chapters-chapter05-llm-inference-basics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "topic:environment-setup",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "tool:docker",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "tool:cuda",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "chapters-chapter03-gpu-basics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "chapters-chapter05-llm-inference-basics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "appendix-b-troubleshooting",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "topic:inference-mechanics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "concept:kv-cache",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "concept:paged-attention",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "concept:continuous-batching",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "optimization-axis:memory",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "chapters-chapter06-kv-cache-optimization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "url:https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "url:https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vllm/",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "url:https://arxiv.org/abs/2309.06180",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "topic:kv-cache",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "concept:kv-cache",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "concept:paged-attention",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "concept:prefix-caching",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "optimization-axis:memory",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "chapters-chapter05-llm-inference-basics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "chapters-chapter08-quantization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "url:https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "topic:request-scheduling",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "concept:continuous-batching",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "concept:prefill-decode-disaggregation",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "concept:throughput-engineering",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "tool:sglang",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "chapters-chapter05-llm-inference-basics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "chapters-chapter06-kv-cache-optimization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "url:https://lmsys.org/blog/2025-12-17-minisgl/",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "url:https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "topic:quantization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "concept:quantization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "concept:int4-qat",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "concept:precision-alignment",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "tool:sglang",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "tool:modelopt",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "optimization-axis:memory",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "chapters-chapter06-kv-cache-optimization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "chapters-chapter09-speculative-sampling",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "topic:speculative-decoding",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "concept:speculative-decoding",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "concept:latency-budget",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "tool:sglang",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "chapters-chapter08-quantization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "topic:production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "concept:observability",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "concept:roi-monitoring",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "tool:kubernetes",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "tool:prometheus",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "tool:grafana",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "appendix-b-troubleshooting",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "appendix-c-benchmarks-roi",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "url:https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "url:https://lmsys.org/blog/2025-12-17-minisgl/",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "topic:advanced-systems",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "concept:agent-infrastructure",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "concept:heterogeneous-deployment",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "concept:moe-inference",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "concept:multimodal-inference",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "tool:triton",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "tool:torch-compile",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "chapters-chapter08-quantization",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "chapters-chapter09-speculative-sampling",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "url:https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "url:https://blog.vllm.ai/2025/12/17/large-scale-serving.html",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "url:https://blog.vllm.ai/2025/12/15/vllm-epd.html",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "url:https://github.com/vllm-project/vllm/issues/20323",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "url:https://github.com/kvcache-aif/MoonCake",
+      "type": "references"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "topic:reference-materials",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "tool:huggingface",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "tool:sglang",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "tool:docker",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "optimization-axis:memory",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "chapters-chapter04-environment-setup",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "chapters-chapter08-quantization",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "docs-refs",
+      "type": "related"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "appendix-b-troubleshooting",
+      "type": "references"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "topic:troubleshooting",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "concept:observability",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "concept:latency-budget",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "tool:nsight-systems",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "optimization-axis:memory",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "chapters-chapter04-environment-setup",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "appendix-c-benchmarks-roi",
+      "type": "references"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "topic:benchmarks-and-roi",
+      "type": "related"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "concept:roi-monitoring",
+      "type": "related"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "concept:throughput-engineering",
+      "type": "related"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "chapters-chapter01-introduction",
+      "type": "related"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "appendix-c-benchmarks-roi",
+      "target": "appendix-a-tools-resources",
+      "type": "references"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "topic:reference-materials",
+      "type": "related"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "topic:market-analysis",
+      "type": "related"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "readme",
+      "type": "related"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "chapters-chapter01-introduction",
+      "type": "related"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "related"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "readme",
+      "type": "extends"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "chapters-chapter01-introduction",
+      "type": "extends"
+    },
+    {
+      "source": "docs-book-metadata",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "extends"
+    },
+    {
+      "source": "docs-content-summary",
+      "target": "topic:reference-materials",
+      "type": "related"
+    },
+    {
+      "source": "docs-content-summary",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "docs-content-summary",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-content-summary",
+      "target": "readme",
+      "type": "related"
+    },
+    {
+      "source": "docs-content-summary",
+      "target": "chapters-chapter01-introduction",
+      "type": "related"
+    },
+    {
+      "source": "docs-content-summary",
+      "target": "readme",
+      "type": "extends"
+    },
+    {
+      "source": "docs-content-summary",
+      "target": "chapters-chapter01-introduction",
+      "type": "extends"
+    },
+    {
+      "source": "docs-faq",
+      "target": "topic:community",
+      "type": "related"
+    },
+    {
+      "source": "docs-faq",
+      "target": "topic:reference-materials",
+      "type": "related"
+    },
+    {
+      "source": "docs-faq",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "docs-faq",
+      "target": "tool:docker",
+      "type": "related"
+    },
+    {
+      "source": "docs-faq",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "docs-faq",
+      "target": "readme",
+      "type": "related"
+    },
+    {
+      "source": "docs-faq",
+      "target": "chapters-chapter04-environment-setup",
+      "type": "related"
+    },
+    {
+      "source": "docs-faq",
+      "target": "appendix-b-troubleshooting",
+      "type": "related"
+    },
+    {
+      "source": "docs-faq",
+      "target": "url:https://TODO",
+      "type": "references"
+    },
+    {
+      "source": "docs-faq",
+      "target": "url:https://discord.gg/TODO",
+      "type": "references"
+    },
+    {
+      "source": "docs-faq",
+      "target": "url:https://github.com/joqk12345/llm-inference-optimization/issues/new?template=question.md",
+      "type": "references"
+    },
+    {
+      "source": "docs-faq",
+      "target": "readme",
+      "type": "extends"
+    },
+    {
+      "source": "docs-faq",
+      "target": "chapters-chapter04-environment-setup",
+      "type": "extends"
+    },
+    {
+      "source": "docs-faq",
+      "target": "appendix-b-troubleshooting",
+      "type": "extends"
+    },
+    {
+      "source": "docs-refs",
+      "target": "topic:reference-materials",
+      "type": "related"
+    },
+    {
+      "source": "docs-refs",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "docs-refs",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "docs-refs",
+      "target": "appendix-a-tools-resources",
+      "type": "related"
+    },
+    {
+      "source": "docs-refs",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "docs-refs",
+      "target": "appendix-a-tools-resources",
+      "type": "extends"
+    },
+    {
+      "source": "docs-refs",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "extends"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "topic:reference-materials",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "concept:kv-cache",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "concept:continuous-batching",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "concept:quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "concept:speculative-decoding",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "chapters-chapter05-llm-inference-basics",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "chapters-chapter06-kv-cache-optimization",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "chapters-chapter08-quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "chapters-chapter09-speculative-sampling",
+      "type": "related"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "chapters-chapter05-llm-inference-basics",
+      "type": "extends"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "chapters-chapter06-kv-cache-optimization",
+      "type": "extends"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "extends"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "chapters-chapter08-quantization",
+      "type": "extends"
+    },
+    {
+      "source": "docs-keywords",
+      "target": "chapters-chapter09-speculative-sampling",
+      "type": "extends"
+    },
+    {
+      "source": "docs-topic-background",
+      "target": "topic:market-analysis",
+      "type": "related"
+    },
+    {
+      "source": "docs-topic-background",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "docs-topic-background",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-topic-background",
+      "target": "readme",
+      "type": "related"
+    },
+    {
+      "source": "docs-topic-background",
+      "target": "chapters-chapter01-introduction",
+      "type": "related"
+    },
+    {
+      "source": "docs-topic-background",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "related"
+    },
+    {
+      "source": "docs-topic-background",
+      "target": "readme",
+      "type": "extends"
+    },
+    {
+      "source": "docs-topic-background",
+      "target": "chapters-chapter01-introduction",
+      "type": "extends"
+    },
+    {
+      "source": "docs-topic-background",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "extends"
+    },
+    {
+      "source": "docs-market-analysis",
+      "target": "topic:market-analysis",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-analysis",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-analysis",
+      "target": "concept:roi-monitoring",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-analysis",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-analysis",
+      "target": "readme",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-analysis",
+      "target": "chapters-chapter01-introduction",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-analysis",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-analysis",
+      "target": "readme",
+      "type": "extends"
+    },
+    {
+      "source": "docs-market-analysis",
+      "target": "chapters-chapter01-introduction",
+      "type": "extends"
+    },
+    {
+      "source": "docs-market-analysis",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "extends"
+    },
+    {
+      "source": "docs-market-comparison",
+      "target": "topic:market-analysis",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-comparison",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-comparison",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-comparison",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-comparison",
+      "target": "readme",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-comparison",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "related"
+    },
+    {
+      "source": "docs-market-comparison",
+      "target": "readme",
+      "type": "extends"
+    },
+    {
+      "source": "docs-market-comparison",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "extends"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "topic:community",
+      "type": "related"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "topic:case-studies",
+      "type": "related"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "concept:roi-monitoring",
+      "type": "related"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "appendix-c-benchmarks-roi",
+      "type": "related"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "url:https://github.com/joqk12345/llm-inference-optimization/issues/new?template=success-story.md",
+      "type": "references"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "url:https://discord.gg/TODO",
+      "type": "references"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "extends"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "appendix-c-benchmarks-roi",
+      "type": "extends"
+    },
+    {
+      "source": "docs-contributors",
+      "target": "topic:community",
+      "type": "related"
+    },
+    {
+      "source": "docs-contributors",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "docs-contributors",
+      "target": "readme",
+      "type": "related"
+    },
+    {
+      "source": "docs-contributors",
+      "target": "url:https://github.com/joqk12345/llm-inference-optimization/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22",
+      "type": "references"
+    },
+    {
+      "source": "docs-contributors",
+      "target": "url:https://discord.gg/TODO",
+      "type": "references"
+    },
+    {
+      "source": "docs-contributors",
+      "target": "readme",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-boaz-barak-ai-economics",
+      "target": "topic:case-studies",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-boaz-barak-ai-economics",
+      "target": "topic:inference-economics",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-boaz-barak-ai-economics",
+      "target": "concept:cost-optimization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-boaz-barak-ai-economics",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-boaz-barak-ai-economics",
+      "target": "chapters-chapter01-introduction",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-boaz-barak-ai-economics",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-boaz-barak-ai-economics",
+      "target": "chapters-chapter01-introduction",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-boaz-barak-ai-economics",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "topic:case-studies",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "topic:advanced-systems",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "topic:production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "concept:prefill-decode-disaggregation",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "concept:agent-infrastructure",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "concept:heterogeneous-deployment",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "tool:sglang",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "tool:kubernetes",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-qingke-ai-infra-2025-analysis",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "topic:case-studies",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "topic:quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "concept:quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "concept:int4-qat",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "concept:precision-alignment",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "tool:sglang",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "tool:modelopt",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "optimization-axis:memory",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "chapters-chapter08-quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "url:https://github.com/sgl-project/sglang",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "url:https://github.com/slime-dev/slime",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "url:https://github.com/IST-DasLab/marlin",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "chapters-chapter08-quantization",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-sglang-int4-qat-rl-analysis",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "topic:case-studies",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "topic:quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "concept:quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "concept:int4-qat",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "concept:precision-alignment",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "tool:modelopt",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "tool:sglang",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "optimization-axis:memory",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "chapters-chapter08-quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "url:https://github.com/NVIDIA/TensorRT-Model-Optimizer",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "url:https://github.com/sgl-project/sglang",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "url:https://github.com/openai/gpt-oss",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-lmsys-qat-mxfp4-analysis",
+      "target": "chapters-chapter08-quantization",
+      "type": "extends"
+    },
+    {
+      "source": "readme",
+      "target": "chapters-chapter01-introduction",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter01-introduction",
+      "target": "chapters-chapter02-technology-landscape",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter02-technology-landscape",
+      "target": "chapters-chapter03-gpu-basics",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "chapters-chapter04-environment-setup",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "chapters-chapter05-llm-inference-basics",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "chapters-chapter06-kv-cache-optimization",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "chapters-chapter08-quantization",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "chapters-chapter09-speculative-sampling",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "evolution"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "appendix-a-tools-resources",
+      "type": "evolution"
+    },
+    {
+      "source": "appendix-a-tools-resources",
+      "target": "appendix-b-troubleshooting",
+      "type": "evolution"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
+      "target": "appendix-c-benchmarks-roi",
+      "type": "evolution"
+    }
+  ]
+}

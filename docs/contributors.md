@@ -1,3 +1,24 @@
+---
+id: "docs-contributors"
+title: "Contributor Hall of Fame"
+slug: "docs-contributors"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "community"
+concepts: []
+tools: []
+architecture_layer:
+  - "frontier-and-ecosystem"
+learning_stage: "advanced"
+optimization_axes:
+  - "operability"
+related:
+  - "readme"
+references: []
+status: "published"
+display_order: 209
+---
 # Contributor Hall of Fame
 
 This page recognizes all the amazing people who contribute to this project. Thank you! 🙏

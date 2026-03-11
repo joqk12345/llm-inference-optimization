@@ -1,3 +1,33 @@
+---
+id: "chapters-chapter06-kv-cache-optimization"
+title: "第6章：KV Cache 优化"
+slug: "chapters-chapter06-kv-cache-optimization"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "kv-cache"
+concepts:
+  - "kv-cache"
+  - "paged-attention"
+  - "prefix-caching"
+tools:
+  - "vllm"
+architecture_layer:
+  - "optimization-techniques"
+learning_stage: "core-techniques"
+optimization_axes:
+  - "memory"
+  - "latency"
+  - "throughput"
+  - "cost"
+related:
+  - "chapters-chapter05-llm-inference-basics"
+  - "chapters-chapter07-request-scheduling"
+  - "chapters-chapter08-quantization"
+references: []
+status: "published"
+display_order: 7
+---
 # 第6章：KV Cache 优化
 
 > **💰 成本影响**（常见量级，强依赖模型/上下文/并发/框架实现）

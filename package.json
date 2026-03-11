@@ -1,0 +1,19 @@
+{
+  "name": "book-craft",
+  "private": true,
+  "scripts": {
+    "docs:dev": "npm run knowledge:build && vitepress dev .",
+    "docs:build": "npm run knowledge:build && vitepress build .",
+    "docs:preview": "vitepress preview .",
+    "knowledge:ingest": "node scripts/knowledge-ingest.js",
+    "knowledge:sync-summary": "node scripts/sync-summary.js",
+    "knowledge:graph": "node scripts/build-graph.js",
+    "knowledge:generate": "node scripts/generate-summary.js && node scripts/generate-path.js && node scripts/generate-architecture.js && node scripts/generate-references.js && npm run knowledge:vite-nav",
+    "knowledge:vite-nav": "node scripts/generate-vitepress-nav.js",
+    "knowledge:lint": "node scripts/lint-structure.js",
+    "knowledge:build": "npm run knowledge:ingest && npm run knowledge:sync-summary && npm run knowledge:graph && npm run knowledge:generate && npm run knowledge:lint"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  }
+}

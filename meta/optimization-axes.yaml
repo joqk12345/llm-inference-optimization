@@ -1,0 +1,13 @@
+axes:
+  - name: latency
+    description: Time-to-first-token and end-to-end response speed.
+  - name: throughput
+    description: Sustained capacity and efficient parallel request handling.
+  - name: memory
+    description: Weight, KV cache, and runtime memory efficiency.
+  - name: cost
+    description: Infrastructure spend, unit economics, and ROI.
+  - name: quality
+    description: Accuracy, alignment, and quality retention under optimization.
+  - name: operability
+    description: Observability, debuggability, resilience, and day-2 operations.

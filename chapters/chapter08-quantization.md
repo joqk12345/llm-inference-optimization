@@ -1,3 +1,35 @@
+---
+id: "chapters-chapter08-quantization"
+title: "第8章：量化技术"
+slug: "chapters-chapter08-quantization"
+date: "2026-03-11"
+type: "article"
+topics:
+  - "quantization"
+concepts:
+  - "quantization"
+  - "int4-qat"
+  - "precision-alignment"
+tools:
+  - "vllm"
+  - "sglang"
+  - "modelopt"
+architecture_layer:
+  - "optimization-techniques"
+learning_stage: "core-techniques"
+optimization_axes:
+  - "memory"
+  - "cost"
+  - "quality"
+  - "latency"
+related:
+  - "chapters-chapter06-kv-cache-optimization"
+  - "chapters-chapter09-speculative-sampling"
+  - "chapters-chapter11-advanced-topics"
+references: []
+status: "published"
+display_order: 9
+---
 # 第8章：量化技术
 
 > **💰 成本影响**（常见量级，强依赖模型/任务/量化方法/硬件与内核实现）

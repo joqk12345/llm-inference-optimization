@@ -1,3 +1,32 @@
+---
+id: "appendix-a-tools-resources"
+title: "附录A: 工具与资源"
+slug: "appendix-a-tools-resources"
+date: "2026-03-11"
+type: "reference"
+topics:
+  - "reference-materials"
+concepts: []
+tools:
+  - "huggingface"
+  - "vllm"
+  - "sglang"
+  - "docker"
+architecture_layer:
+  - "frontier-and-ecosystem"
+learning_stage: "advanced"
+optimization_axes:
+  - "operability"
+  - "cost"
+  - "memory"
+related:
+  - "chapters-chapter04-environment-setup"
+  - "chapters-chapter08-quantization"
+  - "docs-refs"
+references: []
+status: "published"
+display_order: 13
+---
 # 附录A: 工具与资源
 
 > "工欲善其事,必先利其器。" - 孔子
