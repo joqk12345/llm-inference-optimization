@@ -5,7 +5,15 @@ const knowledgeSidebar = fs.existsSync('.vitepress/knowledge-nav.json')
   ? JSON.parse(fs.readFileSync('.vitepress/knowledge-nav.json', 'utf8'))
   : []
 
+const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1]
+const isUserOrOrgPagesSite = repoName?.endsWith('.github.io')
+const base = process.env.VITEPRESS_BASE
+  ?? (process.env.GITHUB_ACTIONS === 'true' && repoName && !isUserOrOrgPagesSite
+    ? `/${repoName}/`
+    : '/')
+
 export default defineConfig({
+  base,
   lang: 'zh-CN',
   title: 'LLM推理性能优化',
   description: 'AI Knowledge Graph System for LLM inference optimization',
