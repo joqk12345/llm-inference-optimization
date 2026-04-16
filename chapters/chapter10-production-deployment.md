@@ -37,14 +37,25 @@ display_order: 11
 
 ## 简介
 
-从开发环境到生产环境，这不是简单的“复制粘贴”，而是一次质变：你需要把推理服务当成可运营的生产系统，而不是一个能跑的 demo。
+前面的章节主要在回答一件事: 如何让单机或单套推理引擎更高效。但当系统真正面对线上流量时,问题会立刻换成另一类: 如何稳定上线、如何观测回归、如何做容量规划、如何在成本和可用性之间取得平衡。
 
 **💰 成本影响**（经验口径，强依赖业务与组织）
 - **可用性**：SLA/SLO 不是“好看”，它直接影响故障损失、客户信任与续费
 - **观测与回归**：没有指标闭环的系统会在规模化后以更高成本“被迫重写”
 - **成本治理**：云上 GPU 成本优化（预留/竞价/分级/配额）往往决定毛利空间，但必须与稳定性一起做
 
-为了保持可执行性，本章同样按“背景-决策-落地-踩坑-指标”的方式组织：你会看到同一套指标如何贯穿架构、K8s、观测、容量规划与成本优化。
+所以第10章不是“再讲几个优化技巧”,而是把前面学到的引擎、KV、调度、量化能力真正带进生产环境。为了保持可执行性，本章同样按“背景-决策-落地-踩坑-指标”的方式组织：你会看到同一套指标如何贯穿架构、K8s、观测、容量规划与成本优化。
+
+本章聚焦“生产落地”本身：高可用、观测、容量、成本、安全与回滚。像 Agent 基础设施、异构硬件、RL rollout 这类更偏高级系统的话题，本章只从“生产约束与治理边界”的角度点到为止,把更深入的系统设计留到第11章。
+
+**本章回答什么**：
+- 推理系统如何从开发环境进入生产环境
+- 如何设计部署架构、观测体系、容量治理和成本闭环
+- 如何把上线、回滚、健康检查和故障恢复纳入同一套运行机制
+
+**本章不回答什么**：
+- 不展开 Agent Infra、异构集群、MoE 等高级系统专题
+- 不重新讲 KV 管理、调度器算法等内核级实现细节
 
 在本章中，你将学习：
 - 生产环境与开发环境的关键差异
@@ -61,7 +72,7 @@ display_order: 11
 - ✅ 实施有效的成本优化策略
 - ✅ 处理生产环境的常见问题
 
-> **数值说明**: 本章出现的阈值、价格、成本与性能数字均为示例或经验值,需结合你的硬件、负载与SLA目标进行校准。
+> **数值说明**：本章出现的阈值、价格、成本与性能数字均为示例或经验值,需结合你的硬件、负载与SLA目标进行校准。
 
 ---
 
@@ -143,7 +154,7 @@ display_order: 11
 | **吞吐量** | 每秒处理的token数 | 依模型与硬件 | 指标监控 |
 | **错误率** | 失败请求比例 | 尽量低 | 日志分析 |
 
-**可用性与成本的关系**:
+**可用性与成本的关系**：
 
 ```
 更高的可用性目标通常意味着更高的架构与运维成本。
@@ -166,7 +177,7 @@ display_order: 11
 
 ### 10.2.1 单机部署
 
-**适用场景**:
+**适用场景**：
 - 开发测试环境
 - 小规模内部工具
 - 低并发场景
@@ -180,7 +191,7 @@ vllm serve meta-llama/Llama-3.1-8B \
   --port 8000
 ```
 
-**架构图**:
+**架构图**：
 
 ```
 ┌─────────────────────────────────────┐
@@ -202,7 +213,7 @@ vllm serve meta-llama/Llama-3.1-8B \
 
 ### 10.2.2 多机部署(模型并行)
 
-**适用场景**:
+**适用场景**：
 - 大模型(70B+)无法放入单卡
 - 需要更高吞吐量
 - 生产环境高可用
@@ -222,7 +233,7 @@ vllm serve meta-llama/Llama-3.1-70B \
   --distributed-executor-backend ray
 ```
 
-**架构图**:
+**架构图**：
 
 ```
           ┌──────────────────┐
@@ -299,7 +310,7 @@ def get_worker_id(session_id: str, num_workers: int) -> int:
 
 ### 10.2.4 高可用架构
 
-**完整的高可用架构**:
+**完整的高可用架构**：
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -344,7 +355,7 @@ def get_worker_id(session_id: str, num_workers: int) -> int:
 
 ### 10.3.1 K8s基础概念
 
-**核心概念映射**:
+**核心概念映射**：
 
 | K8s概念 | LLM服务对应 |
 |---------|-----------|
@@ -357,7 +368,7 @@ def get_worker_id(session_id: str, num_workers: int) -> int:
 
 ### 10.3.2 部署vLLM到K8s
 
-**Deployment配置**:
+**Deployment配置**：
 
 ```yaml
 # vllm-deployment.yaml
@@ -407,7 +418,7 @@ spec:
           periodSeconds: 5
 ```
 
-**Service配置**:
+**Service配置**：
 
 ```yaml
 # vllm-service.yaml
@@ -425,7 +436,7 @@ spec:
   type: LoadBalancer  # 或 ClusterIP
 ```
 
-**部署命令**:
+**部署命令**：
 
 ```bash
 # 应用配置
@@ -442,7 +453,7 @@ kubectl scale deployment vllm-llama3-8b --replicas=5
 
 ### 10.3.3 配置管理
 
-**使用ConfigMap管理配置**:
+**使用ConfigMap管理配置**：
 
 ```yaml
 # vllm-config.yaml
@@ -458,7 +469,7 @@ data:
   KV_CACHE_DTYPE: "fp8"
 ```
 
-**引用ConfigMap**:
+**引用ConfigMap**：
 
 ```yaml
 envFrom:
@@ -468,7 +479,7 @@ envFrom:
 
 ### 10.3.4 资源调度与GPU共享
 
-**GPU共享(NVIDIA GPU Operator)**:
+**GPU共享(NVIDIA GPU Operator)**：
 
 ```yaml
 # 使用时间切片共享GPU
@@ -486,7 +497,7 @@ spec:
         nvidia.com/mig-1g.5gb: 2  # 或使用MIG分区
 ```
 
-**节点选择与亲和性**:
+**节点选择与亲和性**：
 
 ```yaml
 # 确保Pod调度到GPU节点
@@ -531,7 +542,7 @@ description: "高优先级vLLM服务"
 
 ### 10.4.1 关键监控指标
 
-**业务指标**:
+**业务指标**：
 
 ```python
 # 1. 延迟指标
@@ -566,7 +577,7 @@ description: "高优先级vLLM服务"
   - 错误率与超时率尽量低,按SLA设定
 ```
 
-**系统指标**:
+**系统指标**：
 
 ```bash
 # GPU指标
@@ -581,7 +592,7 @@ df -h                      # 磁盘使用
 
 ### 10.4.2 Prometheus + Grafana
 
-**vLLM内置Prometheus支持**:
+**vLLM内置Prometheus支持**：
 
 ```bash
 # 启动vLLM时启用metrics
@@ -590,7 +601,7 @@ vllm serve meta-llama/Llama-3.1-8B \
   --enable-prometheus
 ```
 
-**Prometheus配置**:
+**Prometheus配置**：
 
 ```yaml
 # prometheus.yml
@@ -604,7 +615,7 @@ scrape_configs:
     metrics_path: /metrics
 ```
 
-**Grafana仪表盘JSON片段**:
+**Grafana仪表盘JSON片段**：
 
 ```json
 {
@@ -640,7 +651,7 @@ scrape_configs:
 }
 ```
 
-**关键PromQL查询**:
+**关键PromQL查询**：
 
 ```promql
 # TTFT P95
@@ -661,7 +672,7 @@ vllm_kv_cache_hit_rate
 
 ### 10.4.3 日志收集与分析
 
-**结构化日志配置**:
+**结构化日志配置**：
 
 ```python
 # vllm_logging_config.json
@@ -687,7 +698,7 @@ vllm_kv_cache_hit_rate
 }
 ```
 
-**使用ELK Stack收集日志**:
+**使用ELK Stack收集日志**：
 
 ```yaml
 # filebeat.yml
@@ -702,7 +713,7 @@ output.elasticsearch:
   hosts: ["elasticsearch:9200"]
 ```
 
-**关键日志字段**:
+**关键日志字段**：
 
 ```json
 {
@@ -722,7 +733,7 @@ output.elasticsearch:
 
 ### 10.4.4 分布式追踪
 
-**使用OpenTelemetry**:
+**使用OpenTelemetry**：
 
 ```python
 # 安装
@@ -748,7 +759,7 @@ def generate_request(prompt: str):
             pass
 ```
 
-**Jaeger UI查看追踪**:
+**Jaeger UI查看追踪**：
 
 ```bash
 # 启动Jaeger
@@ -771,7 +782,7 @@ open http://localhost:16686
 
 ### 10.5.1 调优流程
 
-**完整的调优流程**:
+**完整的调优流程**：
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -806,7 +817,7 @@ open http://localhost:16686
 
 ### 10.5.2 瓶颈定位方法
 
-**使用vLLM内置benchmark**:
+**使用vLLM内置benchmark**：
 
 ```bash
 # 运行benchmark
@@ -824,7 +835,7 @@ python benchmark_serving.py \
 # GPU Util: ...
 ```
 
-**使用Nsight Systems**:
+**使用Nsight Systems**：
 
 ```bash
 # 1. 安装Nsight Systems
@@ -843,7 +854,7 @@ nsys-ui report.qdrep
 # - CPU overhead是否过高?
 ```
 
-**诊断决策树**:
+**诊断决策树**：
 
 ```
 GPU利用率偏低?
@@ -936,11 +947,11 @@ GPU利用率偏低?
 
 ### 10.5.5 性能分析工具
 
-> **工具分类**: Profiling工具(定位内核级瓶颈) vs Benchmark工具(端到端性能评估)
+> **工具分类**：Profiling工具(定位内核级瓶颈) vs Benchmark工具(端到端性能评估)
 
 #### 10.5.5.1 PyTorch Profiler
 
-**快速诊断Python/CUDA瓶颈**:
+**快速诊断Python/CUDA瓶颈**：
 
 ```python
 import torch
@@ -969,7 +980,7 @@ with torch.profiler.profile(
 # tensorboard --logdir=./logs
 ```
 
-**查看Chrome Trace**:
+**查看Chrome Trace**：
 
 ```bash
 # 打开Chrome://tracing
@@ -979,7 +990,7 @@ with torch.profiler.profile(
 
 #### 10.5.5.2 Nsight Systems
 
-**系统级性能分析**:
+**系统级性能分析**：
 
 ```bash
 # 采集trace
@@ -994,7 +1005,7 @@ nsys-ui vllm_report.qdrep
 nsys stats vllm_report.qdrep --report csv > stats.csv
 ```
 
-**关键指标解读**:
+**关键指标解读**：
 
 ```yaml
 GPU Utilization:
@@ -1020,7 +1031,7 @@ CPU Overhead:
 
 ### 10.5.5.3 Nsight Compute
 
-**Kernel级深度分析**:
+**Kernel级深度分析**：
 
 ```bash
 # 分析特定kernel
@@ -1076,7 +1087,7 @@ VLLM_USE_TRACING=1 vllm serve meta-llama/Llama-3.1-8B
 
 ### 10.5.5.6 LLM性能测试工具
 
-> **工具定位**: 除了profiling工具,还需要端到端的benchmark工具来评估LLM推理性能。
+> **工具定位**：除了profiling工具,还需要端到端的benchmark工具来评估LLM推理性能。
 
 **GuideLLM** (Intel)
 
@@ -1131,7 +1142,7 @@ python benchmark_serving.py \
 # - GPU利用率
 ```
 
-**完整性能测试工作流**:
+**完整性能测试工作流**：
 
 ```bash
 # Step 1: 快速评估(EvalScope)
@@ -1168,9 +1179,9 @@ guidellm benchmark \
 
 ### 10.6.1 云GPU选择策略
 
-> **说明**: 以下价格与规格仅为示例,实际以云厂商与地区报价为准。
+> **说明**：以下价格与规格仅为示例,实际以云厂商与地区报价为准。
 
-**成本vs性能权衡**:
+**成本vs性能权衡**：
 
 | GPU | 成本/小时 | 性能 | 适用场景 |
 |-----|----------|------|---------|
@@ -1179,7 +1190,7 @@ guidellm benchmark \
 | A100 (80GB) | 示例区间 | 很高 | 大模型 |
 | H100 | 示例区间 | 顶级 | 高性能需求 |
 
-**选择决策树**:
+**选择决策树**：
 
 ```
 模型大小 < 30B?
@@ -1193,14 +1204,14 @@ guidellm benchmark \
 
 ### 10.6.2 Spot实例使用
 
-**💰 成本节省**: 通常会显著低于按需价格（折扣强依赖地区/供给/时段，以实际账单为准）
+**💰 成本节省**：通常会显著低于按需价格（折扣强依赖地区/供给/时段，以实际账单为准）
 
 **什么是Spot实例?**
 - 云厂商的闲置GPU资源
 - 价格通常显著低于按需实例（折扣浮动较大）
 - 可能被随时回收
 
-**使用策略**:
+**使用策略**：
 
 ```python
 # 使用Ray Autoscaler自动管理Spot实例
@@ -1238,7 +1249,7 @@ autoscaler_options:
   idle_timeout_minutes: 10
 ```
 
-**处理中断**:
+**处理中断**：
 
 ```python
 # 检测Spot中断
@@ -1266,7 +1277,7 @@ def graceful_shutdown():
 
 ### 10.6.3 自动伸缩
 
-**基于负载的自动伸缩**:
+**基于负载的自动伸缩**：
 
 ```yaml
 # Kubernetes HPA
@@ -1303,7 +1314,7 @@ spec:
         periodSeconds: 120
 ```
 
-**基于时间的伸缩**:
+**基于时间的伸缩**：
 
 ```python
 # 业务高峰期提前扩容
@@ -1325,7 +1336,7 @@ scheduler.start()
 
 ### 10.6.4 成本监控工具
 
-**AWS Cost Explorer**:
+**AWS Cost Explorer**：
 
 ```bash
 # 设置成本告警
@@ -1339,7 +1350,7 @@ aws budgets create-budget \
   }'
 ```
 
-**自定义成本追踪**:
+**自定义成本追踪**：
 
 ```python
 import psutil
@@ -1382,19 +1393,21 @@ def log_request_cost(tokens: int, time_seconds: float):
     print(f"Cost: ${cost_per_1k_tokens:.6f} per 1K tokens")
 ```
 
-### 10.6.5 Agent系统的成本优化策略
+### 10.6.5 多步任务 / Agent 场景的成本优化策略
 
-**参考链接（可选）**: [Manus - Context Engineering for AI Agents](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus)
+**参考链接（可选）**：[Manus - Context Engineering for AI Agents](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus)
 
-**核心观点（经验口径）**: 围绕 KV-Cache 设计 Agent 系统,通常是最具杠杆的成本优化路径之一（但不是银弹）
+**核心观点（经验口径）**：围绕 KV-Cache 设计多步任务系统,通常是最具杠杆的成本优化路径之一（但不是银弹）
+
+> 本节只讨论成本治理视角。Agent 基础设施的系统设计与运行环境放到第11.1节展开。
 
 #### 10.6.5.1 成本对比: Cached vs Uncached
 
-**成本口径（通用）**:
+**成本口径（通用）**：
 - 在不少商用 API/内部计费体系中,cache hit 的 token 成本往往显著低于未命中的 token（具体价差以供应商公开价或你的内部计费为准）
 - 即使是自建推理,cache hit 也会直接减少 prefill 计算量,降低单位成本
 
-**Agent系统的成本放大效应**:
+**Agent系统的成本放大效应**：
 ```
 典型Agent任务往往包含大量重复前缀与多步调用。
 在高复用场景下,缓存可显著降低成本与延迟。
@@ -1449,7 +1462,7 @@ for tool_call in tool_calls:
     cache_manager.append(tool_call.result)
 ```
 
-**优化4: Session-Aful路由**
+**优化4: Session-Aware 路由**
 
 ```python
 class SessionAwareRouter:
@@ -1469,7 +1482,7 @@ class SessionAwareRouter:
         return worker_id
 ```
 
-**效果**:
+**效果**：
 - Prefix cache复用率提升
 - TTFT 可能明显降低（取决于 cache hit、负载形态与路由策略）
 - 吞吐可能提升（取决于并发提升是否被调度/显存/带宽瓶颈抵消）
@@ -1477,7 +1490,7 @@ class SessionAwareRouter:
 
 #### 10.6.5.3 成本优化Checklist
 
-**基线测量**:
+**基线测量**：
 - [ ] 测量当前KV-cache hit rate
 - [ ] 计算平均每个任务的token数
 - [ ] 统计prefill vs decode比例
@@ -1490,7 +1503,7 @@ class SessionAwareRouter:
 - [ ] 启用Prefix Caching
 
 **中期优化**(1周内):
-- [ ] 实现Session-Aful路由
+- [ ] 实现 Session-Aware 路由
 - [ ] 添加file system fallback机制
 - [ ] 监控cache hit rate指标
 
@@ -1509,19 +1522,19 @@ class SessionAwareRouter:
 | 复杂任务 | 相对较高 | 相对较低 | 通常更明显 |
 | 超长任务 | 相对较高 | 相对较低 | 通常更明显 |
 
-**关键洞察**: 任务越复杂,优化收益往往越明显——因为上下文累积更多。
+**核心洞察**：任务越复杂,优化收益往往越明显——因为上下文累积更多。
 
-### 10.6.6 轻量级参考实现:Mini-SGLang
+### 10.6.6 轻量级参考实现: Mini-SGLang（选读）
 
-> **💡 深度来源**: [Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/)
+> **💡 深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/)
 >
-> **核心价值**: 以相对较小代码规模实现完整推理引擎,适合学习和研究原型
+> **核心价值**：以相对较小代码规模实现完整推理引擎,适合学习和研究原型
 >
-> **适用场景**: 教育学习、快速研究验证、内核开发调试
+> **适用场景**：教育学习、快速研究验证、内核开发调试
 
 #### 10.6.6.1 为什么需要轻量级实现?
 
-**问题**:
+**问题**：
 - **vLLM代码规模**: 数十万行量级
   - 新手学习曲线陡峭
   - 修改风险高(破坏隐式不变量)
@@ -1531,7 +1544,7 @@ class SessionAwareRouter:
   - 功能完整,但复杂度高
   - 不适合教学场景
 
-**Mini-SGLang的答案**:
+**Mini-SGLang的答案**：
 - **更少的代码规模**(便于理解与改动)
 - **保留核心优化**:
   - Radix Attention (KV Cache复用)
@@ -1543,7 +1556,7 @@ class SessionAwareRouter:
 
 #### 10.6.6.2 轻量级实现的核心功能
 
-**代码结构**:
+**代码结构**：
 ```
 mini-sglang/
 ├── server.py          # OpenAI兼容API server
@@ -1556,7 +1569,7 @@ mini-sglang/
     └── flashinfer.py        # FlashInfer集成
 ```
 
-**启动示例**:
+**启动示例**：
 
 ```bash
 # 安装
@@ -1577,7 +1590,7 @@ curl http://localhost:8000/v1/chat/completions \
   }'
 ```
 
-**关键设计决策**:
+**关键设计决策**：
 - **简洁性优先**: 移除边缘case处理,专注核心逻辑
 - **教育导向**: 代码注释丰富,易于理解
 - **研究友好**: 易于修改和实验新想法
@@ -1649,7 +1662,7 @@ class TensorParallelRunner:
 
 #### 10.6.6.4 学习价值
 
-**与vLLM对比**:
+**与vLLM对比**：
 
 | 维度 | vLLM | Mini-SGLang |
 |------|------|-------------|
@@ -1660,7 +1673,7 @@ class TensorParallelRunner:
 | 修改难度 | 高 | 低 |
 | 阅读时间 | 数周 | 数小时 |
 
-**适用场景**:
+**适用场景**：
 
 ✅ **Mini-SGLang适合**:
 - 学习LLM推理原理
@@ -1681,7 +1694,7 @@ class TensorParallelRunner:
 
 ### 10.7.1 如何追踪推理成本
 
-**完整的成本追踪系统**:
+**完整的成本追踪系统**：
 
 ```python
 class CostTracker:
@@ -1744,7 +1757,7 @@ print(tracker.get_summary())
 
 ### 10.7.2 优化措施的ROI计算
 
-**ROI计算公式**:
+**ROI计算公式**：
 
 ```python
 def calculate_roi(
@@ -1783,7 +1796,7 @@ print(roi)
 # 输出为示例
 ```
 
-**ROI仪表盘**:
+**ROI仪表盘**：
 
 ```python
 import matplotlib.pyplot as plt
@@ -1823,7 +1836,7 @@ def plot_roi_dashboard():
 
 ### 10.7.3 持续优化流程
 
-**PDCA循环**:
+**PDCA循环**：
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -1855,7 +1868,7 @@ def plot_roi_dashboard():
 └─────────────────────────────────────────────────┘
 ```
 
-**优化优先级矩阵**:
+**优化优先级矩阵**：
 
 ```
 高ROI, 低难度 → 优先实施
@@ -1885,7 +1898,7 @@ def plot_roi_dashboard():
 
 ### 10.8.1 API认证与授权
 
-**API Key认证**:
+**API Key认证**：
 
 ```python
 from fastapi import FastAPI, Header, HTTPException
@@ -1914,7 +1927,7 @@ async def chat_completions(
     # ...
 ```
 
-**速率限制**:
+**速率限制**：
 
 ```python
 from slowapi import Limiter
@@ -1928,7 +1941,7 @@ async def chat_completions(request: Request):
     # ...
 ```
 
-**基于Token的限流**:
+**基于Token的限流**：
 
 ```python
 class TokenBucketRateLimiter:
@@ -1970,7 +1983,7 @@ async def generate(prompt: str, max_tokens: int):
 
 ### 10.8.2 内容安全过滤
 
-**输入过滤**:
+**输入过滤**：
 
 ```python
 import re
@@ -1996,7 +2009,7 @@ def validate_input(prompt: str):
     return True
 ```
 
-**输出过滤**:
+**输出过滤**：
 
 ```python
 from transformers import pipeline
@@ -2018,7 +2031,7 @@ def filter_output(text: str) -> str:
 
 ### 10.8.3 数据隐私
 
-**敏感数据脱敏**:
+**敏感数据脱敏**：
 
 ```python
 import re
@@ -2045,7 +2058,7 @@ def mask_pii(text: str) -> str:
     return text
 ```
 
-**数据加密存储**:
+**数据加密存储**：
 
 ```python
 from cryptography.fernet import Fernet
@@ -2070,7 +2083,7 @@ decrypted = storage.decrypt(encrypted)
 
 ### 10.8.4 审计日志
 
-**完整的审计日志**:
+**完整的审计日志**：
 
 ```python
 import logging
@@ -2132,7 +2145,7 @@ audit.log_request(
 
 ### 10.9.1 失败场景分析
 
-**常见失败场景**:
+**常见失败场景**：
 
 | 失败类型 | 概率 | 影响 | 检测方式 |
 |---------|------|------|---------|
@@ -2170,7 +2183,7 @@ readinessProbe:
   failureThreshold: 3
 ```
 
-**自定义健康检查端点**:
+**自定义健康检查端点**：
 
 ```python
 from fastapi import FastAPI
@@ -2214,7 +2227,7 @@ def readiness_check():
 
 ### 10.9.3 自动重启策略
 
-**Kubernetes重启策略**:
+**Kubernetes重启策略**：
 
 ```yaml
 apiVersion: apps/v1
@@ -2233,7 +2246,7 @@ spec:
       restartPolicy: Always
 ```
 
-**自动恢复脚本**:
+**自动恢复脚本**：
 
 ```python
 import time
@@ -2264,7 +2277,7 @@ if __name__ == "__main__":
 
 ### 10.9.4 降级方案
 
-**优雅降级策略**:
+**优雅降级策略**：
 
 ```python
 class DegradationManager:
@@ -2318,7 +2331,7 @@ async def chat_completions(request: Request):
 
 ---
 
-## 10.10 RL系统部署 ⚠️ 开源生态缺失
+## 10.10 RL rollout 的生产约束 ⚠️ 开源生态缺失
 
 **背景**：RL rollout 把推理变成“训练目的组织的大规模生成”。它会带来混合负载（推理+评估+数据处理），并对隔离、配额、观测与成本治理提出更高要求。
 
@@ -2329,9 +2342,11 @@ async def chat_completions(request: Request):
 - 在线 serving：SLA 优先，严格限流与降级
 - rollout/训练：吞吐优先，可中断/可重试，但必须有配额
 
+> 本节关注的是“生产环境如何隔离和治理 rollout 负载”。异构硬件与更完整的高级系统视角，请继续看第11章。
+
 ### 10.10.1 RL系统的特殊需求
 
-**与普通推理的区别**:
+先明确它和普通在线 serving 的差别:
 
 | 维度 | 普通推理 | RL系统 |
 |------|---------|--------|
@@ -2341,197 +2356,76 @@ async def chat_completions(request: Request):
 | **GPU类型** | 同构 | 常异构(训练+推理) |
 | **调度** | 简单 | 复杂(PD分离) |
 
-### 10.10.2 开源项目现状
+这意味着 RL rollout 最大的问题不是“能不能跑”,而是“会不会把在线业务拖垮”。
 
-**当前状况**:
-- ✅ **Ray/RLlib**: 训练框架成熟
-- ❌ **Rollout服务**: 开源生态缺失
-- ❌ **统一框架**: 生产级方案少
+### 10.10.2 生产环境里最重要的四条边界
 
-**主要项目**:
+**边界1: 资源池必须隔离**
+- 在线 serving 和 rollout/训练不要共享同一套无上限资源池
+- 即使共用集群,也要分队列、分配额、分优先级
 
-- **slime** (质朴科技)
-  - GitHub: https://github.com/zizai/slime
-  - **定位**: RL训练和推理的统一框架
-  - **特点**:
-    - Training和Rollout共享GPU
-    - 支持异构GPU(H100+H200)
-    - 弹性资源分配
+**边界2: SLA 和吞吐目标要分开**
+- 在线 serving 以 TTFT、P95/P99、错误率为主
+- rollout 更关注单位时间样本产出、任务完成率和资源成本
+- 不要用一套统一指标同时优化两类系统
 
-### 10.10.3 关键挑战
+**边界3: 失败处理方式不同**
+- 在线 serving 更关注快速失败、降级和回滚
+- rollout 更适合可中断、可重试、可恢复
+- 如果两者共用策略,通常会两边都做不好
 
-**挑战1: Training vs Rollout的资源竞争**
+**边界4: 观测维度必须补齐**
+- 至少区分 online queue、rollout queue、GPU 占用、重试率、任务完成率
+- 如果只看整体 GPU 利用率,很容易误判为“机器很忙所以系统健康”
+
+### 10.10.3 一个最小可行的治理方案
+
+可以先从下面这套最小方案开始:
+
+```text
+在线 serving:
+- 独立优先级
+- 严格限流
+- SLA 告警
+- 回滚优先
+
+rollout / 训练:
+- 独立资源池
+- 配额控制
+- 可中断任务
+- 成本和产出联动
+```
+
+一个简化的资源治理思路:
 
 ```python
-# 问题: Training和Rollout竞争GPU资源
-# 解决方案: 动态资源分配
+class ResourcePolicy:
+    def __init__(self, online_quota: int, rollout_quota: int):
+        self.online_quota = online_quota
+        self.rollout_quota = rollout_quota
 
-class DynamicResourceManager:
-    """动态资源管理器"""
+    def allow_online(self, online_inflight: int) -> bool:
+        return online_inflight < self.online_quota
 
-    def __init__(self, total_gpus: int):
-        self.total_gpus = total_gpus
-        self.training_gpus = 0
-        self.rollout_gpus = 0
-
-    def allocate(self, rollout_queue_length: int):
-        """根据队列长度动态分配"""
-
-        if rollout_queue_length > 100:
-            # Rollout压力大,增加资源
-            self.rollout_gpus = min(self.total_gpus * 0.8, self.rollout_gpus + 1)
-            self.training_gpus = self.total_gpus - self.rollout_gpus
-
-        elif rollout_queue_length < 10:
-            # Rollout压力小,减少资源
-            self.rollout_gpus = max(self.total_gpus * 0.2, self.rollout_gpus - 1)
-            self.training_gpus = self.total_gpus - self.rollout_gpus
-
-        return {
-            "training": self.training_gpus,
-            "rollout": self.rollout_gpus
-        }
+    def allow_rollout(self, rollout_inflight: int, online_slo_healthy: bool) -> bool:
+        return online_slo_healthy and rollout_inflight < self.rollout_quota
 ```
 
-**挑战2: 异构GPU协同**
+核心思想只有两个:
 
-```python
-# H100用于training,H200用于rollout
+- 在线服务的健康度优先于 rollout 吞吐
+- rollout 的扩容和重试不能无条件挤占在线配额
 
-class HeterogeneousCluster:
-    """异构集群管理"""
+### 10.10.4 本章到这里为止,后面交给第11章
 
-    def __init__(self):
-        self.h100_count = 8
-        self.h200_count = 4
+如果你接下来要深入这些问题,就已经进入高级系统专题了:
 
-    def schedule_task(self, task_type: str):
-        """调度任务到合适的GPU"""
+- Agent / rollout 环境怎么设计执行沙箱
+- 异构 GPU 如何按工作负载拆分
+- 训练、rollout、在线服务如何长期共存
+- 哪些框架已经能支撑生产级落地,哪些仍处于探索期
 
-        if task_type == "training":
-            # Training → H100(性价比高)
-            return "h100"
-
-        elif task_type == "rollout":
-            # Rollout → H200(低延迟)
-            return "h200"
-```
-
-### 10.10.4 部署架构
-
-**单机部署**:
-
-```
-┌─────────────────────────────────────┐
-│         单服务器 (H100)              │
-│                                     │
-│  ┌─────────────┐  ┌──────────────┐ │
-│  │  Training   │  │   Rollout    │ │
-│  │   (70%)     │  │    (30%)     │ │
-│  └─────────────┘  └──────────────┘ │
-└─────────────────────────────────────┘
-```
-
-**适合**: 小规模实验
-
-**多机部署**:
-
-```
-┌──────────────────┐      ┌──────────────────┐
-│   Training Node  │      │  Rollout Nodes   │
-│   (H100 x 8)     │      │  (H200 x 4)      │
-│                  │      │                  │
-│  ┌────────────┐  │      │  ┌────────────┐  │
-│  │   PPO     │  │      │  │  vLLM/SGL  │  │
-│  │  Training  │  │      │  │  Serving   │  │
-│  └────────────┘  │      │  └────────────┘  │
-└────────┬─────────┘      └────────┬─────────┘
-         │                         │
-         └────────────┬────────────┘
-                      │
-              ┌───────▼────────┐
-              │  Parameter     │
-              │   Server       │
-              └────────────────┘
-```
-
-**适合**: 生产环境
-
-### 10.10.5 实战案例
-
-**案例1: 使用slime部署简单RL任务**
-
-```bash
-# 安装slime
-pip install slime-rl
-
-# 启动RL训练+rollout服务
-slime launch \
-  --model meta-llama/Llama-3.1-8B \
-  --task rlhf \
-  --training-gpus 4 \
-  --rollout-gpus 2 \
-  --rollout-framework vllm
-```
-
-**案例2: 异构GPU的RL部署(H100+H200)**
-
-```python
-# slime配置文件
-# slime_config.yaml
-
-cluster:
-  training_nodes:
-    - type: H100
-      count: 8
-      use: training
-
-  rollout_nodes:
-    - type: H200
-      count: 4
-      use: rollout
-
-training:
-  framework: ppo
-  batch_size: 512
-  learning_rate: 1e-5
-
-rollout:
-  framework: vllm
-  tensor_parallel_size: 4
-  gpu_memory_utilization: 0.9
-```
-
-**案例3: 大规模RL的弹性资源分配**
-
-```python
-class ElasticRLScheduler:
-    """弹性RL调度器"""
-
-    def __init__(self):
-        self.cloud_provider = AWS()
-        self.spot_instances = []
-
-    def scale_rollout_workers(self, demand: int):
-        """根据需求弹性扩缩容"""
-
-        current_workers = len(self.spot_instances)
-
-        if demand > current_workers * 100:
-            # 需要扩容
-            new_instances = self.cloud_provider.launch_spot_instances(
-                instance_type="p4d.24xlarge",
-                count=(demand // 100) - current_workers
-            )
-            self.spot_instances.extend(new_instances)
-
-        elif demand < current_workers * 50:
-            # 需要缩容
-            instances_to_terminate = self.spot_instances[(demand // 50):]
-            for inst in instances_to_terminate:
-                self.cloud_provider.terminate_instance(inst)
-            self.spot_instances = self.spot_instances[:(demand // 50)]
-```
+本章先停在这里,因为这些内容已经不只是"部署",而是"系统设计"问题。
 
 ---
 
@@ -2539,7 +2433,7 @@ class ElasticRLScheduler:
 
 ### ❌ "生产环境只需要更多GPU"
 
-**实际情况**: 架构和优化比硬件更重要。
+**实际情况**：架构和优化比硬件更重要。
 
 ```
 场景1: 多卡中端 vs 少量高端
@@ -2552,7 +2446,7 @@ class ElasticRLScheduler:
 
 ### ❌ "K8s能自动处理所有故障"
 
-**实际情况**: K8s只是工具,需要合理配置。
+**实际情况**：K8s只是工具,需要合理配置。
 
 ```yaml
 # ❌ 错误配置
@@ -2569,7 +2463,7 @@ livenessProbe:
 
 ### ❌ "监控越详细越好"
 
-**实际情况**: 关注关键指标,避免信息过载。
+**实际情况**：关注关键指标,避免信息过载。
 
 ```python
 # ❌ 监控所有指标
@@ -2596,7 +2490,7 @@ metrics = [
 
 ### ❌ "Spot实例不可靠,不适合生产"
 
-**实际情况**: 合理的设计可以可靠使用Spot实例。
+**实际情况**：合理的设计可以可靠使用Spot实例。
 
 ```python
 # ✅ 最佳实践
@@ -2638,7 +2532,7 @@ metrics = [
 
 ## 📚 动手练习
 
-**练习10.1**: 部署vLLM到Kubernetes
+**练习10.1**：部署vLLM到Kubernetes
 
 目标: 将vLLM服务部署到K8s集群
 
@@ -2657,7 +2551,7 @@ curl http://localhost:8000/v1/models
 
 ---
 
-**练习10.2**: 搭建完整的监控系统
+**练习10.2**：搭建完整的监控系统
 
 目标: 使用Prometheus + Grafana监控vLLM
 
@@ -2674,7 +2568,7 @@ curl http://localhost:8000/v1/models
 
 ---
 
-**练习10.3**: 建立ROI监控仪表盘
+**练习10.3**：建立ROI监控仪表盘
 
 目标: 追踪推理成本和优化ROI
 
@@ -2691,24 +2585,24 @@ curl http://localhost:8000/v1/models
 
 ---
 
-**练习10.4**: 使用slime部署简单RL任务 ⭐
+**练习10.4**：设计 RL rollout 资源隔离方案 ⭐
 
-目标: 部署一个简单的RL训练+rollout系统
+目标: 为在线 serving 和 rollout 设计一套不会相互拖垮的资源治理方案
 
 任务:
-1. 安装slime框架
-2. 配置训练和rollout节点
-3. 启动RLHF任务
-4. 监控训练进度
+1. 划分 online / rollout 两类资源池
+2. 为两类流量设置不同的配额和优先级
+3. 定义在线 SLO 不健康时 rollout 的降载策略
+4. 设计最少需要监控的 5 个指标
 
 验收:
-- Training节点正常运行
-- Rollout服务响应满足SLA
-- 模型reward收敛
+- 在线流量发生峰值时 rollout 不会挤占 SLA
+- 方案里明确说明限流、重试和告警策略
+- 可以解释为什么这套方案比“共享一个大集群”更稳
 
 ---
 
-**练习10.5**: 开发并部署vLLM自定义插件 ⭐⭐
+**练习10.5**：开发并部署vLLM自定义插件 ⭐⭐
 
 目标: 实现一个vLLM插件来定制行为
 
@@ -2870,7 +2764,7 @@ class CostTracker:
 
 ## 🎯 总结
 
-关键要点:
+关键要点：
 - **生产环境≠开发环境**: 需要高可用、监控、安全、灾备
 - **监控是基础**: Metrics、Logs、Traces三大支柱
 - **优化先于扩容**: Prefix Caching、量化、自动伸缩
@@ -2878,6 +2772,8 @@ class CostTracker:
 - **安全第一**: 认证、授权、审计日志
 - **未雨绸缪**: 健康检查、自动恢复、降级方案
 
-**下一步**: 第11章高级话题(异构硬件、MoE、未来趋势)
+## 章节衔接
+
+到这里,你已经把“推理系统如何稳定运行”这件事补齐了。接下来的第11章不再围绕通用生产落地,而是进入更靠前沿和更靠专题的问题: 当系统继续扩展到 Agent、异构硬件、多模态和底层 kernel 优化时,哪些新复杂度会出现,又该如何判断它们是否值得引入。
 
 ---

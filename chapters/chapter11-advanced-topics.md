@@ -37,12 +37,23 @@ display_order: 12
 
 ## 简介
 
-前10章我们覆盖了从GPU基础到生产部署的完整知识体系。本章将探讨一些高级话题和未来趋势,这些内容代表了LLM推理优化的前沿方向。
+前10章已经建立了一条完整主线: 从硬件基础、推理机制、KV 管理、请求调度,一路到生产部署与运行治理。第11章不再试图回答“一个标准推理服务如何上线”,而是转向那些并非所有团队都必须立即采用、但决定系统上限和未来方向的高级专题。
 
 **💰 成本影响**（经验口径，强依赖场景）
 - **MoE**：稀疏激活有机会降低单位计算成本，但系统复杂度与尾延迟治理会变得更关键
 - **多模态**：token 形态变化（图像/音频）会改变瓶颈与成本结构
 - **边缘与异构**：把推理推向更靠近用户的地方可以换取延迟，但会带来运维与版本治理成本
+
+换句话说,第10章解决的是“如何把系统稳定落地”,第11章解决的是“当基础盘已经稳定后,下一步往哪里扩”。这里的主题更像专题与前沿雷达,而不是默认主线上的必选项。
+
+**本章回答什么**：
+- 当系统继续扩展到 Agent、异构、多模态、MoE 和底层优化时,会遇到哪些新问题
+- 哪些方向值得继续投入,哪些方向仍然处在高不确定性阶段
+- 如何用系统视角而不是单点技巧去看这些前沿能力
+
+**本章不回答什么**：
+- 不重讲标准生产部署、监控、回滚和容量治理
+- 不假设所有团队都必须立即采用这些高级专题
 
 在本章中,你将学习:
 - Agent基础设施的挑战与机遇
@@ -52,7 +63,7 @@ display_order: 12
 - Flash Attention等底层优化技术
 - 技术发展的未来趋势
 
-> **数值说明**: 本章出现的阈值、比例与性能数字多为示意或经验值,需结合硬件、负载与模型校准。
+> **数值说明**：本章出现的阈值、比例与性能数字多为示意或经验值,需结合硬件、负载与模型校准。
 
 ---
 
@@ -74,7 +85,7 @@ display_order: 12
 
 ### 11.1.1 为什么Agent Infra很重要
 
-**近期的爆发**:
+**近期的爆发**：
 
 ```
 商业产品:
@@ -90,7 +101,7 @@ display_order: 12
 - Agent可承担部分科研与生产任务
 - 能在一定程度上降低人工推理成本
 
-**独特挑战**:
+**独特挑战**：
 - 不像传统推理只有text input/output
 - 需要复杂的环境交互
 
@@ -108,14 +119,14 @@ display_order: 12
   - 学术界几乎没有使用经验
 ```
 
-**需求**:
+**需求**：
 - Scalable and easy to use的sandbox system
 - 像inference engine一样给个URL
 - 发HTTP request就能完成所有事情
 
 ### 11.1.3 Agent环境的复杂性
 
-**文件系统**:
+**文件系统**：
 ```python
 # Agent需要操作文件系统
 agent.filesystem.write("/tmp/data.txt", content)
@@ -129,7 +140,7 @@ except MountError:
     pass
 ```
 
-**网络**:
+**网络**：
 ```python
 # HTTP请求、API调用
 response = agent.http_fetch("https://api.example.com/data")
@@ -143,7 +154,7 @@ response = agent.http_fetch(
 )
 ```
 
-**虚拟机**:
+**虚拟机**：
 - 可能需要嵌套VM
 - 复杂的workflow构造
 
@@ -162,29 +173,29 @@ response = agent.http_fetch(
 
 ### 11.1.4 Agent环境的类型
 
-**简单环境**:
+**简单环境**：
 - Docker容器
 - 基本的文件系统操作
 
-**中等复杂**:
+**中等复杂**：
 - K8S上的虚拟环境
 - 网络调用
 
-**高复杂**:
+**高复杂**：
 - 嵌套VM
 - 复杂workflow
 - 多个服务协同
 
 ### 11.1.5 Agent部署架构
 
-**单机部署**:
+**单机部署**：
 ```python
 # 适合开发和实验
 # 单机运行Agent + Inference
 docker-compose up agent inference
 ```
 
-**K8S部署**:
+**K8S部署**：
 ```yaml
 # 需要Operator管理
 apiVersion: agent.example.com/v1
@@ -203,7 +214,7 @@ spec:
     maxReplicas: 10 # 示例
 ```
 
-**云原生部署**:
+**云原生部署**：
 - 使用AWS Lambda、GCP Cloud Functions
 - Serverless架构
 
@@ -310,12 +321,12 @@ services:
 
 **原则1: Design Around the KV-Cache** ⭐⭐⭐
 
-**核心洞察**:
+**核心洞察**：
 - KV-cache hit rate是生产级agent最重要的单一指标
 - 直接影响latency(TTFT)和cost
 - Agent的输入输出比例可能显著高于普通对话
 
-**三大实践**:
+**三大实践**：
 
 1. **稳定的Prompt Prefix**
    ```python
@@ -368,12 +379,12 @@ services:
 
 **原则2: Mask, Don't Remove** ⭐⭐⭐
 
-**问题**: 工具数量爆炸
+**问题**：工具数量爆炸
 - MCP协议让用户plug数百个工具
 - 工具过多导致模型选择错误action
 - 动态添加/删除工具破坏KV-cache
 
-**Solution**: Context-aware State Machine
+**Solution**：Context-aware State Machine
 
 ```python
 # 保持工具定义稳定(保护KV-cache)
@@ -400,7 +411,7 @@ def get_prefill(agent_state: str) -> str:
     # 可以选择任何工具
 ```
 
-**三种Function Calling模式**:
+**三种Function Calling模式**：
 ```python
 # Mode 1: Auto - 模型自主选择
 prefix = "<|im_start|>assistant\n"
@@ -415,12 +426,12 @@ prefix = "<|im_start|>assistant\n<|tool|>{\"name\": \"browser_"
 
 **原则3: File System as Ultimate Context** ⭐⭐
 
-**长context的三大痛点**:
+**长context的三大痛点**：
 1. **Observations巨大**: 网页、PDF可能包含大量tokens
 2. **性能下降**: 超过一定长度后模型性能可能下降
 3. **成本高昂**: 即使有cache,长context仍贵
 
-**Solution**: 文件系统作为外部memory
+**Solution**：文件系统作为外部memory
 
 ```python
 # 网页内容 → 保存到文件
@@ -444,12 +455,12 @@ context.append({
 
 **原则4: Manipulate Attention Through Recitation** ⭐⭐
 
-**问题**:
+**问题**：
 - 典型Agent任务: 多步tool calls
 - Context快速增长到大量tokens
 - 模型容易"lost-in-the-middle"或偏移目标
 
-**Solution**: todo.md机制
+**Solution**：todo.md机制
 
 ```python
 # Agent自动创建和更新todo.md
@@ -475,18 +486,18 @@ Current step: Comparing prices...
 
 **原则5: Keep the Wrong Stuff In** ⭐⭐
 
-**常见错误**:
+**常见错误**：
 - Agent出错 → 清理trace → 重试
 - 使用temperature"重启"
 - 隐藏错误让context"干净"
 
-**为什么错误**:
+**为什么错误**：
 - 移除失败 = 移除证据
 - 模型无法从错误中学习
 - 无法更新内部beliefs
 - 容易重复同样错误
 
-**正确做法**:
+**正确做法**：
 ```python
 # 保留完整trace(包括错误)
 context = [
@@ -504,25 +515,25 @@ context = [
 ]
 ```
 
-**关键洞察**:
+**核心洞察**：
 - **错误恢复是true agentic behavior的标志**
 - 学术界忽视的指标
 - 人类从错误中学习,Agent也应如此
 
 **原则6: Don't Get Few-Shotted** ⭐
 
-**问题**:
+**问题**：
 - LLM是优秀的mimic
 - Few-shot在Agent中可能适得其反
 - Context充满相似action-observation pairs
 - 模型陷入模式,失去灵活性
 
-**案例**:
+**案例**：
 - 批量处理20份简历
 - Agent陷入节奏: 重复相似动作
 - 结果: drift、overgeneralization、hallucination
 
-**Solution**: 增加多样性
+**Solution**：增加多样性
 
 ```python
 # 引入微小变化
@@ -542,13 +553,13 @@ templates = [
 
 #### 开源生态的机会
 
-**当前缺失**:
+**当前缺失**：
 - ❌ 没有标准化的context management
 - ❌ 每个agent都要re-invent这些模式
 - ❌ 缺乏best practices文档
 - ❌ 没有agent-oriented的profiling工具
 
-**可以做的事情**:
+**可以做的事情**：
 
 1. **开源Context Management Library**
    ```python
@@ -599,13 +610,13 @@ templates = [
 - Flops per byte: 训练阶段通常更高(示意)
 - 计算密集
 
-**推理**:
+**推理**：
 - Flops per byte: 推理阶段通常更低(示意)
 - 带宽密集
 
-**差距**: 数量级差异(示意)
+**差距**：数量级差异(示意)
 
-**启示**: 应该用不同的硬件
+**启示**：应该用不同的硬件
 
 ```
 训练: 需要高计算能力 → 选择更强算力硬件
@@ -616,7 +627,7 @@ templates = [
 
 ### 11.2.2 异构部署的机会
 
-**之前的问题**:
+**之前的问题**：
 - 大家都在SPMD时不会考虑
 - 物理上在同一集群但权限不同
 
@@ -625,28 +636,28 @@ templates = [
 - 结合不同成本与性能特征的硬件
 - 提升整体硬件利用率
 
-**为什么现在可以**:
+**为什么现在可以**：
 - RL把training和rollout分开了
 - 推理之间没有异构通信
 - 可以独立操作
 
 ### 11.2.3 不同GPU的应用场景
 
-**H100**:
+**H100**：
 - 训练优化
 - 高计算能力
 
-**H200/L40s**:
+**H200/L40s**：
 - 推理优化
 - 高带宽
 
-**多种硬件选择**:
+**多种硬件选择**：
 - 推理场景硬件可选项更丰富
 - 训练硬件选择更依赖生态与工具链
 
 ### 11.2.4 容灾和混部的机会
 
-**之前的问题**:
+**之前的问题**：
 - NCCL/MPI不太能容灾
 - 一个节点挂了就整体夯死
 - 大家全杀掉重启
@@ -656,7 +667,7 @@ templates = [
 - 推理之间没有异构通信
 - 可以做容灾、混部、扩缩容
 
-**应用场景**:
+**应用场景**：
 ```python
 # 潮汐队列: 白天推理,夜间RL
 daytime:
@@ -675,15 +686,15 @@ nighttime:
 
 ### 11.2.5 异构部署的挑战
 
-**Checkpoint管理**:
+**Checkpoint管理**：
 - 不同硬件间checkpoint转换
 - T级别模型checkpoint巨大(张博涵@浙大)
 
-**通信**:
+**通信**：
 - 跨集群的通信
 - 网络带宽瓶颈
 
-**监控**:
+**监控**：
 - 统一监控不同硬件
 - 资源调度复杂
 
@@ -788,7 +799,7 @@ class MoELayer:
         return output
 ```
 
-**MoE的优势**:
+**MoE的优势**：
 - **稀疏激活**: 每个token只使用部分专家
 - **模型容量大**: 总参数量多,但计算量少
 - **成本优化**: 推理成本可能降低(依负载而定)
@@ -834,7 +845,7 @@ communication_cost = O(num_tokens * num_gpus * num_experts)
 
 ### 11.3.3 专家路由优化
 
-**负载均衡策略**:
+**负载均衡策略**：
 
 ```python
 class LoadBalancedGate:
@@ -991,7 +1002,7 @@ class LLaVA:
 
 ### 11.4.2 视觉编码器优化
 
-**挑战**: 图像编码计算量大
+**挑战**：图像编码计算量大
 
 ```
 图像: 典型分辨率(示意)
@@ -1001,7 +1012,7 @@ Vision Encoder: 典型大模型(示意)
 计算: 视模型规模与patch数而定
 ```
 
-**优化策略**:
+**优化策略**：
 
 1. **提前计算图像特征**
    ```python
@@ -1038,7 +1049,7 @@ Vision Encoder: 典型大模型(示意)
 
 ### 11.4.3 多模态推理流水线
 
-**完整的流水线**:
+**完整的流水线**：
 
 ```python
 class MultiModalPipeline:
@@ -1068,7 +1079,7 @@ class MultiModalPipeline:
         return outputs
 ```
 
-**性能优化**:
+**性能优化**：
 
 ```python
 # 优化1: Pipeline并行
@@ -1107,12 +1118,12 @@ async def async_generate(image: Image, prompt: str):
 两边大眼瞪小眼
 ```
 
-**技术疑问**:
+**技术疑问**：
 - Diffusion的训练推理分离是否成立?
   - 训练: computation bound
   - 推理: I/O bound
 
-**市场空白**:
+**市场空白**：
 - Video generation没有好的开源训练框架
 - 市面上没有很好的Diffusion RL系统
 
@@ -1143,7 +1154,7 @@ compiled_model = torch.compile(model)
 # 4. Compilation: 编译为机器码
 ```
 
-**优化技术**:
+**优化技术**：
 - **Dead Code Elimination**: 移除无用代码
 - **Operator Fusion**: 融合多个操作
 - **Memory Layout Optimization**: 优化内存布局
@@ -1211,7 +1222,7 @@ VLLM_USE_TORCH_COMPILE=1 vllm serve meta-llama/Llama-3.1-8B  # 示例
 
 ### 11.6.1 Flash Attention原理
 
-**标准Attention的问题**:
+**标准Attention的问题**：
 
 ```python
 # 标准Attention: O(N²) 内存复杂度
@@ -1230,7 +1241,7 @@ def standard_attention(Q, K, V):
     return output
 ```
 
-**Flash Attention的优化**:
+**Flash Attention的优化**：
 
 ```python
 # Flash Attention: O(N) 内存复杂度
@@ -1269,7 +1280,7 @@ def flash_attention(Q, K, V, block_size=64):
 
 ### 11.6.2 Flash Attention 2
 
-**Flash Attention 2改进**:
+**Flash Attention 2改进**：
 - 更好的work partition
 - 减少非矩阵计算
 - 更好的并行性
@@ -1356,12 +1367,12 @@ vllm serve meta-llama/Llama-3.1-8B \
 
 ### 11.7.1 何时需要自定义算子
 
-**场景**:
+**场景**：
 1. **性能瓶颈**: 现有算子性能不够
 2. **新算法**: PyTorch没有实现
 3. **特殊优化**: 针对特定硬件优化
 
-**示例**:
+**示例**：
 - 自定义Attention实现
 - 特殊量化算子
 - MoE专家路由
@@ -1490,7 +1501,7 @@ print(f"Speedup: {torch_time/custom_time:.2f}x")
 - Inference的CPU优化
 - 是否用C++(PyTorch也在考虑)
 
-**解决方案**:
+**解决方案**：
 
 ```python
 # 使用FastAPI + uvicorn
@@ -1551,13 +1562,13 @@ if __name__ == "__main__":
 
 **核心价值**：解决超大 MoE 模型的部署难题（把问题从“能不能训”变成“能不能稳态服务”）
 
-**什么是Large EP**:
+**什么是Large EP**：
 - 传统的Tensor Parallelism在MoE上的局限
 - Expert Parallelism: 将不同专家分配到不同GPU
 - 跨节点的专家路由和负载均衡
 - All-to-All通信优化
 
-**关键技术挑战**:
+**关键技术挑战**：
 
 1. **专家负载均衡**
    - 不同专家的访问频率差异
@@ -1573,7 +1584,7 @@ if __name__ == "__main__":
    - 专家失败的处理
    - 动态扩缩容专家数量
 
-**vLLM的实现**:
+**vLLM的实现**：
 - 分布式调度器设计
 - 专家路由算法
 - 性能基准测试
@@ -1585,7 +1596,7 @@ if __name__ == "__main__":
 
 **核心价值**：把 EP 与 DP 组合起来，试图同时解决“模型太大放不下”和“利用率不均”的问题
 
-**EPD的核心思想**:
+**EPD的核心思想**：
 
 传统MoE部署的问题:
 - 单纯Expert Parallelism: GPU利用率不均
@@ -1596,7 +1607,7 @@ EPD的创新:
 - 更好的负载均衡
 - 提升整体GPU利用率
 
-**可能带来的收益（需压测验证）**:
+**可能带来的收益（需压测验证）**：
 - 吞吐与 GPU 利用率可能提升（尤其是负载不均明显时）
 - 尾延迟可能改善，也可能因通信/排队变差；必须看 P95/P99
 
@@ -1604,14 +1615,14 @@ EPD的创新:
 
 **参考链接（可选）**：[vLLM Issue #20323](https://github.com/vllm-project/vllm/issues/20323)
 
-**核心价值**: 动态调整专家并行度,适应不同负载
+**核心价值**：动态调整专家并行度,适应不同负载
 
-**什么是Elastic EP**:
+**什么是Elastic EP**：
 - 静态EP的问题: 无法适应流量波动
 - Elastic EP: 根据负载动态调整专家副本数
 - 弹性扩缩容专家
 
-**应用场景**:
+**应用场景**：
 - 流量波动大的服务
 - 多租户环境
 - 成本敏感的部署
@@ -1622,7 +1633,7 @@ EPD的创新:
 
 **核心价值**：解耦 prefill 与 decode，把不同阶段放到更合适的资源池上
 
-**MoonCake的核心设计**:
+**MoonCake的核心设计**：
 
 ```python
 # disaggregated architecture
@@ -1649,12 +1660,12 @@ kv_cache_cluster = Cluster(
 )
 ```
 
-**为什么分离**:
+**为什么分离**：
 - Prefill和Decode的计算模式完全不同
 - 统一部署导致资源浪费
 - 分离后可分别优化
 
-**关键技术**:
+**关键技术**：
 
 1. **KV Cache传输协议**
    - 高效的序列化和反序列化
@@ -1671,7 +1682,7 @@ kv_cache_cluster = Cluster(
    - 故障恢复
    - 重新计算策略
 
-**可能的收益（需压测验证）**:
+**可能的收益（需压测验证）**：
 - 成本可能下降（取决于资源类型匹配、KV 传输开销与负载形态）
 - 吞吐可能提升（若网络/调度不成为新瓶颈）
 - 资源利用率有机会提高，但尾延迟与故障域也更复杂
@@ -1681,19 +1692,19 @@ kv_cache_cluster = Cluster(
 
 **核心洞察（经验口径）**：当框架层的优化接近边际收益时，瓶颈会继续下沉到网络与通信，需要全栈协同优化
 
-**2024 vs 2025对比**:
+**2024 vs 2025对比**：
 - **2024年**: 框架层面优化(vLLM、TGI)
 - **2025年**: 需要深入到更低层次
   - RDMA优化
   - Networking层优化
   - Kernel层优化
 
-**为什么需要更深层**:
+**为什么需要更深层**：
 - 框架层的优化已经接近极限
 - 瓶颈转移到网络和通信
 - 需要全栈协同优化
 
-**技术要求**:
+**技术要求**：
 - 需要懂: 算法 + 硬件 + 系统 + 网络
 - 跨领域协作成为常态
 - 人才稀缺性增加
@@ -1702,24 +1713,24 @@ kv_cache_cluster = Cluster(
 
 **核心洞察（经验口径）**：传统 SPMD 并不适合所有在线推理负载；当请求模式多变、batch 难以做大时，更事件驱动的调度与执行方式可能更合适
 
-**SPMD (Single Program Multiple Data)**:
+**SPMD (Single Program Multiple Data)**：
 - 传统的数据并行模式
 - Workflow事先program好
 - 适合大规模批量处理
 
-**Event Driven模式**:
+**Event Driven模式**：
 - 动态调度和执行
 - 适合batch size达不到的场景
 - 更灵活但编程复杂度高
 
-**适用场景对比**:
+**适用场景对比**：
 
-**SPMD适合**:
+**SPMD适合**：
 - 高吞吐量场景
 - 请求模式稳定
 - 批处理任务
 
-**Event Driven适合**:
+**Event Driven适合**：
 - 低延迟要求
 - 请求模式多变
 - 交互式应用
@@ -1728,23 +1739,23 @@ kv_cache_cluster = Cluster(
 
 **核心洞察（经验口径）**：算法与系统需要同步演进；如果两边只在“交付完成后”才对齐，往往会在最后一公里出现大量返工
 
-**传统模式的问题**:
+**传统模式的问题**：
 - 系统团队: 等算法成熟再做优化
 - 算法团队: 等系统优化好再实验
 - 结果: 两边都在等,进度缓慢
 
-**Co-Design方法**:
+**Co-Design方法**：
 
-**同步螺旋式上升**:
+**同步螺旋式上升**：
 - 算法和系统同步演进
 - 每个版本都互相反馈
 - 快速迭代验证
 
-**案例**:
+**案例**：
 - INT4 QAT: 算法创新 + 系统优化
 - PD分离: 架构创新 + 工程实现
 
-**实践建议**:
+**实践建议**：
 - 建立联合开发团队
 - 共享性能基准
 - 定期技术同步
@@ -1755,7 +1766,7 @@ kv_cache_cluster = Cluster(
 
 ### ❌ "MoE总是更便宜"
 
-**实际情况**: 取决于部署策略。
+**实际情况**：取决于部署策略。
 
 ```python
 # Dense模型
@@ -1775,7 +1786,7 @@ kv_cache_cluster = Cluster(
 
 ### ❌ "更多GPU总是更快"
 
-**实际情况**: 通信开销可能抵消收益。
+**实际情况**：通信开销可能抵消收益。
 
 ```python
 # 单GPU: 基准(示意)
@@ -1789,7 +1800,7 @@ kv_cache_cluster = Cluster(
 
 ### ❌ "Agent系统就是LLM + Tools"
 
-**实际情况**: Agent Infra是复杂的系统工程。
+**实际情况**：Agent Infra是复杂的系统工程。
 
 ```
 需要考虑:
@@ -1805,7 +1816,7 @@ kv_cache_cluster = Cluster(
 
 ### ❌ "Linear Attention是未来"
 
-**实际情况**: Sparse Attention更实用。
+**实际情况**：Sparse Attention更实用。
 
 ```python
 # Linear Attention
@@ -1838,7 +1849,7 @@ kv_cache_cluster = Cluster(
 
 ## 📚 动手练习
 
-**练习11.1**: 搭建简单的Jupyter Agent
+**练习11.1**：搭建简单的Jupyter Agent
 
 目标: 实现一个在Jupyter环境中运行的Agent
 
@@ -1857,7 +1868,7 @@ assert result == "6"
 
 ---
 
-**练习11.2**: 异构硬件部署实验
+**练习11.2**：异构硬件部署实验
 
 目标: 体验异构部署的优势
 
@@ -1873,7 +1884,7 @@ assert result == "6"
 
 ---
 
-**练习11.3**: Context Engineering实践
+**练习11.3**：Context Engineering实践
 
 目标: 应用Manus的六大原则
 
@@ -1943,7 +1954,7 @@ print(result)  # 6
 
 ## 🎯 总结
 
-关键要点:
+关键要点：
 - **Agent Infra是最大的机会**: 开源生态是负分,等待创新
 - **Context Engineering是Agent的"SGD"**: 围绕KV-cache设计,通过实验和迭代找到局部最优
 - **异构部署是趋势**: Training用H100,Rollout用H200,充分利用硬件
@@ -1951,6 +1962,8 @@ print(result)  # 6
 - **技术栈越来越深**: 从框架到网络到kernel,需要全栈优化
 - **算法和系统需要Co-Design**: 同步螺旋式上升,快速迭代验证
 
-**下一步**: 探索附录中的工具和资源
+## 继续深入
+
+读到这里，主线已经收束。后续如果要继续往前走，建议把附录和参考资料当成“工程工具箱”而不是补充阅读：一边回到自己的系统里做 profiling、压测和故障复盘，一边挑选与你当前阶段最相关的专题继续深挖，而不是同时追所有前沿方向。
 
 ---
