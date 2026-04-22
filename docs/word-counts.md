@@ -7,15 +7,15 @@
 
 | file | bytes | lines | chars | non_ws | cjk | words |
 | --- | --- | --- | --- | --- | --- | --- |
-| `chapters/chapter01-introduction.md` | 23969 | 449 | 9967 | 9019 | 6035 | 754 |
-| `chapters/chapter02-technology-landscape.md` | 28019 | 586 | 12550 | 11081 | 6440 | 1163 |
-| `chapters/chapter03-gpu-basics.md` | 22501 | 556 | 10886 | 9466 | 4944 | 1132 |
+| `chapters/chapter01-introduction.md` | 15711 | 338 | 7016 | 6116 | 3761 | 762 |
+| `chapters/chapter02-technology-landscape.md` | 32565 | 676 | 15350 | 13313 | 7187 | 1710 |
+| `chapters/chapter03-gpu-basics.md` | 25749 | 639 | 13342 | 11027 | 5288 | 1460 |
 | `chapters/chapter04-environment-setup.md` | 35353 | 1441 | 26978 | 21203 | 2943 | 3030 |
-| `chapters/chapter05-llm-inference-basics.md` | 36424 | 1391 | 22817 | 17981 | 6333 | 3655 |
-| `chapters/chapter06-kv-cache-optimization.md` | 36954 | 1418 | 26355 | 20476 | 4887 | 4018 |
-| `chapters/chapter07-request-scheduling.md` | 45309 | 1560 | 29370 | 22171 | 7135 | 3360 |
-| `chapters/chapter08-quantization.md` | 56590 | 2275 | 38064 | 29514 | 8405 | 5023 |
+| `chapters/chapter05-llm-inference-basics.md` | 38969 | 1454 | 24522 | 19358 | 6714 | 3968 |
+| `chapters/chapter06-kv-cache-optimization.md` | 40846 | 1501 | 28942 | 22499 | 5426 | 4483 |
+| `chapters/chapter07-request-scheduling.md` | 51638 | 1673 | 33326 | 24172 | 7338 | 3794 |
+| `chapters/chapter08-quantization.md` | 60908 | 2360 | 41115 | 31952 | 8957 | 5618 |
 | `chapters/chapter09-speculative-sampling.md` | 36800 | 1096 | 19445 | 15556 | 7188 | 2271 |
-| `chapters/chapter10-production-deployment.md` | 73784 | 2779 | 53892 | 40579 | 7626 | 5540 |
+| `chapters/chapter10-production-deployment.md` | 78224 | 2934 | 57724 | 43424 | 7920 | 5955 |
 | `chapters/chapter11-advanced-topics.md` | 52475 | 1969 | 36330 | 29187 | 7457 | 3914 |
-| **TOTAL** | 448178 | 15520 | 286654 | 226233 | 69393 | 33860 |
+| **TOTAL** | 469238 | 16081 | 304090 | 237807 | 70179 | 36965 |
