@@ -105,14 +105,14 @@ Recommendation: Your GPU is working near max capacity. Consider:
 
 ## 🧪 Exercises
 
-### Exercise 2.1: Calculate Memory for Different Models
+### Exercise 3.1: Calculate Memory for Different Models
 
 Calculate memory requirements for:
 1. Llama-3-70B with 4-bit quantization
 2. Mistral-7B with INT8 quantization
 3. Compare and explain the differences
 
-### Exercise 2.2: Batch Size vs Memory
+### Exercise 3.2: Batch Size vs Memory
 
 Plot how memory usage scales with batch size:
 ```bash
@@ -121,7 +121,7 @@ python memory_calculator.py --batch-size 2 > batch2.txt
 # ... and so on
 ```
 
-### Exercise 2.3: Real-World Diagnosis
+### Exercise 3.3: Real-World Diagnosis
 
 Monitor a real vLLM server:
 1. Start vLLM with Llama-3-8B

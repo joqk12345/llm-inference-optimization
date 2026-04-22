@@ -32,7 +32,7 @@ display_order: 6
 >
 > 核心思路: 从第一性原理出发,理解LLM推理的基本流程和优化动机。
 >
-> 学习路径: Attention → KV Cache → Chunked Prefill → Continuous Batching → PagedAttention
+> 学习路径: Prefill/Decode → Attention → KV Cache → 系统瓶颈 → 为第6-7章做准备
 
 ## 简介
 
@@ -50,19 +50,18 @@ display_order: 6
 - LLM 如何生成文本 (Prefill 和 Decode 阶段)
 - Attention 机制的工作原理和计算复杂度
 - KV Cache 如何将复杂度从 O(n²) 降到 O(n)
-- 内存碎片化问题: 传统KV Cache管理的致命缺陷
-- 操作系统类比: 从虚拟内存理解PagedAttention的设计思想
-- Chunked Prefill 如何处理超长 prompt
-- 为什么需要 Continuous Batching
-- vLLM 的三层架构全景
+- 内存碎片化问题: 为什么后续会出现更复杂的 KV 管理方案
+- 操作系统类比: 如何用虚拟内存视角理解分页式 KV 管理
+- Chunked Prefill、PagedAttention、Continuous Batching 分别在解决什么问题
+- vLLM 架构如何把这些优化组织成完整系统
 
-学完本章，你将能够解释 vLLM 为什么能在很多场景里显著快于朴素实现，并理解 PagedAttention 如何借鉴操作系统虚拟内存的思想缓解 KV 管理中的碎片化与复用问题。
+学完本章，你将能够解释 vLLM 为什么能在很多场景里显著快于朴素实现，并知道哪些问题会在第6章和第7章被展开为独立主题。本章的目标是建立共同语言，而不是替代后续章节的工程细节。
 
 ---
 
 ## 5.1 训练 vs 推理: 工作负载的本质差异
 
->  核心洞察: 理解训练和推理的工作负载差异,是理解优化策略的第一步。
+>  核心洞察：理解训练和推理的工作负载差异,是理解优化策略的第一步。
 
 ### 5.1.1 训练: 计算密集型的并行工作负载
 
@@ -934,7 +933,7 @@ Request C: 预分配2048 slots, 实际使用300
 
 ## 5.6 操作系统类比: 虚拟内存与分页
 
->  核心洞察: PagedAttention的设计思想直接借鉴了操作系统的虚拟内存机制。
+>  核心洞察：PagedAttention的设计思想直接借鉴了操作系统的虚拟内存机制。
 
 ### 5.6.1 操作系统面临的内存管理问题
 
@@ -1053,913 +1052,264 @@ MMU重新翻译: 页2 → 帧3
 
 ## 5.7 Chunked Prefill: 处理长 prompt
 
-### 5.7.1 . 问题: 大 prompt 超过显存
+> 这一节只建立问题直觉和基本流程。更完整的调度策略放到第7章展开。
 
-场景: Cursor 添加整个代码仓库到 prompt
+### 5.7.1 为什么会需要它
 
-```
-代码仓库: 10,000 行代码
-Tokens:   ~100,000 tokens
+当 prompt 很长时,问题往往不是模型参数放不下,而是一次性 prefill 需要的中间激活和 KV 增长超过了当前显存预算。
 
-问题: 100,000 个 tokens 的激活值超过 GPU 显存!
-```
+典型场景:
 
-约束: 每次 forward pass 最多处理 m 个 token
-
-```
-GPU: RTX 4090 24GB
-显存: 24 GB
-约束: 每次 ~4,096 tokens
+```text
+一个请求携带超长上下文
+→ 一次性 prefill 太大
+→ TTFT 变高,甚至直接 OOM
 ```
 
----
+### 5.7.2 它在做什么
 
-### 5.7.2 . 解决方案: 分块处理
+Chunked Prefill 的核心不是新算法,而是一种更保守的执行方式:
 
-思路: 将 n 个 token 的 prompt 分成 ⌈n/m⌉ 个 chunks
+- 不一次吞下整个 prompt
+- 把 prefill 拆成若干段
+- 每处理完一段,就把已经得到的 KV 保留下来
+- 下一段在已有 KV 的基础上继续推进
 
-示例: n=7, m=4 → 分成 2 个 chunks
+如果只记一句话,就是:
 
-```
-原始: [t0, t1, t2, t3, t4, t5, t6]
-
-Chunk 1: [t0, t1, t2, t3]
-Chunk 2: [t4, t5, t6]
-```
-
-关键: 如何保持信息连续性?
-
----
-
-### 5.7.3 . KV Cache 在 chunked prefill 中的作用
-
-Chunk 1:
-```
-输入: [t0, t1, t2, t3]
-计算:
-  K0, V0
-  K1, V1
-  K2, V2
-  K3, V3
-存储: 缓存 K0-3, V0-3
+```text
+把“大 prompt 的一次性峰值显存压力”换成“多轮可控的增量处理”。
 ```
 
-Chunk 2:
-```
-输入: [t4, t5, t6]
-复用: K0-3, V0-3 (从缓存读取)
-计算:
-  K4, V4
-  K5, V5
-  K6, V6
-拼接: [K0, K1, K2, K3, K4, K5, K6]
-      [V0, V1, V2, V3, V4, V5, V6]
-```
+### 5.7.3 在系统里它意味着什么
 
-Attention mask 调整: 确保跨 chunk 的 token 正确交互
+Chunk size 不是越大越好,而是要和三件事一起看:
 
-```python
-# Chunk 1 mask (4 tokens)
-mask1 = [
-    [True,  False, False, False],
-    [True,  True,  False, False],
-    [True,  True,  True,  False],
-    [True,  True,  True,  True ],
-]
+- 显存预算: 太大容易 OOM
+- TTFT: 太小会让 prefill 被切得过碎
+- 调度公平性: 超长请求不能长期霸占整轮资源
 
-# Chunk 2 mask (3 tokens, but can attend to chunk 1)
-mask2 = [
-    [True,  True,  True,  True,  True,  False, False],  # t4
-    [True,  True,  True,  True,  True,  True,  False],  # t5
-    [True,  True,  True,  True,  True,  True,  True ],  # t6
-    └─────┬────┘ └───────────┬───────────┘
-      Chunk 1         Chunk 2
-```
+所以到这里你只需要建立直觉:
 
----
-
-### 5.7.4 . 图解分块处理流程
-
-无 chunked prefill:
-```
-输入: 100,000 tokens
-问题: 显存不足!
-```
-
-有 chunked prefill:
-```
-Chunk 1: 处理 tokens 0-4095
-  → 计算 K0-4095, V0-4095
-  → 缓存到 GPU 内存
-
-Chunk 2: 处理 tokens 4096-8191
-  → 复用 K0-4095, V0-4095
-  → 计算 K4096-8191, V4096-8191
-  → 拼接完整 cache
-
-Chunk 3: 处理 tokens 8192-12287
-  → 复用 K0-8191, V0-8191
-  → 计算 K8192-12287, V8192-12287
-  → 拼接完整 cache
-
-...重复 25 次 (100,000 / 4,096)
-
-完成: 整个 100,000 tokens 的 KV cache
-```
-
-灵活性: 可根据内存约束动态调整 chunk 大小
-
-```
-GPU 内存充足: chunk_size = 8192
-GPU 内存紧张: chunk_size = 2048
-```
+- 它解决的是"长 prompt 怎么进系统"
+- 它通常和调度器一起工作,而不是单独存在
+- 第7章会继续讲它如何和 Continuous Batching、token budget 结合
 
 ---
 
 ## 5.8 PagedAttention入门: 借鉴OS的内存管理
 
->  核心思想: 将KV Cache分成固定大小的blocks,就像OS将内存分成pages一样。
+>  核心洞察：将KV Cache分成固定大小的blocks,就像OS将内存分成pages一样。
+>
+> 这一节聚焦为什么需要分页式 KV 管理。更具体的实现与工程权衡放到第6章继续展开。
 
-### 5.8.1 . 传统KV Cache的问题
+### 5.8.1 传统连续分配为什么麻烦
 
-连续内存分配:
+如果把每个请求的 KV 都当成一整块连续内存来管理,很快就会遇到三个问题:
 
-```
-Request A的KV Cache:
-  [Token 0-2047] 连续存储在GPU内存的某个区域
+- 请求提前结束时,预留空间被浪费
+- 请求继续变长时,需要搬迁或重新分配大块空间
+- 多请求并发时,连续大块越来越难找
 
-问题:
-  1. 预分配整个2048 token的空间
-  2. 如果只生成100 tokens,浪费1948个位置
-  3. 如果需要超过2048 tokens,需要重新分配更大的空间
-```
+也就是说,麻烦不在"KV Cache 有没有",而在"KV Cache 怎么放"。
 
-### 5.8.2 . Paged KV Cache的核心设计
+### 5.8.2 PagedAttention 的基本直觉
 
-分块存储:
+vLLM 的关键想法是:
 
-```
-传统方式:
-  Request A: [连续的2048个token的KV]
+- 不把 KV 当成一整段连续空间
+- 改成固定大小的 blocks
+- 用一张映射表记录"逻辑顺序"和"物理位置"
 
-Paged方式:
-  Request A:
-    Block 0: [Token 0-15]
-    Block 1: [Token 16-31]
-    Block 2: [Token 32-47]
-    ...
-    Block 127: [Token 2032-2047]
+可以把它类比成操作系统里的分页:
 
-每个Block:
-  - 固定大小 (如16 tokens)
-  - 可以存储在GPU内存的任意位置
-  - 通过Block Table追踪
+```text
+逻辑上的连续序列
+≠
+物理上的连续存储
 ```
 
-Block Table:
+这个变化本身不会改变 Attention 的数学结果,改变的是内存管理方式。
 
-```python
-# 逻辑块 → 物理块的映射
-block_table = {
-    "request_A": {
-        "logical_block_0": "physical_block_42",
-        "logical_block_1": "physical_block_17",
-        "logical_block_2": "physical_block_93",
-        # ...
-    }
-}
-```
+### 5.8.3 你现在只需要记住的收益
 
-### 5.8.3 . PagedAttention如何工作
+分页式 KV 管理最重要的收益有三类:
 
-Attention计算的挑战:
+- 更少的碎片化: 显存利用率更稳定
+- 更容易复用: 相同前缀更容易共享 blocks
+- 更利于调度: 多请求并发时,分配和回收更灵活
 
-```
-传统Attention:
-  - 假设K、V连续存储
-  - 一次性加载整个序列
-  - 简单的矩阵乘法
+对应地,复杂度也被转移到了系统实现里:
 
-PagedAttention:
-  - K、V分散在多个blocks
-  - 需要遍历block table
-  - 逐block计算attention
-```
+- 需要额外的 block table
+- 需要更复杂的分配与回收策略
+- kernel 不能再假设 KV 一定连续
 
-PagedAttention算法:
-
-```
-输入:
-  - Query: qi (当前token的query向量)
-  - Block Table: [B0, B1, B2, ..., Bn]
-
-步骤:
-  1. 初始化:
-     output = 0
-     running_max = -∞
-     running_sum = 0
-
-  2. 遍历每个block j:
-     a. 从Block Table获取物理块位置
-     b. 加载该块的Kj、Vj
-     c. 计算注意力分数: scores = qi ⊤ Kj / √d
-     d. 更新running_max和running_sum (online softmax)
-     e. 计算权重: weights = exp(scores - running_max)
-     f. 累加输出: output += weights × Vj
-
-  3. 归一化并返回output
-```
-
-关键特性:
-
-1. 数学等价性: 结果与传统Attention完全相同
-2. 内存灵活性: blocks可以分散在任意位置
-3. 增量计算: 只加载需要的blocks
-
-### 5.8.4 . PagedAttention的优势
-
-解决内部碎片化:
-
-```
-传统方式:
-  Request A: 生成100 tokens
-  → 预分配2048 slots
-  → 浪费: 1948 slots (95%)
-
-Paged方式:
-  Request A: 生成100 tokens
-  → 分配⌈100/16⌉ = 7个blocks
-  → 最后一个block只用了4个slots
-  → 浪费: 12 slots (12/112 = 11%)
-```
-
-解决外部碎片化:
-
-```
-传统方式:
-  内存分散,无法分配大块
-
-Paged方式:
-  所有blocks大小相同
-  任何空闲block都可以使用
-  无外部碎片化
-```
-
-内存共享 (Copy-on-Write):
-
-```
-Request A: "解释量子计算"
-Request B: "解释量子物理"
-
-共享前缀: "解释量子"
-
-Paged方式:
-  - 前缀的blocks可以共享
-  - 两个请求指向相同的物理blocks
-  - 只在分叉点分配新blocks
-  → 节省内存!
-```
-
-### 5.8.5 性能对比
-
-vLLM论文数据:
-
-```
-传统系统 (Orca, TGI):
-  - 内存浪费: 60-80%
-  - 实际吞吐: 基准
-
-vLLM (PagedAttention):
-  - 内存浪费: 显著降低（论文/benchmark 口径，实际取决于分配策略与负载）
-  - 吞吐: 往往更高（常见能带来明显提升，但幅度需以压测为准）
-```
-
-为什么能提升吞吐?
-
-```
-更少的内存浪费 → 可以服务更多并发请求 → 更好的GPU利用率 → 更高吞吐
-```
+这些实现细节正是第6章的重点。
 
 ---
 
 ## 5.9 批处理的挑战: 从静态到动态
 
-### 5.9.1 静态批处理
+### 5.9.1 静态批处理为什么会失效
 
-目标: 提高吞吐量 (throughput)
+批处理的初心没有错: 把多个请求一起送进 GPU,提高吞吐。
 
-方法: 将多个 prompt 打包成一个 batch
+问题在于,在线流量几乎从来都不是整齐的:
 
-```python
-# 3 个 prompt
-prompt1 = "Hello"
-prompt2 = "Hi there, how are you doing today?"
-prompt3 = "Hey"
+- prompt 长度不同
+- 输出长度不同
+- 新请求会不断到达
+- 有些请求已经进入 decode,有些请求还在 prefill
 
-# 问题: 长度不一致!
+一旦长度不一致,传统 batch 就会用 padding 把所有请求补到同一尺寸。
+
+### 5.9.2 真正被浪费的是什么
+
+padding 不是"显示上补几个空位"这么简单,而是会把本来不需要的计算也一起带进去。
+
+例如三个请求长度分别是 2、5、10:
+
+```text
+静态 batch 需要按 10 对齐
+→ 实际 token: 2 + 5 + 10 = 17
+→ 计算 token: 10 + 10 + 10 = 30
+→ 有效占比: 17 / 30 ≈ 57%
 ```
 
-约束: 所有 prompt 必须有相同长度
+这还只是 prefill 阶段的简单例子。到了在线 decode 阶段,问题通常更严重,因为:
 
-解决方案: 左侧 padding,右侧对齐
+- 老请求每轮只新增 1 个 token
+- 新请求可能一下子带来很长的 prompt
 
-```python
-# Padding
-prompt1 = "<pad><pad><pad><pad><pad><pad><pad><pad>Hello"
-prompt2 = "Hi there, how are you doing today?"
-prompt3 = "<pad><pad><pad><pad><pad><pad><pad><pad><pad>Hey"
+这时如果还坚持传统 batch,就会出现"少量真实 token + 大量对齐填充"的局面。
 
-# 统一长度: max(len(prompt1, prompt2, prompt3)) = 36
+### 5.9.3 这一节想把你带到哪里
+
+所以第5章在这里要完成的认知转折只有一个:
+
+```text
+在线推理的问题,不只是“能不能 batch”,
+而是“怎样 batch 才不会浪费掉绝大多数计算”。
 ```
 
----
-
-### 5.9.2 Padding 的问题: 计算浪费
-
-Padding 位置: 左侧 (添加`<pad>` token)
-
-Attention mask: padding 位置设为 False
-
-```python
-# Prompt 1 的 attention mask
-mask1 = [
-    [False, False, False, ..., True,  True],  # "H"
-    [False, False, False, ..., True,  True,  True],  # "e"
-    [False, False, False, ..., True,  True,  True,  True],  # "l"
-    [False, False, False, ..., True,  True,  True,  True,  True],  # "l"
-    [False, False, False, ..., True,  True,  True,  True,  True,  True],  # "o"
-    └─────────┬────────┘ └─────────────┬─────────────┘
-     padding (浪费)          实际内容
-]
-```
-
-问题: padding token 占用了计算资源,但没有实际贡献
-
-```python
-# GPU 仍然计算 padding tokens 的 attention!
-# 虽然结果被 mask 掉,但计算量没有减少
-```
-
----
-
-### 5.9.3 不同序列长度的困境
-
-场景: batch 中有多个 prompt,长度差异大
-
-```python
-batch = [
-    "Hi",          # 2 tokens
-    "Hello",       # 3 tokens
-    "How are you?", # 12 tokens
-]
-
-# 需要全部 padding 到 12 tokens
-padded_batch = [
-    "<pad><pad><pad><pad><pad><pad><pad><pad><pad><pad>Hi",
-    "<pad><pad><pad><pad><pad><pad><pad><pad><pad>Hello",
-    "How are you?",
-]
-```
-
-问题 1: 短 prompt 完成后,长 prompt 还在生成
-
-```
-时间线:
-0ms    100ms   200ms   300ms   ...   1200ms
-│      │       │       │             │
-Hi    Hi     Hi     ...          Hi   (完成)
-       Hello  Hello  ...          Hello   (完成)
-                How ...         How are you?   (完成)
-
-问题: "Hi" 和 "Hello" 完成后,
-      仍在 batch 中等待"How are you?"完成
-      → GPU 计算浪费在 padding 上!
-```
-
-问题 2: 动态调度引入大量 padding
-
-```
-Decode 阶段:
-- 正在 decode 的 prompt 每次只加 1 个 token
-- 新加入的 prompt 需要 prefill 很多 tokens
-
-Batch 状态:
-  Request 1: 已生成 100 tokens (decode 阶段)
-  Request 2-8: 已生成 50 tokens (decode 阶段)
-  Request 9: 新加入,有 1000 tokens 的 prompt
-
-问题:
-  - Request 9 需要 prefill 1000 tokens
-  - Request 1-8 只需要 decode 1 个 token
-  - 如何组织 batch?
-```
-
-Padding 数量 = (n-1) × (B-1)
-
----
-
-### 5.9.4 示例: 为什么 padding 成本随 batch 和长度二次增长
-
-参数:
-```
-B = 8   (batch 中 8 个 prompt 在 decode)
-n = 100 (新 prompt 有 100 个 token)
-```
-
-计算 padding:
-```
-新 prompt (Request 9):
-- 需要 prefill 100 tokens
-- 其他 7 个 request 只加 1 个 token
-
-Padding 数量:
-= (100 - 1) × (8 - 1)
-= 99 × 7
-= 693 个 padding tokens!
-
-实际计算:
-- Request 9: 100 tokens (实际内容)
-- Request 1-8: 每个 99 个 padding tokens + 1 个实际 token
-- 总计: 100 + 8×1 + 7×99 = 791 tokens
-- 有效: 100 + 8 = 108 tokens
-- 浪费: 791 - 108 = 683 tokens (86%!)
-```
-
-结论: 动态调度 + 传统 batching = 灾难
+接下来 Continuous Batching 就是在回答这个问题,而更完整的调度设计会在第7章展开。
 
 ---
 
 ## 5.10 Continuous Batching 入门 
->  核心洞察: 去掉 batch 维度,用 attention mask 控制 token 交互,让 GPU 时刻满载。
+>  核心洞察：去掉 batch 维度,用 attention mask 控制 token 交互,让 GPU 时刻满载。
+>
+> 本节只解释核心直觉。更系统的请求调度、负载取舍与线上指标放到第7章。
 
-### 5.10.1 核心思想: 去掉 batch 维度
+### 5.10.1 它到底改变了什么
 
-问题根源: batch 维度引入了 padding
+Continuous Batching 的关键变化是:
 
-激进想法: 不要 batch 维度!
+- 不再把每个请求硬塞进一个固定矩形 batch
+- 改成把当前活跃的工作拼接起来
+- 用 attention mask 保证不同请求彼此隔离
 
-替代方案: 拼接所有 prompt
+所以它真正去掉的不是"批处理",而是"必须按同一长度对齐"这件事。
 
-```python
-# 传统 batching
-batch = [
-    [token1, token2, token3],
-    [token4, token5],
-]
-shape: [2, 3]  # batch_size=2, seq_len=3 (padding!)
+### 5.10.2 为什么它适合在线推理
 
-# 新方法: 拼接
-sequence = [token1, token2, token3, token4, token5]
-shape: [5]  # 只有 seq_len!
+在线推理的典型状态是:
+
+- 有些请求刚进入系统,还在 prefill
+- 有些请求已经在 decode,每轮只新增 1 个 token
+- 有些请求刚好结束,可以被新请求替换
+
+Continuous Batching 适合这种场景,因为它允许调度器在每一轮都重新组织工作集:
+
+- 完成的请求移出
+- 等待中的请求补进
+- 长 prompt 可以按 chunk 逐步进入
+
+这也是为什么它本质上属于"调度问题",而不是单纯的 tensor 形状技巧。
+
+### 5.10.3 用一句话区分三种思路
+
+| 方法 | 你该记住的核心特征 |
+|------|--------------------|
+| Static Batching | 简单,但长度不齐时 padding 浪费大 |
+| Dynamic Batching | 能动态凑 batch,但仍容易被 padding 拖累 |
+| Continuous Batching | 让调度器按轮重组活跃请求,尽量只计算真正有意义的 token |
+
+如果只看第5章,你只需要接受这个结论:
+
+```text
+Continuous Batching 不是“又一种 batch 技巧”,
+而是在线推理系统从静态批处理走向迭代级调度的入口。
 ```
 
-新问题: 如何防止不同 prompt 的 token 互相干扰?
+更具体的工作流程、调度器实现、PD 分离与参数调优,统一放到第7章。
 
 ---
 
-### 5.10.2 Ragged Batching: 用 attention mask 控制交互
+## 5.11 vLLM 架构预览
+**参考链接（可选）**：[Berkeley EECS-2025-192 - Deconstructing vLLM](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
 
-方法:
-1. 将多个 prompt 拼接成一个序列
-2. 用 attention mask 控制 token 交互
-3. Prompt A 的 token 不能 attend to Prompt B 的 token
+**核心价值**：用一张模块地图把前面出现的概念串起来,为后续章节铺垫架构知识。
 
-Mask 形状: 块对角矩阵 (block-diagonal)
-
-可视化:
-```
-Prompt A (3 tokens): [A1, A2, A3]
-Prompt B (2 tokens): [B1, B2]
-
-拼接: [A1, A2, A3, B1, B2]
-
-Attention Mask:
-       A1   A2   A3   B1   B2
-A1:   []  [ ]  [ ]  [ ]  [ ]
-A2:   []  []  [ ]  [ ]  [ ]
-A3:   []  []  []  [ ]  [ ]
-B1:   [ ]  [ ]  [ ]  []  [ ]
-B2:   [ ]  [ ]  [ ]  []  []
-
-块对角结构:
-┌─────┬─────┐
-│ A A │     │
-│ A A │     │
-│ A A │     │
-├─────┼─────┤
-│     │ B B │
-│     │ B B │
-└─────┴─────┘
-```
-
-优势: 无 padding,所有计算都有意义
-
-```python
-# GPU 计算的每个 token 都是实际需要的!
-# 没有 padding 浪费
-```
-
----
-
-### 5.10.3 Dynamic Scheduling: 动态替换完成的请求
-
-场景: 某个 prompt 生成 `<eos>`
-
-动作:
-```
-步骤 1: 检测到 Request A 完成
-步骤 2: 立即从 batch 中移除 Request A
-步骤 3: 用等待中的 Request C 替换
-步骤 4: 重新构建 attention mask
-```
-
-目标: 保持 GPU 时刻满载
-
-关键: Ragged batching 让替换成本低
-
-```
-传统 batching (需要重新 padding):
-- 移除 Request A
-- 重新计算最大长度
-- 重新 padding 所有请求
-- 成本: 高!
-
-Continuous Batching (只需重建 mask):
-- 移除 Request A 的 tokens
-- 追加 Request C 的 tokens
-- 重建 block-diagonal mask
-- 成本: 低!
-```
-
----
-
-### 5.10.4 混合 Prefill 和 Decode: 最大化 throughput
-
-挑战:
-```
-Decode 阶段的 prompt:
-- 每次只加 1 个 token
-- 快速,占用少量 GPU
-
-新加入的 prompt:
-- 需要 prefill 很多 tokens
-- 慢,占用大量 GPU
-
-如何平衡?
-```
-
-调度算法:
-```
-目标: 每个 batch 达到 m 个 token (memory budget)
-
-步骤 1: 统计当前 decode 阶段的请求数
-  decode_requests = 10
-  decode_tokens = 10 × 1 = 10
-
-步骤 2: 计算剩余空间
-  remaining = m - decode_tokens
-  remaining = 1000 - 10 = 990
-
-步骤 3: 用 chunked prefill 加入新请求
-  new_request_tokens = 100
-  if remaining >= new_request_tokens:
-    # 可以加入整个 request
-    add_request(new_request)
-  else:
-    # 只 prefill 一个 chunk
-    chunk_size = remaining
-    add_chunk(new_request, chunk_size)
-```
-
-示例:
-```
-Memory budget: m = 1000
-
-当前状态:
-- 10 个 decode requests → 10 个 tokens
-
-新请求:
-- Request A: 100 tokens
-- Request B: 200 tokens
-- Request C: 500 tokens
-
-调度:
-- 加入 Request A: 10 + 100 = 110 tokens
-- 加入 Request B: 110 + 200 = 310 tokens
-- 加入 Request C (chunk 1): 310 + 500 = 810 tokens
-- 剩余: 1000 - 810 = 190 tokens
-- 加入 Request C (chunk 2): 810 + 190 = 1000 tokens (满!)
-
-GPU 利用率: 1000/1000 = 100%
-```
-
----
-
-### 5.10.5 完整的 Continuous Batching 流程图
-
-```
-步骤 1: 初始 batch
-┌─────────────────────────────────────┐
-│ Request A (已生成 50 tokens)        │
-│ Request B (已生成 30 tokens)        │
-│ Request C (已生成 20 tokens)        │
-└─────────────────────────────────────┘
-
-步骤 2: 某个请求完成
-┌─────────────────────────────────────┐
-│ Request A (生成 <eos>)             │
-│ Request B (已生成 31 tokens)        │
-│ Request C (已生成 21 tokens)        │
-└─────────────────────────────────────┘
-
-步骤 3: 移除完成的请求,加入新请求
-┌─────────────────────────────────────┐
-│ Request D (新,需要 prefill 100)     │
-│ Request B (已生成 32 tokens)        │
-│ Request C (已生成 22 tokens)        │
-└─────────────────────────────────────┘
-
-步骤 4: Chunked prefill + Decode
-┌─────────────────────────────────────┐
-│ Request D (prefill chunk 1: 70)     │
-│ Request B (decode: +1 token)        │
-│ Request C (decode: +1 token)        │
-└─────────────────────────────────────┘
-
-步骤 5: Forward pass
-→ GPU 处理 70 + 1 + 1 = 72 tokens
-→ 生成新 tokens
-
-步骤 6: 循环回到步骤 2
-```
-
----
-
-### 5.10.6 Continuous Batching vs 传统方法对比
-
-Static Batching:
-```
-优点:
-   简单,易于实现
-   适合固定长度的批处理
-
-缺点:
-   大量 padding (50-90%)
-   吞吐量低
-   GPU 利用率低
-```
-
-Dynamic Batching:
-```
-优点:
-   动态调整
-   比静态 batching 灵活
-
-缺点:
-   padding 仍然严重
-   频繁的重新 padding
-   难以优化
-```
-
-Continuous Batching (vLLM):
-```
-优点:
-   无 padding
-   GPU 利用率最高 (可达 95%+)
-   吞吐量可能显著提升（幅度取决于负载与实现）
-   支持动态调度
-
-缺点:
-   实现复杂
-   需要动态管理 attention mask
-   CPU 开销较高
-```
-
----
-
-## 5.11 vLLM 架构全景 
-**参考链接（可选）**: [Berkeley EECS-2025-192 - Deconstructing vLLM](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
-
-**核心价值**: 系统性理解 vLLM 的三层架构——Interface、Model Authoring、Runtime,为后续章节铺垫架构知识。
-
-**为什么重要**:
+**为什么重要**：
 - 从"会用 vLLM"到"理解 vLLM"的关键转变
 - 调试问题、性能优化、扩展开发的基础
 - 为第6章 (KV Cache)、第7章 (调度)、第10章 (部署) 铺垫
 
+本节只回答一个问题: 当一个请求进入 vLLM 后,哪些模块分别负责接口、内存、调度和执行? 具体实现细节不要在这里展开,否则会和后续章节重复。
+
 ### 5.11.1 vLLM 的三层架构
 
-Layer 1: Interfaces (用户交互层)
+可以先把 vLLM 看成三层:
 
 ```
-User Request → OpenAI Server → API Server → LLMEngine
+接口层 → 引擎/策略层 → 运行时层
 ```
 
-- LLMEngine: 核心引擎
-  - 作用: 协调所有组件
-  - 职责: 请求管理、资源分配、结果返回
-  - 接口: `generate()`, `encode()`
+| 层级 | 代表模块 | 主要职责 | 对应后续章节 |
+|------|----------|----------|--------------|
+| 接口层 | OpenAI-Compatible Server、API Server | 接收请求、参数校验、协议兼容 | 第10章 |
+| 引擎/策略层 | LLMEngine、Scheduler、BlockManager | 请求编排、调度决策、KV 资源管理 | 第6章、第7章 |
+| 运行时层 | Worker、CacheEngine、GPU kernels | 执行 forward、维护 cache、调用底层 kernel | 第6章、第11章 |
 
-- API Server: HTTP 服务
-  - 作用: 提供 REST API
-  - 职责: 请求路由、认证、限流
-  - 协议: HTTP/REST
-
-- OpenAI-Compatible Server: 标准接口
-  - 作用: 兼容 OpenAI API
-  - 职责: `/v1/chat/completions` 等接口
-  - 价值: 零代码迁移
+读这张表时要抓住一点: vLLM 的性能并不是某一个 kernel 单独决定的,而是接口、调度、内存管理和运行时共同作用的结果。
 
 ---
 
-Layer 2: Model Authoring (模型抽象层)
+### 5.11.2 一个请求如何穿过这三层
 
+可以把请求路径简化成下面这条线:
+
+```text
+用户请求
+  → API 层接收和校验
+  → LLMEngine 创建请求对象
+  → Scheduler 决定本轮谁先执行
+  → BlockManager / CacheEngine 准备 KV 资源
+  → Worker 在 GPU 上执行 prefill 或 decode
+  → 结果返回给用户
 ```
-LLMEngine → ModelExecutor → BlockManager + Scheduler
-```
 
-- ModelExecutor: 模型执行器
-  - 作用: 执行模型 forward pass
-  - 抽象: 支持不同模型架构
-  - 接口: `execute_model()`, `profile()`
-  - 详见: 第10章 Model Authoring
+这条链路里最值得记住的是两个分工:
 
-- BlockManager: 内存块管理
-  - 作用: 管理 KV Cache 的 physical blocks
-  - 职责: 分配、释放、迁移 blocks
-  - 抽象: Physical vs Logical blocks
-  - 详见: 第6章 PagedAttention 原理
+- `Scheduler` 负责"这轮该跑谁、跑多少"
+- `BlockManager / CacheEngine` 负责"KV 放哪、怎么复用、什么时候释放"
 
-- Scheduler: 请求调度器
-  - 作用: 决定哪些请求可以执行
-  - 策略: FIFO、Priority、SJF
-  - 输出: Scheduled requests
-  - 详见: 第7章 vLLM 的调度器实现
+前者主要决定吞吐、排队和尾延迟,后者主要决定显存效率、上下文承载能力和 OOM 风险。
 
 ---
 
-Layer 3: Runtime (运行时层)
+### 5.11.3 与后续章节的衔接
 
-```
-Scheduler → CacheEngine → Worker (GPU)
-```
+从这里开始,后面几章其实是在把这张地图拆开看:
 
-- CacheEngine: KV 缓存引擎
-  - 作用: 管理 KV Cache 的物理存储
-  - 数据结构: Block table
-  - 功能: Hash-based lookup
-  - 详见: 第6章 内存管理深度剖析
+- 第6章回答: KV Cache 为什么难管,`PagedAttention / Prefix Caching` 如何提升显存效率与复用能力
+- 第7章回答: 调度器如何在吞吐、延迟、公平性之间做取舍
+- 第10章回答: 当这些模块进入生产环境后,如何部署、观测、扩缩容和回滚
+- 第11章回答: 当系统继续演化到 Agent、异构硬件和底层优化时,运行时会遇到什么新问题
 
-- Worker: 工作进程
-  - 作用: 在 GPU 上执行计算
-  - 职责: 模型推理、kernel 执行
-  - 通信: 与主进程通信
-
----
-
-### 5.11.2 用户请求的完整流程
-
-步骤 1: 用户发送请求
-
-```bash
-curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "llama2",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
-```
-
-步骤 2: OpenAI Server 接收
-- 解析请求
-- 验证参数
-- 转发给 API Server
-
-步骤 3: API Server 处理
-- 请求路由
-- 限流检查
-- 调用 LLMEngine.generate()
-
-步骤 4: LLMEngine 调度
-- 创建请求对象
-- 提交给 Scheduler
-- 等待调度结果
-
-步骤 5: Scheduler 决策
-- 检查资源 (GPU memory、compute)
-- 选择可执行的请求
-- 返回 scheduled requests
-
-步骤 6: ModelExecutor 执行
-- 准备 input data
-- 调用 Worker.execute_model()
-- 等待 GPU 返回结果
-
-步骤 7: Worker 在 GPU 上执行
-- 加载模型 weights
-- 执行 PagedAttention kernels
-- 返回 generated tokens
-
-步骤 8: 结果返回
-```
-Worker → ModelExecutor → LLMEngine
-  ↓
-LLMEngine → API Server → OpenAI Server
-  ↓
-OpenAI Server → 用户
-```
-
----
-
-### 5.11.3 架构图
-
-```
-┌─────────────────────────────────────────────────┐
-│              Layer 1: Interfaces               │
-├─────────────────────────────────────────────────┤
-│  OpenAI Server  →  API Server  →  LLMEngine    │
-│  (HTTP)            (REST)         (Core)        │
-└─────────────────────────────────────────────────┘
-                        │
-┌─────────────────────────────────────────────────┐
-│           Layer 2: Model Authoring             │
-├─────────────────────────────────────────────────┤
-│  ModelExecutor  ←  Scheduler  ←  BlockManager   │
-│  (Execution)      (Policy)       (Memory)       │
-└─────────────────────────────────────────────────┘
-                        │
-┌─────────────────────────────────────────────────┐
-│             Layer 3: Runtime                    │
-├─────────────────────────────────────────────────┤
-│  CacheEngine  →  Worker  →  GPU Kernels         │
-│  (KV Cache)      (Compute)    (CUDA)            │
-└─────────────────────────────────────────────────┘
-```
-
----
-
-### 5.11.4 与后续章节的关联
-
-第6章 KV Cache 优化:
-- BlockManager 的详细实现 (6.3.2)
-- CacheEngine 的内存管理 (6.3.3)
-- PagedAttention 的核心创新 (6.3.2)
-
-第7章 请求调度策略:
-- Scheduler 的调度算法 (7.4)
-- Iteration-level scheduling (7.4.2)
-- CPU overheads 分析 (7.4.3)
-
-第10章 生产环境部署:
-- Interface 层部署模式 (10.2-10.4)
-- Model Authoring 实战 (10.6)
-- 性能分析与调优 (10.5)
-
----
-
-### 5.11.5 实战: 启动 vLLM 并观察架构
-
-启动 vLLM server:
-
-```bash
-vllm serve meta-llama/Llama-2-7b-hf \
-  --port 8000 \
-  --host 0.0.0.0
-```
-
-查看启动过程:
-
-```
-INFO:     Started server process
-INFO:     Waiting for vLLM engine to initialize
-INFO:     Initializing an LLM engine with config
-INFO:     Loading model weights
-INFO:     GPU memory: 15.50 GB
-INFO:     Model loaded
-```
-
-发送请求:
-
-```bash
-curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "meta-llama/Llama-2-7b-hf",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
-```
-
----
-
-### 5.11.6 架构理解检查点
-
-完成本章后,你应该能够:
-
-- [ ] 解释 vLLM 的三层架构
-- [ ] 描述用户请求的完整流程 (8步骤)
-- [ ] 理解 LLMEngine、ModelExecutor、Worker 的职责
-- [ ] 知道 BlockManager 和 Scheduler 的作用
-- [ ] 理解 PagedAttention 在架构中的位置
+如果你能把一个性能问题先归类到"接口层 / 调度层 / KV 层 / 运行时层",后面的大部分章节就会更容易读。
 
 ---
 
@@ -1974,7 +1324,7 @@ curl http://localhost:8000/v1/chat/completions \
 - [ ] 解释 Chunked Prefill 的原理和应用场景
 - [ ] 对比 Static Batching、Dynamic Batching 和 Continuous Batching
 - [ ] 描述 vLLM 的三层架构
-- [ ] 追踪用户请求在 vLLM 中的完整流程
+- [ ] 将性能问题初步归类到接口层、调度层、KV层或运行时层
 
 ---
 
@@ -2005,12 +1355,12 @@ Llama-2-7B 的配置:
 2. 画出 Continuous Batching 的 attention mask
 3. 计算 GPU 利用率 (有效 tokens / 总 tokens)
 
-练习 5.3: 追踪 vLLM 请求流程
+练习 5.3: 用模块地图分析一个请求流程
 
 启动 vLLM server,发送一个请求,并观察日志:
-1. 识别每个层级 (Interface、Model Authoring、Runtime) 的日志
+1. 将日志粗分到接口层、调度/KV层、运行时层
 2. 记录请求从进入到返回的时间
-3. 找出 Scheduler、ModelExecutor、Worker 的日志
+3. 标出最可能影响 TTFT 的两个模块
 
 ---
 
@@ -2022,15 +1372,17 @@ Llama-2-7B 的配置:
 - Attention 是唯一让 token 交互的操作,复杂度为 O(n²)
 - KV Cache 通过缓存历史 token 的 K、V,将复杂度降到 O(n)
 - 内存碎片化: 传统KV Cache管理的60-80%内存浪费问题
-- PagedAttention: 借鉴操作系统虚拟内存技术,将KV Cache分块管理
-  - 解决内部碎片: 按需分配blocks
-  - 解决外部碎片: 固定大小的blocks可任意重用
-  - 支持内存共享: 相同前缀的请求可共享物理blocks
+- PagedAttention 借鉴操作系统虚拟内存技术,将 KV Cache 分块管理
+- PagedAttention 通过按需分配 blocks 解决内部碎片
+- PagedAttention 通过固定大小的 blocks 重用缓解外部碎片
+- PagedAttention 支持相同前缀请求共享物理 blocks
 - Chunked Prefill 允许处理超长 prompt,避免显存溢出
 - Continuous Batching 通过去除 padding 和动态调度,大幅提升 GPU 利用率
-- vLLM 的三层架构 (Interface、Model Authoring、Runtime) 提供了清晰的抽象
+- vLLM 的三层架构 (接口层、引擎/策略层、运行时层) 提供了清晰的抽象
 
-下一章：第6章 KV Cache 优化——深入理解 PagedAttention 和内存管理的更多细节。
+## 章节衔接
+
+这一章的目标是把“问题空间”搭出来,而不是把所有优化都讲完。下一章自然会先进入第6章,因为一旦你理解了 prefill/decode 和 Attention 的代价,最先需要精细化管理的就是 KV 这类长期占用显存的资产; 再往后第7章才会在这个基础上讨论调度器如何消费这些 KV 状态来做系统级决策。
 
 ---
 

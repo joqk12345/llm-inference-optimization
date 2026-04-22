@@ -44,7 +44,23 @@ display_order: 8
 - 谁先算、谁后算（公平性与业务优先级）
 - 哪些请求可以一起算（吞吐）
 - 什么时候该拆开算（尾延迟与抖动）
-- 显存怎么分配、KV 怎么增长（容量与 OOM 风险）
+- 在当前 KV 容量与系统预算下,哪些请求能进入本轮执行（容量与 OOM 风险）
+
+这里也要先和第6章划清边界:
+
+- 第6章负责 KV block 的组织、分配/回收、碎片治理与 prefix 复用
+- 第7章负责利用这些 KV 状态做调度决策: 谁先跑、谁等待、谁被抢占、token budget 怎么分
+
+也就是说,第7章默认“KV 管理器已经存在”,重点讨论的是调度器如何消费这些状态来做系统级取舍。
+
+**本章回答什么**：
+- 在线推理为什么需要显式调度器
+- Continuous Batching 为什么适合在线场景
+- 调度器如何围绕 admission、iteration 和 priority 做系统级决策
+
+**本章不回答什么**：
+- 不重新展开 PagedAttention、Prefix Caching 等底层 KV 机制
+- 不处理生产环境里的监控、灾备、发布与回滚流程
 
 本章仍然按“书籍化”的框架来读：
 
@@ -101,7 +117,7 @@ display_order: 8
 
 ### 7.1.1 为什么需要调度
 
-**场景**: 多个用户同时发送推理请求
+**场景**：多个用户同时发送推理请求
 
 ```
 时间线:
@@ -121,7 +137,7 @@ GPU 资源:
 4. 如何最大化 GPU 利用率?
 ```
 
-**没有调度器的问题**:
+**没有调度器的问题**：
 ```
 ❌ 串行处理:
   A → B → C
@@ -137,7 +153,7 @@ GPU 资源:
   P95 延迟高
 ```
 
-**调度器的价值**:
+**调度器的价值**：
 ```
 ✅ 动态调整:
   根据请求长度和资源情况动态调度
@@ -153,16 +169,16 @@ GPU 资源:
 
 ### 7.1.2 服务质量 vs 吞吐量
 
-**服务质量 (Quality of Service, QoS)**:
+**服务质量 (Quality of Service, QoS)**：
 - **延迟**: TTFT (首字延迟)、TBT (字间延迟)
 - **公平性**: 所有请求都能及时处理
 - **可靠性**: 请求不超时、不丢失
 
-**吞吐量 (Throughput)**:
+**吞吐量 (Throughput)**：
 - 单位时间内处理的请求数
 - 单位时间内生成的 tokens 数
 
-**权衡曲线**:
+**权衡曲线**：
 ```
 吞吐量
   ↑
@@ -175,24 +191,24 @@ GPU 资源:
   └────────────→ 延迟
 ```
 
-**调度器的目标**: 找到最佳平衡点
+**调度器的目标**：找到最佳平衡点
 
 ---
 
 ### 7.1.3 调度器的目标
 
-**主要目标**:
+**主要目标**：
 1. ✅ **最小化延迟**: P50、P95、P99 延迟尽可能低
 2. ✅ **最大化吞吐量**: 在给定硬件上服务更多用户
 3. ✅ **公平性**: 避免长请求饿死短请求
 4. ✅ **资源利用**: GPU 利用率尽可能高
 
-**次要目标**:
+**次要目标**：
 - 简单性: 易于理解和调试
 - 可扩展性: 支持分布式部署
 - 鲁棒性: 容忍异常情况
 
-**设计原则**:
+**设计原则**：
 ```
 优先级 1: 不超时 (SLA)
 优先级 2: 低延迟 (用户体验)
@@ -220,7 +236,7 @@ GPU 资源:
 
 ### 7.2.1 FIFO (First In First Out)
 
-**原理**: 按请求到达顺序处理
+**原理**：按请求到达顺序处理
 
 ```python
 class FIFOScheduler:
@@ -236,17 +252,17 @@ class FIFOScheduler:
         return []
 ```
 
-**优点**:
+**优点**：
 - ✅ 实现简单
 - ✅ 公平 (先来先服务)
 - ✅ 无饥饿 (每个请求最终都会被处理)
 
-**缺点**:
+**缺点**：
 - ❌ 吞吐量低 (一次只处理一个请求)
 - ❌ GPU 利用率偏低
 - ❌ 长请求阻塞后续所有请求
 
-**适用场景**:
+**适用场景**：
 - 单用户环境
 - 低并发场景
 - 对公平性要求高的场景
@@ -255,7 +271,7 @@ class FIFOScheduler:
 
 ### 7.2.2 静态批处理 (Static Batching)
 
-**原理**: 将多个请求打包成一个固定大小的 batch
+**原理**：将多个请求打包成一个固定大小的 batch
 
 ```python
 class StaticBatchScheduler:
@@ -274,7 +290,7 @@ class StaticBatchScheduler:
         return []
 ```
 
-**Padding 的问题**:
+**Padding 的问题**：
 ```
 Batch 中的请求长度不一致:
 Request A: 10 tokens
@@ -289,16 +305,16 @@ Padded C: [pad×30][20 tokens]
 浪费(示意): (40 + 0 + 30) / 100 = 70% padding
 ```
 
-**优点**:
+**优点**：
 - ✅ 提高吞吐量 (相比 FIFO)
 - ✅ GPU 利用率提升
 
-**缺点**:
+**缺点**：
 - ❌ 大量 padding 浪费
 - ❌ 短请求被长请求阻塞
 - ❌ 无法动态调整
 
-**适用场景**:
+**适用场景**：
 - 请求长度相近的场景
 - 对延迟不敏感的离线批处理
 
@@ -312,7 +328,7 @@ Padded C: [pad×30][20 tokens]
 | **Static Batching** | 中 | 高 (等待 batch) | 中等 | 简单 | 离线批处理 |
 | **Continuous Batching** | 高 | 低 | 通常更高 | 中等 | 生产环境 |
 
-**结论**: Continuous Batching 在多数生产环境中是常见选择
+**结论**：Continuous Batching 在多数生产环境中是常见选择
 
 ---
 
@@ -330,7 +346,7 @@ Padded C: [pad×30][20 tokens]
 
 - token 级迭代与重组（本轮哪些请求继续 decode）
 - attention mask 组织（减少 padding）
-- 内存管理（KV block 分配、增长、回收与复用）
+- 基于 KV 状态的容量判断（本轮还能安全接纳哪些请求）
 
 **踩坑**：
 
@@ -344,202 +360,88 @@ Padded C: [pad×30][20 tokens]
 - 端到端：P95/P99 与超时率比 P50 更重要
 - 吞吐：有效 tokens/s（扣除失败/重试/降级）比理论值更真实
 
-### 7.3.1 问题: 静态批处理的浪费
+本节只解决原理层面的三个问题: 它为什么出现、核心机制是什么、什么时候值得用。真正的请求状态机、每轮调度循环、容量预留和 overlap 细节统一放到 7.4。
 
-**场景回顾**:
-```
-Batch 中有 3 个请求:
-Request A: 10 tokens (已生成 100,还需 50)
-Request B: 50 tokens (已生成 200,还需 10)
-Request C: 20 tokens (已生成 150,还需 30)
+### 7.3.1 它在对抗什么浪费
 
-问题 1: Request B 完成后
-  → Batch 中还有 A 和 C
-  → B 的位置空着 (padding 浪费)
+静态批处理的问题不只是“有 padding”，而是它默认所有请求会在同一个整齐的矩形里一起前进。但在线推理并不是这样运作的:
 
-问题 2: 新请求 D 到达
-  → 必须等待整个 batch 完成
-  → 延迟高
+- 请求到达时间不同
+- prompt 长度不同
+- decode 阶段每轮只新增很少 token
+- 已完成请求会立刻留下空槽
 
-问题 3: Batch 中请求长度差异大
-  → 大量 padding
-  → GPU 计算浪费
-```
+于是浪费会同时出现在两处:
 
-**浪费量化(示意)**:
-```
-假设 batch_size = 8,每个请求平均生成 100 tokens
+- **计算浪费**: padding 和空槽让 GPU 计算了很多没有价值的 token
+- **排队浪费**: 新请求明明已经到了,却要等旧 batch 整体收尾
 
-Static Batching:
-- 需要等待所有请求完成
-- P95 延迟常由最慢请求主导
-- Padding 比例可能较高
+Continuous Batching 的价值,就是把这两类浪费一起压下去。
+
+---
+
+### 7.3.2 它由哪三部分组成
+
+从原理上看,Continuous Batching 只有三件事:
+
+1. **工作集重组**
+每一轮都允许完成的请求退出、等待中的请求进入,而不是等整批结束。
+
+2. **非矩形 batch 组织**
+请求不必强行补齐到同一长度,而是按当前活跃 token 组织计算。
+
+3. **prefill / decode 混合执行**
+系统可以同时面对“老请求继续 decode”和“新请求开始 prefill”,调度器负责决定这一轮怎么配比。
+
+如果把它压缩成一句话,就是:
+
+```text
+Continuous Batching = 不再等待一个固定 batch 完整结束,而是按轮持续重组当前活跃工作集。
 ```
 
 ---
 
-### 7.3.2 Continuous Batching 原理
+### 7.3.3 什么时候值得用
 
-**核心思想**:
-1. **去掉 batch 维度**,用 attention mask 控制 token 交互
-2. **动态替换完成的请求**,立即加入新请求
-3. **混合 Prefill 和 Decode**,最大化 GPU 利用率
+不是所有系统都需要它。通常在下面这些条件同时出现时,它的价值才会很明显:
 
-**Ragged Batching**:
-```python
-# 拼接所有请求的 tokens
-tokens = [
-    # Request A (3 tokens)
-    A1, A2, A3,
-    # Request B (2 tokens)
-    B1, B2,
-    # Request C (4 tokens)
-    C1, C2, C3, C4,
-]
-
-# Attention mask: 块对角矩阵
-mask = [
-    [1, 0, 0, 0, 0, 0, 0, 0, 0],  # A1
-    [1, 1, 0, 0, 0, 0, 0, 0, 0],  # A2
-    [1, 1, 1, 0, 0, 0, 0, 0, 0],  # A3
-    [0, 0, 0, 1, 0, 0, 0, 0, 0],  # B1
-    [0, 0, 0, 1, 1, 0, 0, 0, 0],  # B2
-    [0, 0, 0, 0, 0, 1, 0, 0, 0],  # C1
-    [0, 0, 0, 0, 0, 1, 1, 0, 0],  # C2
-    [0, 0, 0, 0, 0, 1, 1, 1, 0],  # C3
-    [0, 0, 0, 0, 0, 1, 1, 1, 1],  # C4
-]
-```
-
-**动态替换**:
-```python
-def continuous_batching_step(scheduled, running, completed):
-    """
-    scheduled: 等待调度的请求
-    running: 正在运行的请求
-    completed: 刚完成的请求
-    """
-    # 1. 移除完成的请求
-    for req in completed:
-        running.remove(req)
-
-    # 2. 从等待队列中加入新请求
-    num_slots = batch_size - len(running)
-    for i in range(num_slots):
-        if scheduled:
-            new_req = scheduled.pop(0)
-            running.append(new_req)
-
-    # 3. 重新构建 attention mask
-    mask = build_ragged_mask(running)
-
-    return running, mask
-```
+- 有持续并发,而不是偶发单请求
+- 请求长度分布差异明显
+- 你确实在为 padding、空槽和排队付出代价
+- KV 管理已经足够稳定,不会因为 batch 扩大而更容易 OOM
 
 ---
 
-### 7.3.3 图解工作流程
+### 7.3.4 这一节和 7.4 的关系
 
-**迭代级调度 (Iteration-level Scheduling)**:
+到这里为止,你应该已经知道:
 
-```
-时间线 (每次迭代耗时依硬件与模型而定):
+- 它为什么比静态批处理更适合在线场景
+- 它依赖哪几类机制才能成立
+- 它什么时候可能真正带来收益
 
-Iter 1:
-  Running: [Req A (100→101), Req B (50→51), Req C (200→201)]
-  GPU: 处理 3 个请求,各生成 1 个 token
+接下来的 7.4 不再重复讲这些原理,而是回答另一类问题:
 
-Iter 2:
-  Running: [Req A (101→102), Req B (52→53), Req C (201→202)]
-  GPU: 处理 3 个请求,各生成 1 个 token
-
-Iter 3:
-  Req B 完成 (生成 <eos>)
-  Running: [Req A (102→103), Req C (202→203)]
-  空出 1 个 slot
-  Scheduled: [Req D (新请求,需要 prefill)]
-  Action: 用 Req D 替换 Req B
-  Running: [Req A (103→104), Req C (203→204), Req D (prefill→1)]
-  GPU: 处理 3 个请求 (decode + decode + prefill)
-
-Iter 4:
-  Running: [Req A (104→105), Req C (204→205), Req D (1→2)]
-  GPU: 处理 3 个请求
-
-Iter 5:
-  Req A 和 Req D 同时完成
-  Running: [Req C (205→206)]
-  空出 2 个 slots
-  Scheduled: [Req E, Req F]
-  Action: 加入 Req E 和 Req F
-  Running: [Req C (206→207), Req E (prefill→1), Req F (prefill→1)]
-  GPU: 处理 3 个请求
-```
-
-**关键观察**:
-- GPU 尽量保持高负载
-- 完成的请求立即被替换
-- Prefill 和 Decode 混合处理
-- 无 padding 浪费
-
----
-
-### 7.3.4 性能提升分析
-
-**吞吐量提升(示意)**:
-```
-假设:
-- GPU 每次迭代可处理 1024 tokens
-- 平均请求长度: 100 tokens
-
-Static Batching:
-- Batch size: 8
-- 每个迭代: 8 个请求 (各 1 token)
-- 每 100 个迭代完成一批 (8 个请求)
-- 吞吐量: 8 requests / 100 iterations = 0.08 req/iter
-
-Continuous Batching:
-- 通过动态替换完成请求,减少空槽
-- 吞吐量通常高于静态批处理,但具体提升需基准测试
-```
-
-**延迟改善(示意)**:
-```
-假设:
-- 100 个请求排队
-- Batch size: 8
-
-Static Batching:
-- 第 100 个请求需要等待多个 batch
-- P95 延迟由最慢批次主导(示意)
-
-Continuous Batching:
-- 排队等待通常更短
-- P95 延迟通常改善,幅度依负载而定
-```
-
-**GPU 利用率(示意)**:
-```
-Static Batching:
-  - Padding 可能较高
-  - GPU 利用率中等
-
-Continuous Batching:
-  - Padding 通常显著降低
-  - GPU 利用率通常更高
-```
+- 请求对象在系统里如何流转
+- 调度器每一轮到底检查什么
+- 容量预留和 CPU-GPU overlap 如何作为配套机制挂到主循环上
 
 ---
 
 ## 7.4 vLLM 的调度器实现
 
-**背景**：理解 vLLM 的调度器不是为了照抄实现，而是为了学习它如何把三类矛盾放到同一个系统里解决：迭代级调度、动态内存管理、以及 CPU 开销治理（避免 GPU 空转等待）。
+**背景**：理解 vLLM 的调度器不是为了照抄实现，而是为了学习它如何把三类矛盾放到同一个系统里解决：迭代级调度、容量预留策略、以及 CPU 开销治理（避免 GPU 空转等待）。
 
 **决策**：读这一节时建议关注接口与职责边界：
 
 - “请求生命周期”与“调度决策”如何分层？
 - 哪些信息是调度器必须知道的（长度、优先级、KV 状态）？
 - 哪些信息应该由内存管理器维护（block 分配/回收/碎片）？
+
+一个实用的读法是:
+
+- 把第6章当成“KV 管理器提供的能力边界”
+- 把第7章当成“调度器如何使用这些能力做 admission / iteration / priority 决策”
 
 **落地**：在生产系统里改调度的稳妥方式：
 
@@ -552,9 +454,15 @@ Continuous Batching:
 - 只看吞吐，不看 CPU overhead 与尾延迟，上线后“更快但更不稳”。
 - 把内存管理与调度强耦合，导致系统难以演进与排障。
 
+从层次上看,这一节可以按三步读:
+
+1. 先看请求对象和生命周期
+2. 再看每轮调度主循环
+3. 最后看围绕主循环的两类增强: 容量预留与 CPU-GPU overlap
+
 ### 7.4.1 请求生命周期管理
 
-**状态机**:
+**状态机**：
 ```
                             ┌─────────────┐
                             │   Waiting   │  ← 等待调度
@@ -583,7 +491,7 @@ Continuous Batching:
                             └─────────────┘
 ```
 
-**vLLM 的请求对象**:
+**vLLM 的请求对象**：
 ```python
 class Sequence:
     def __init__(self, request_id, prompt):
@@ -606,9 +514,14 @@ class Sequence:
 
 ---
 
-### 7.4.2 预分配 vs 动态分配
+### 7.4.2 请求进入时的容量预留
 
-**预分配 (Pre-allocation)**:
+这一节讨论的是**调度视角的容量预留策略**,不是第6章那种底层 block 布局实现。你可以把它理解成:
+
+- 第6章回答: block 最终怎么放进显存
+- 这里回答: 调度器在请求刚进入系统时,应该保守预留多少未来空间
+
+**预分配 (Pre-allocation)**：
 ```python
 # 传统方法: 预分配最大空间
 def allocate_max_space(request):
@@ -619,11 +532,11 @@ def allocate_max_space(request):
     return allocate_blocks(total)
 ```
 
-**问题**:
+**问题**：
 - 浪费显存 (大多数请求不会达到 max_new_tokens)
 - 限制并发数
 
-**动态分配 (Dynamic Allocation)**:
+**动态分配 (Dynamic Allocation)**：
 ```python
 # vLLM 方法: 动态增长
 def allocate_dynamic(request):
@@ -639,7 +552,7 @@ def allocate_dynamic(request):
     return blocks
 ```
 
-**优势**:
+**优势**：
 - 节省显存 (幅度依场景而定)
 - 提高并发数
 - 支持 max_new_tokens 很大的场景
@@ -648,7 +561,7 @@ def allocate_dynamic(request):
 
 ### 7.4.3 迭代级调度 (Iteration-level Scheduling)
 
-**定义**: 每次迭代 (iteration) 重新调度一次
+**定义**：每次迭代 (iteration) 重新调度一次
 
 ```python
 class Scheduler:
@@ -688,7 +601,7 @@ class Scheduler:
         return True
 ```
 
-**调度流程**:
+**调度流程**：
 ```
 每次迭代:
   1. 调度器决定哪些请求可以执行
@@ -704,17 +617,17 @@ class Scheduler:
 
 ### 7.4.4 Overlap Scheduling (Mini-SGLang) ⚡️
 
-> **💡 深度来源**: [Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/) + [Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
+> **💡 深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/) + [Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
 >
-> **核心问题**: CPU overhead 可能导致 GPU 闲置 → Overlap Scheduling 是一种应对方式
+> **核心问题**：CPU overhead 可能导致 GPU 闲置 → Overlap Scheduling 是一种应对方式
 >
-> **性能影响**: 可减少 GPU stalls,具体提升需基准测试
+> **性能影响**：可减少 GPU stalls,具体提升需基准测试
 
 ---
 
 #### 7.4.4.1 CPU 开销导致 GPU 闲置问题
 
-**Berkeley EECS-2025-192 的发现**:
+**Berkeley EECS-2025-192 的发现**：
 - CPU 开销在某些场景中占据可观比例
 - 主要来源:
   - Kernel launch (启动 GPU kernel)
@@ -722,7 +635,7 @@ class Scheduler:
   - Synchronization (等待 GPU 完成)
   - Batch scheduling (决定哪些请求一起处理)
 
-**问题**:
+**问题**：
 - vLLM 的迭代级调度是 **串行** 的:
   ```
   Step 1: CPU 调度下一批请求
@@ -746,7 +659,7 @@ GPU:              |<--Compute1-->|    stalls    |
 
 #### 7.4.4.2 Overlap Scheduling 设计思想
 
-**核心思想**:
+**核心洞察**：
 - **CPU-GPU 并行执行**:
   - CPU 准备下一批请求时,GPU 正在计算当前批次
   - GPU 计算完成后,下一批请求已经 ready,立即开始
@@ -754,7 +667,7 @@ GPU:              |<--Compute1-->|    stalls    |
   - CPU: 生产者 (准备 batches)
   - GPU: 消费者 (执行 batches)
 
-**对比**:
+**对比**：
 ```
 无 Overlap (vLLM 默认):
 CPU: |--Schedule--|--Prepare--|
@@ -770,7 +683,7 @@ GPU 持续运行,无闲置!
 
 #### 7.4.4.3 实现机制
 
-**架构设计**:
+**架构设计**：
 ```python
 class OverlapScheduler:
     def __init__(self):
@@ -809,7 +722,7 @@ class OverlapScheduler:
             self._process_outputs(outputs)
 ```
 
-**关键优化**:
+**关键优化**：
 1. **Pipeline 深度**: 通常 2-3 个 batches 的 pipeline
 2. **同步机制**: 使用条件变量避免 busy waiting
 3. **内存管理**: 预分配 buffers 避免运行时分配
@@ -818,7 +731,7 @@ class OverlapScheduler:
 
 #### 7.4.4.4 性能提升
 
-**吞吐量提升(示意)**:
+**吞吐量提升(示意)**：
 ```
 无 Overlap:
 - CPU 开销: 依实现而定
@@ -831,7 +744,7 @@ class OverlapScheduler:
 - 吞吐量可能提升
 ```
 
-**延迟改善(示意)**:
+**延迟改善(示意)**：
 ```
 P95 延迟通常可改善
 - CPU 准备时间不再完全阻塞 GPU
@@ -858,15 +771,17 @@ llm = LLM(
 
 ---
 
-### 7.4.5 Dynamic Memory Management (动态内存管理)
+### 7.4.5 运行中的动态容量预留
 
-> **💡 参考思路（经验口径）**: 一些推理引擎会提供动态内存管理来减少“按 max_new_tokens 预留”的浪费
+> **💡 参考思路（经验口径）**：一些推理引擎会提供动态容量预留来减少“按 max_new_tokens 预留”的浪费
 >
-> **问题**: 预留 max_new_tokens 的空间可能浪费内存
+> **问题**：预留 max_new_tokens 的空间可能浪费内存
 >
-> **解决**: 根据实际使用情况动态调整预留大小
+> **解决**：调度器根据实际使用情况动态调整预留大小
 
-**核心问题**:
+注意这里讨论的仍然是“调度器怎么做 admission 和增长策略”,不是“底层 block manager 如何摆放 physical blocks”。后者属于第6章。
+
+**核心问题**：
 ```python
 # 用户设置
 max_new_tokens = 2048
@@ -880,9 +795,9 @@ actual = 500
 # 浪费: 2048 - 500 = 1548 tokens (示意)
 ```
 
-**Dynamic Memory Management**:
+**调度侧的动态容量预留**：
 ```python
-class DynamicMemoryManager:
+class DynamicReservationManager:
     def __init__(self, initial_beta=0.5):
         """
         beta: 预留比例
@@ -892,7 +807,7 @@ class DynamicMemoryManager:
         self.actual_usage_history = []
 
     def allocate(self, prompt_len, max_new_tokens):
-        """动态分配内存"""
+        """按当前策略预留容量"""
         # 预留: prompt + (beta × max_new_tokens)
         reserved = int(prompt_len + self.beta * max_new_tokens)
         blocks = allocate_blocks(reserved)
@@ -932,7 +847,7 @@ class DynamicMemoryManager:
         }
 ```
 
-**工作流程**:
+**工作流程**：
 ```
 请求到来时:
   1. 用户请求: prompt=1000 tokens, max_new_tokens=2048
@@ -940,7 +855,7 @@ class DynamicMemoryManager:
   2. 传统做法:
      预留: 1000 + 2048 = 3048 tokens 的 KV Cache
 
-  3. Dynamic Memory Management:
+  3. 动态容量预留:
      预留: 1000 + (0.5 × 2048) = 1000 + 1024 = 2024 tokens
      (β=0.5,节省 33% 内存,示意)
 
@@ -958,7 +873,7 @@ class DynamicMemoryManager:
   5. 下次请求只预留: 1000 + (0.35 × 2048) = 1716 tokens
 ```
 
-**性能提升(示意)**:
+**性能提升(示意)**：
 ```
 内存节省(示意):
   场景        | 传统做法 | 动态管理 | 节省
@@ -996,7 +911,7 @@ class DynamicMemoryManager:
 
 ### 7.5.1 优先级调度
 
-**原理**: 不同请求有不同优先级
+**原理**：不同请求有不同优先级
 
 ```python
 class PriorityScheduler:
@@ -1021,7 +936,7 @@ class PriorityScheduler:
             return [self.queues['low'].pop(0)]
 ```
 
-**应用场景**:
+**应用场景**：
 - VIP 用户 vs 普通用户
 - 付费用户 vs 免费用户
 - 实时请求 vs 离线批处理
@@ -1030,7 +945,7 @@ class PriorityScheduler:
 
 ### 7.5.2 最短作业优先 (SJF)
 
-**原理**: 优先处理预计完成时间最短的请求
+**原理**：优先处理预计完成时间最短的请求
 
 ```python
 class SJFScheduler:
@@ -1044,15 +959,15 @@ class SJFScheduler:
         return sorted_requests[:batch_size]
 ```
 
-**优势**:
+**优势**：
 - ✅ 降低平均延迟
 - ✅ 提高吞吐量
 
-**劣势**:
+**劣势**：
 - ❌ 可能饿死长请求
 - ❌ 需要准确估计请求长度
 
-**改进**: Shortest Remaining Time First (SRTF)
+**改进**：Shortest Remaining Time First (SRTF)
 - 动态重新评估
 - 考虑已执行的时间
 
@@ -1060,7 +975,7 @@ class SJFScheduler:
 
 ### 7.5.3 轮询调度 (Round Robin)
 
-**原理**: 公平地轮转处理每个队列
+**原理**：公平地轮转处理每个队列
 
 ```python
 class RoundRobinScheduler:
@@ -1089,11 +1004,11 @@ class RoundRobinScheduler:
         return []
 ```
 
-**优势**:
+**优势**：
 - ✅ 绝对公平
 - ✅ 无饥饿
 
-**劣势**:
+**劣势**：
 - ❌ 上下文切换开销
 - ❌ 可能降低吞吐量
 
@@ -1101,7 +1016,7 @@ class RoundRobinScheduler:
 
 ### 7.5.4 自适应调度
 
-**原理**: 根据系统状态动态调整调度策略
+**原理**：根据系统状态动态调整调度策略
 
 ```python
 class AdaptiveScheduler:
@@ -1129,11 +1044,11 @@ class AdaptiveScheduler:
         return self.current_strategy.schedule()
 ```
 
-**优势**:
+**优势**：
 - ✅ 适应不同工作负载
 - ✅ 自动优化
 
-**挑战**:
+**挑战**：
 - ⚠️ 策略切换开销
 - ⚠️ 参数调优复杂
 
@@ -1156,7 +1071,7 @@ class AdaptiveScheduler:
 
 ### 7.6.1 vLLM 调度参数调优
 
-**关键参数**:
+**关键参数**：
 ```bash
 vllm serve meta-llama/Llama-2-7b-hf \
   # Batch 相关
@@ -1172,7 +1087,7 @@ vllm serve meta-llama/Llama-2-7b-hf \
   --schedule-policy "fcfs" \              # 调度策略 (fcfs/priority)
 ```
 
-**调优建议**:
+**调优建议**：
 ```
 场景 1: 低延迟优先
   --max-num-batched-tokens 4096  # 减小 batch size
@@ -1274,17 +1189,17 @@ vllm serve meta-llama/Llama-2-7b-hf \
 
 ### 7.7.1 什么是 PD 分离
 
-**Prefill 阶段**: 并行处理 prompt,计算密集
+**Prefill 阶段**：并行处理 prompt,计算密集
 - 输入: 整个 prompt
 - 计算: 矩阵乘法为主
 - 特点: 计算密集,可以并行
 
-**Decode 阶段**: 串行生成 token,内存带宽密集
+**Decode 阶段**：串行生成 token,内存带宽密集
 - 输入: 每次一个新 token
 - 计算: 内存读取为主
 - 特点: 带宽密集,串行生成
 
-**两种阶段的计算模式差异**:
+**两种阶段的计算模式差异**：
 ```
 Prefill:
   GPU 利用: 计算占比更高
@@ -1306,7 +1221,7 @@ Decode:
 
 ### 7.7.2 PD 分离的架构演进
 
-**演进路径(概述)**:
+**演进路径(概述)**：
 - 学术与社区提出架构思路
 - 部分框架尝试落地实现
 - 逐步出现可运维的工程实践
@@ -1315,7 +1230,7 @@ Decode:
 
 ### 7.7.3 PD 分离的技术优势
 
-**异构部署**:
+**异构部署**：
 ```
 Prefill Worker: H100 (算力优化)
   - 高 FLOPS
@@ -1327,7 +1242,7 @@ Decode Worker: A100 (带宽优化)
   - 成本更低
 ```
 
-**资源隔离**:
+**资源隔离**：
 ```
 无分离:
   长请求的 Prefill 阻塞短请求的 Decode
@@ -1338,7 +1253,7 @@ Decode Worker: A100 (带宽优化)
   → 长请求不影响短请求
 ```
 
-**弹性扩展**:
+**弹性扩展**：
 ```
 高峰期:
   增加 Prefill Worker (新用户多)
@@ -1347,7 +1262,7 @@ Decode Worker: A100 (带宽优化)
   增加 Decode Worker (生成多)
 ```
 
-**性能优化**:
+**性能优化**：
 ```
 Prefill Worker:
   - 大 batch size
@@ -1364,7 +1279,7 @@ Decode Worker:
 
 ### 7.7.4 vLLM 的 PD 分离实现
 
-**架构设计**:
+**架构设计**：
 ```python
 # Prefill Worker
 class PrefillWorker:
@@ -1405,7 +1320,7 @@ class DecodeWorker:
         return output
 ```
 
-**通信机制**: KV Cache 的传输
+**通信机制**：KV Cache 的传输
 ```python
 # 序列化 KV Cache
 def serialize_kv_cache(kv_cache):
@@ -1426,7 +1341,7 @@ prefill_worker.push_kv_cache(
 )
 ```
 
-**调度策略**:
+**调度策略**：
 ```python
 def schedule_for_pd(requests):
     """将请求分配到 Prefill 或 Decode Worker"""
@@ -1448,7 +1363,7 @@ def schedule_for_pd(requests):
 
 ### 7.7.5 SGLang 的 PD 分离实践
 
-**RadixAttention**: 统一的注意力抽象
+**RadixAttention**：统一的注意力抽象
 ```python
 class RadixAttention:
     def forward(self, query, key, value, state):
@@ -1459,14 +1374,14 @@ class RadixAttention:
             return self._decode_forward(query, key, value)
 ```
 
-**自动分离**: 无需手动配置
+**自动分离**：无需手动配置
 ```bash
 python -m sglang.launch_server \
   --model meta-llama/Llama-3-8B \
   --enable-pd-separation  # 自动启用
 ```
 
-**生产经验**: 稳定性、性能监控
+**生产经验**：稳定性、性能监控
 ```
 关键指标:
   - Prefill Worker: GPU 利用率高
@@ -1483,7 +1398,7 @@ python -m sglang.launch_server \
 
 ### 7.7.6 PD 分离的挑战
 
-**KV Cache 传输**:
+**KV Cache 传输**：
 ```
 问题: 网络开销和序列化
   - KV Cache 很大 (数百 MB 到数 GB)
@@ -1496,7 +1411,7 @@ python -m sglang.launch_server \
   - 增量传输 (只传输新增部分)
 ```
 
-**负载均衡**:
+**负载均衡**：
 ```
 问题: Prefill 和 Decode 的速率匹配
   - Prefill 快: Decode 成为瓶颈
@@ -1508,7 +1423,7 @@ python -m sglang.launch_server \
   - 监控和自动扩缩容
 ```
 
-**容错处理**:
+**容错处理**：
 ```
 问题: Worker 故障如何恢复
   - Prefill Worker 故障: 新请求无法处理
@@ -1520,7 +1435,7 @@ python -m sglang.launch_server \
   - 自动故障转移
 ```
 
-**复杂度增加**:
+**复杂度增加**：
 ```
 问题: 部署和运维的挑战
   - 需要管理两种 Worker
@@ -1582,7 +1497,7 @@ python -m sglang.launch_server \
 
 - [ ] 解释为什么需要调度器
 - [ ] 对比 FIFO、Static Batching、Continuous Batching
-- [ ] 描述 Continuous Batching 的工作流程
+- [ ] 解释 Continuous Batching 的核心机制与适用条件
 - [ ] 理解 vLLM 的迭代级调度
 - [ ] 解释 Overlap Scheduling 的原理和优势
 - [ ] 配置 vLLM 的调度参数
@@ -1595,7 +1510,7 @@ python -m sglang.launch_server \
 
 ## 📚 动手练习
 
-**练习 7.1**: 对比静态批处理和动态批处理
+**练习 7.1**：对比静态批处理和动态批处理
 
 场景:
 - 8 个请求,长度分别为: [10, 50, 20, 100, 30, 15, 80, 25] tokens
@@ -1606,7 +1521,7 @@ python -m sglang.launch_server \
 2. 计算 Continuous Batching 的 padding 数量
 3. 比较两种方法的 GPU 利用率
 
-**练习 7.2**: 针对不同场景优化调度参数
+**练习 7.2**：针对不同场景优化调度参数
 
 场景:
 - Chatbot: 100 个并发,平均 50 tokens,对延迟敏感
@@ -1618,7 +1533,7 @@ python -m sglang.launch_server \
 2. 选择合适的调度算法
 3. 配置 vLLM 参数
 
-**练习 7.3**: 使用 vLLM 部署 PD 分离架构 ⭐
+**练习 7.3**：使用 vLLM 部署 PD 分离架构 ⭐
 
 任务:
 1. 设计一个 PD 分离的部署方案
@@ -1630,14 +1545,16 @@ python -m sglang.launch_server \
 
 ## 🎯 总结
 
-**关键要点**:
+关键要点：
 - 调度器是推理系统的核心,决定性能上限
 - Continuous Batching 通过动态调整,消除 padding 浪费
 - Overlap Scheduling 通过 CPU-GPU 并行,消除 GPU stalls
-- Dynamic Memory Management 通过动态分配,节省 30-50% 内存
+- 调度侧的动态容量预留可减少“按 max_new_tokens 全额预留”带来的浪费
 - PD 分离在合适负载与工程能力下可能带来显著收益,但主要价值经常体现在尾延迟与资源重配,而不是“无条件数倍提升”
 - 不同场景需要不同的调度策略
 
-**下一章**: 第8章 量化技术——如何通过量化节省显存并提升推理速度。
+## 章节衔接
+
+第6章和第7章合起来,你已经有了推理系统最核心的两块拼图: 一块是 KV 如何被存放和复用,另一块是请求如何被组织和调度。接下来进入第8章,主题会从“怎么更聪明地使用显存和算力”转向“怎么从模型表示本身继续压缩资源占用”,也就是量化技术。
 
 ---

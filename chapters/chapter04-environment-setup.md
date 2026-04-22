@@ -58,7 +58,7 @@ display_order: 5
 
 你可能听过这样的话:"在我机器上能运行,为什么在你那就不行?"
 
-**传统方式的问题**:
+**传统方式的问题**：
 ```
 工程师 A 的机器:
 - Ubuntu 20.04
@@ -78,7 +78,7 @@ display_order: 5
 → 生产环境部署噩梦
 ```
 
-**Docker 的解决方案**:
+**Docker 的解决方案**：
 ```
 Docker 容器:
 - 固定的基础镜像
@@ -92,7 +92,7 @@ Docker 容器:
 → 一键部署到生产
 ```
 
-**商业价值**:
+**商业价值**：
 - 减少 80% 的环境相关 bug
 - 新人上手时间从 2 天降到 30 分钟
 - 部署时间从数小时降到数分钟
@@ -101,7 +101,7 @@ Docker 容器:
 
 ### 4.1.2 环境一致性: 本地 vs 生产
 
-**三层环境一致性**:
+**三层环境一致性**：
 
 ```
 ┌─────────────────────────────────────────┐
@@ -126,7 +126,7 @@ Docker 容器:
 └─────────────────────────────────────────┘
 ```
 
-**关键原则**:
+**关键原则**：
 1. **开发容器化**: 从第一天开始就用 Docker
 2. **版本锁定**: 使用 `requirements.txt` 或 `pyproject.toml` 锁定依赖
 3. **配置外部化**: 环境变量、配置文件不要硬编码
@@ -171,7 +171,7 @@ Docker 容器:
 └─────────────────────────────────────────────────────┘
 ```
 
-**每一层都很重要**:
+**每一层都很重要**：
 - 应用层: 你的业务逻辑
 - 框架层: 推理引擎的基础
 - 运行时层: Python 和 CUDA 的版本兼容性
@@ -184,7 +184,7 @@ Docker 容器:
 
 ### 4.2.1 NVIDIA 驱动安装
 
-**检查当前驱动版本**:
+**检查当前驱动版本**：
 
 ```bash
 nvidia-smi
@@ -203,13 +203,13 @@ nvidia-smi
 +-------------------------------+----------------------+----------------------+
 ```
 
-**关键信息**:
+**关键信息**：
 - **Driver Version**: 至少 525+ (推荐 535+)
 - **CUDA Version**: 这是最高的 CUDA 版本支持,不一定是已安装的版本
 
-**如果驱动版本过低或未安装**:
+**如果驱动版本过低或未安装**：
 
-**Ubuntu/Debian**:
+**Ubuntu/Debian**：
 ```bash
 # 添加 NVIDIA 仓库
 sudo apt-get update
@@ -229,7 +229,7 @@ sudo apt-get install -y nvidia-driver-535
 sudo reboot
 ```
 
-**CentOS/RHEL**:
+**CentOS/RHEL**：
 ```bash
 # 添加 NVIDIA 仓库
 sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
@@ -242,7 +242,7 @@ sudo yum install -y nvidia-driver
 sudo reboot
 ```
 
-**云平台 (AWS/GCP/Azure)**:
+**云平台 (AWS/GCP/Azure)**：
 - 通常已经预装 NVIDIA 驱动
 - 使用官方的 GPU 优化 AMI/Image
 
@@ -250,7 +250,7 @@ sudo reboot
 
 ### 4.2.2 CUDA Toolkit 配置
 
-**重要说明**: Docker 容器中的 CUDA 不需要宿主机安装 CUDA Toolkit!
+**重要说明**：Docker 容器中的 CUDA 不需要宿主机安装 CUDA Toolkit!
 
 **为什么?**
 ```
@@ -264,7 +264,7 @@ Docker 容器:
 - 隔离的 CUDA 版本
 ```
 
-**最佳实践**:
+**最佳实践**：
 - ✅ 宿主机: 只安装 NVIDIA 驱动
 - ✅ Docker 容器: 使用带 CUDA 的基础镜像
 - ❌ 避免在宿主机安装多个 CUDA 版本
@@ -292,7 +292,7 @@ nvcc --version
 
 ### 4.2.3 Docker 与 NVIDIA Container Toolkit
 
-**安装 Docker**:
+**安装 Docker**：
 
 ```bash
 # Ubuntu/Debian
@@ -310,7 +310,7 @@ docker --version
 docker run hello-world
 ```
 
-**安装 NVIDIA Container Toolkit**:
+**安装 NVIDIA Container Toolkit**：
 
 ```bash
 # 添加 NVIDIA 仓库
@@ -345,7 +345,7 @@ bash code/chapter04/check_env.sh
 
 ### 4.2.4 Python 环境管理
 
-**推荐方式**: 使用 pyenv 或 conda 管理多个 Python 版本
+**推荐方式**：使用 pyenv 或 conda 管理多个 Python 版本
 
 **使用 pyenv** (推荐):
 
@@ -396,19 +396,19 @@ pip install --upgrade pip
 
 **vLLM** 是目前最流行的开源 LLM 推理引擎之一,由 UC Berkeley 的团队开发。
 
-**核心特性**:
+**核心特性**：
 - ⚡ **高性能**: PagedAttention 等优化在多场景中可显著提升吞吐
 - 🚀 **连续批处理**: Continuous Batching,最大化 GPU 利用率
 - 🎯 **易用性**: 兼容 OpenAI API,一行代码启动服务
 - 🔧 **灵活性**: 支持多种量化格式、投机解码、前缀缓存
 
-**适用场景**:
+**适用场景**：
 - ✅ 高吞吐量推理服务
 - ✅ 多模型并发部署
 - ✅ 需要低延迟的实时应用
 - ✅ 生产环境部署
 
-**不适用场景**:
+**不适用场景**：
 - ❌ 需要极高灵活性的研究实验 (Transformers 更灵活)
 - ❌ 需要最大化的模型灵活性
 - ❌ 超大模型的模型并行 (vLLM 支持有限)
@@ -426,7 +426,7 @@ pip install --upgrade pip
 | **生产就绪** | ✅ | ⚠️ | ✅ | ❌ |
 | **学习曲线** | 低 | 中 | 高 | 低 |
 
-**选择建议**:
+**选择建议**：
 - **vLLM**: 大多数场景的首选,性能与易用性的最佳平衡
 - **SGLang**: 需要结构化生成或高级调度功能
 - **TensorRT-LLM**: 极致性能要求,愿意投入时间优化
@@ -477,7 +477,7 @@ docker pull vllm/vllm-openai:latest
 
 ### 4.3.4 启动第一个推理服务
 
-**最简单的启动方式**:
+**最简单的启动方式**：
 
 ```bash
 # OpenAI API 兼容服务器
@@ -487,7 +487,7 @@ python -m vllm.entrypoints.openai.api_server \
     --port 8000
 ```
 
-**使用 Docker**:
+**使用 Docker**：
 
 ```bash
 docker run --gpus all \
@@ -497,7 +497,7 @@ docker run --gpus all \
     --model meta-llama/Llama-2-7b-chat-hf
 ```
 
-**测试推理服务**:
+**测试推理服务**：
 
 ```bash
 # 使用 curl
@@ -529,7 +529,7 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-**重要启动参数**:
+**重要启动参数**：
 
 ```bash
 python -m vllm.entrypoints.openai.api_server \
@@ -549,7 +549,7 @@ python -m vllm.entrypoints.openai.api_server \
 
 ### 4.4.1 Dockerfile 编写
 
-**基础版 Dockerfile**:
+**基础版 Dockerfile**：
 
 ```dockerfile
 # 基础镜像: 包含 CUDA 12.1
@@ -651,7 +651,7 @@ CMD ["python3", "-m", "vllm.entrypoints.openai.api_server", \
      "--model", "${MODEL_PATH}"]
 ```
 
-**requirements.txt**:
+**requirements.txt**：
 
 ```txt
 vllm==0.6.0
@@ -667,7 +667,7 @@ pydantic==2.7.0
 
 ### 4.4.2 Docker Compose 配置
 
-**docker-compose.yml**:
+**docker-compose.yml**：
 
 ```yaml
 version: '3.8'
@@ -780,7 +780,7 @@ networks:
     driver: bridge
 ```
 
-**启动服务**:
+**启动服务**：
 
 ```bash
 # 构建并启动
@@ -824,7 +824,7 @@ docker compose down -v
 │ 最终镜像: 8GB ✅           │
 ```
 
-**优势**:
+**优势**：
 - ✅ 更小的镜像体积 (节省存储和传输)
 - ✅ 更高的安全性 (不包含源代码和构建工具)
 - ✅ 更快的部署速度
@@ -833,7 +833,7 @@ docker compose down -v
 
 ### 4.4.4 数据卷管理
 
-**三种挂载方式**:
+**三种挂载方式**：
 
 ```yaml
 volumes:
@@ -847,7 +847,7 @@ volumes:
   - tmpfs-data:/tmp:rw,size=1g
 ```
 
-**最佳实践**:
+**最佳实践**：
 
 ```yaml
 volumes:
@@ -870,7 +870,7 @@ volumes:
 
 ### 4.5.1 单次推理
 
-**Python API**:
+**Python API**：
 
 ```python
 from vllm import LLM, SamplingParams
@@ -906,7 +906,7 @@ for i, output in enumerate(outputs):
     print(f"Generated: {generated_text}\n")
 ```
 
-**OpenAI API**:
+**OpenAI API**：
 
 ```python
 import openai
@@ -932,7 +932,7 @@ print(response.choices[0].message.content)
 
 ### 4.5.2 批量推理
 
-**Python API**:
+**Python API**：
 
 ```python
 from vllm import LLM, SamplingParams
@@ -977,7 +977,7 @@ import json
 print(json.dumps(results, indent=2, ensure_ascii=False))
 ```
 
-**性能优化建议**:
+**性能优化建议**：
 - ✅ 使用更大的 batch size 提高吞吐量
 - ✅ 预处理 prompt,减少运行时开销
 - ✅ 使用异步 API 处理大量请求
@@ -986,7 +986,7 @@ print(json.dumps(results, indent=2, ensure_ascii=False))
 
 ### 4.5.3 流式输出
 
-**服务器端配置**:
+**服务器端配置**：
 
 ```python
 from vllm.engine.arg_utils import AsyncEngineArgs
@@ -1002,7 +1002,7 @@ engine_args = AsyncEngineArgs(
 engine = AsyncLLMEngine.from_engine_args(engine_args)
 ```
 
-**客户端使用**:
+**客户端使用**：
 
 ```python
 import asyncio
@@ -1031,7 +1031,7 @@ async def stream_chat():
 asyncio.run(stream_chat())
 ```
 
-**curl 示例**:
+**curl 示例**：
 
 ```bash
 curl http://localhost:8000/v1/chat/completions \
@@ -1047,7 +1047,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 ### 4.5.4 性能基准测试
 
-**简单的基准测试脚本**:
+**简单的基准测试脚本**：
 
 ```python
 import time
@@ -1085,7 +1085,7 @@ prompts = ["Hello, world!"] * 32  # 批量 32 个请求
 benchmark(llm, prompts, sampling_params)
 ```
 
-**使用 Apache Bench**:
+**使用 Apache Bench**：
 
 ```bash
 # 安装 ab
@@ -1097,7 +1097,7 @@ ab -n 1000 -c 10 -T 'application/json' \
   http://localhost:8000/v1/chat/completions
 ```
 
-**request.json**:
+**request.json**：
 ```json
 {
   "model": "meta-llama/Llama-2-7b-chat-hf",
@@ -1115,7 +1115,7 @@ ab -n 1000 -c 10 -T 'application/json' \
 
 **VS Code** (推荐):
 
-**推荐插件**:
+**推荐插件**：
 - Python
 - Pylance
 - Docker
@@ -1143,7 +1143,7 @@ ab -n 1000 -c 10 -T 'application/json' \
 }
 ```
 
-**PyCharm**:
+**PyCharm**：
 - 内置强大的 Python 支持
 - Docker 集成
 - 性能分析工具
@@ -1152,7 +1152,7 @@ ab -n 1000 -c 10 -T 'application/json' \
 
 ### 4.6.2 调试工具
 
-**Python 调试器**:
+**Python 调试器**：
 
 ```python
 # 使用 pdb
@@ -1213,7 +1213,7 @@ import GPUtil
 GPUtil.showUtilization()
 ```
 
-**自定义监控脚本**:
+**自定义监控脚本**：
 
 ```python
 import time
@@ -1247,7 +1247,7 @@ while True:
 
 ### 4.6.4 可视化工具
 
-**TensorBoard**:
+**TensorBoard**：
 
 ```python
 from torch.utils.tensorboard import SummaryWriter
@@ -1263,7 +1263,7 @@ writer.add_scalar('GPU_Memory', gpu_memory, step)
 # tensorboard --logdir runs
 ```
 
-**Grafana + Prometheus**:
+**Grafana + Prometheus**：
 
 ```yaml
 # prometheus.yml
@@ -1282,11 +1282,11 @@ scrape_configs:
 
 ### 4.7.1 CUDA 版本不兼容
 
-**问题**: `CUDA_ERROR_INVALID_DEVICE`
+**问题**：`CUDA_ERROR_INVALID_DEVICE`
 
-**原因**: 驱动版本与 CUDA 版本不匹配
+**原因**：驱动版本与 CUDA 版本不匹配
 
-**解决方案**:
+**解决方案**：
 
 ```bash
 # 1. 检查驱动版本
@@ -1300,7 +1300,7 @@ docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
 # CUDA 11.8 需要 Driver >= 450
 ```
 
-**版本兼容表**:
+**版本兼容表**：
 | CUDA 版本 | 最低驱动版本 |
 |-----------|-------------|
 | 12.x      | 525+        |
@@ -1311,11 +1311,11 @@ docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
 
 ### 4.7.2 Docker GPU 访问问题
 
-**问题**: `could not select device driver`
+**问题**：`could not select device driver`
 
-**原因**: NVIDIA Container Toolkit 配置不正确
+**原因**：NVIDIA Container Toolkit 配置不正确
 
-**解决方案**:
+**解决方案**：
 
 ```bash
 # 1. 检查 Docker 运行时
@@ -1347,9 +1347,9 @@ sudo systemctl restart docker
 
 ### 4.7.3 端口冲突处理
 
-**问题**: `port is already allocated`
+**问题**：`port is already allocated`
 
-**解决方案**:
+**解决方案**：
 
 ```bash
 # 1. 查看占用端口的进程
@@ -1366,9 +1366,9 @@ docker run --gpus all -p 8001:8000 vllm/vllm-openai:latest
 
 ### 4.7.4 依赖安装失败
 
-**问题**: pip 安装失败
+**问题**：pip 安装失败
 
-**解决方案**:
+**解决方案**：
 
 ```bash
 # 1. 升级 pip
@@ -1404,7 +1404,7 @@ python --version
 
 ## 📚 动手练习
 
-**练习 4.1**: 从零搭建 vLLM 开发环境
+**练习 4.1**：从零搭建 vLLM 开发环境
 
 1. 安装 Docker 和 NVIDIA Container Toolkit
 2. 拉取 vLLM Docker 镜像
@@ -1412,7 +1412,7 @@ python --version
 4. 使用 curl 发送测试请求
 5. 验证服务正常工作
 
-**练习 4.2**: Docker 化一个推理服务
+**练习 4.2**：Docker 化一个推理服务
 
 1. 编写 Dockerfile,构建自定义 vLLM 镜像
 2. 配置 docker-compose.yml,包含:
@@ -1427,13 +1427,15 @@ python --version
 
 ## 🎯 总结
 
-**关键要点**:
+关键要点：
 - Docker 是确保环境一致性的最佳方式
 - 从宿主机到生产环境使用同一个 Docker 镜像
 - vLLM 提供高性能、易用的推理服务
 - Docker Compose 简化多服务编排
 - 掌握基本的调试和监控工具
 
-**下一章**：第5章 LLM 推理基础——用第一性原理把 prefill/decode、attention 与关键指标讲清楚，为后续 KV Cache 与调度优化打底。
+## 章节衔接
+
+到这一章为止，实验与部署底座已经搭好。下一章开始，书的主线会正式进入推理过程本身：先用第5章把 prefill、decode、attention 和核心指标讲清楚，再顺着这些代价结构进入后面的 KV 管理、请求调度和量化优化。
 
 ---

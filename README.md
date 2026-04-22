@@ -33,17 +33,42 @@ display_order: 1
 
 ---
 
+## 🧭 Reading Guide
+
+- Main reading path: [`SUMMARY.md`](SUMMARY.md)
+- Repo landing page: [`index.md`](index.md)
+- Back-cover style summary: [`docs/content-summary.md`](docs/content-summary.md)
+- Editorial changelog: [`CHANGELOG.md`](CHANGELOG.md)
+
+---
+
 ## 📖 What This Book Teaches
 
 This book teaches you how to optimize Large Language Model (LLM) inference through practical, hands-on examples. No deep learning background required - just Python and basic programming skills.
 
 You'll learn:
 
-- **5 Core Techniques**: KV Cache, Request Scheduling, Quantization, Speculative Sampling, Production Deployment
+- **11 Chapters in 4 Parts**: From motivation and GPU basics to production deployment and advanced topics
 - **GPU Fundamentals**: Understand how GPUs work and how to leverage them for inference
-- **Complete Code Examples**: Every concept comes with working code
-- **Docker Ready**: One-command setup, no environment hassles
+- **Selected Code Examples**: The repo currently ships runnable examples for the foundational chapters, with more chapter code added incrementally
+- **Docker Ready Foundations**: Environment checks and base examples are designed to be reproducible
 - **Production Grade**: Real-world deployment strategies
+
+---
+
+## 📝 Current Editorial Status
+
+- The manuscript is currently organized into **4 parts / 11 chapters**
+- Chapter boundaries have been tightened so the main path now reads more cleanly:
+  - Chapter 5 frames the problem space
+  - Chapter 6 focuses on KV management and reuse
+  - Chapter 7 focuses on request scheduling and budget decisions
+  - Chapter 10 focuses on production deployment and runtime governance
+  - Chapter 11 focuses on advanced and frontier topics
+- Cross-chapter transitions, summary labels, and section lead-ins have been standardized for consistency
+- Runnable code is still concentrated in the foundational chapters, with later chapter examples being added incrementally
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the latest structural and editorial updates.
 
 ---
 
@@ -70,12 +95,12 @@ You'll learn:
 - **Chapter 3: GPU Basics** - GPU architecture, memory, and bandwidth ([`chapters/chapter03-gpu-basics.md`](chapters/chapter03-gpu-basics.md))
 - **Chapter 4: Environment Setup** - Docker, CUDA, and sanity checks ([`chapters/chapter04-environment-setup.md`](chapters/chapter04-environment-setup.md))
 - **Chapter 5: LLM Inference Basics** - What actually happens in prefill/decode ([`chapters/chapter05-llm-inference-basics.md`](chapters/chapter05-llm-inference-basics.md))
-- **Chapter 6: KV Cache Optimization** - Memory, caching, and hit-rate ([`chapters/chapter06-kv-cache-optimization.md`](chapters/chapter06-kv-cache-optimization.md))
-- **Chapter 7: Request Scheduling** - Batching, prioritization, and tail latency ([`chapters/chapter07-request-scheduling.md`](chapters/chapter07-request-scheduling.md))
+- **Chapter 6: KV Cache Optimization** - How KV state is stored, reused, and kept compact ([`chapters/chapter06-kv-cache-optimization.md`](chapters/chapter06-kv-cache-optimization.md))
+- **Chapter 7: Request Scheduling** - How the scheduler makes admission, iteration, and budget decisions ([`chapters/chapter07-request-scheduling.md`](chapters/chapter07-request-scheduling.md))
 - **Chapter 8: Quantization** - INT8/INT4 trade-offs and pitfalls ([`chapters/chapter08-quantization.md`](chapters/chapter08-quantization.md))
 - **Chapter 9: Speculative Sampling** - Draft/verify, acceptance, rollback ([`chapters/chapter09-speculative-sampling.md`](chapters/chapter09-speculative-sampling.md))
-- **Chapter 10: Production Deployment** - Kubernetes, observability, ops ([`chapters/chapter10-production-deployment.md`](chapters/chapter10-production-deployment.md))
-- **Chapter 11: Advanced Topics** - MoE, compilation, kernels, trends ([`chapters/chapter11-advanced-topics.md`](chapters/chapter11-advanced-topics.md))
+- **Chapter 10: Production Deployment** - Deployment, observability, capacity, and cost governance in production ([`chapters/chapter10-production-deployment.md`](chapters/chapter10-production-deployment.md))
+- **Chapter 11: Advanced Topics** - Agent infra, heterogeneous systems, MoE, and frontier topics ([`chapters/chapter11-advanced-topics.md`](chapters/chapter11-advanced-topics.md))
 
 ### Appendices
 - **Appendix A: Tools and Resources** - A curated list of helpful tools
@@ -116,6 +141,12 @@ This repo ships a GitHub Actions workflow that runs word-count stats on every pu
 - Script: `scripts/wordcount.py`
 
 If `docs/word-counts.md` / `docs/word-counts.json` changes, the workflow commits the updated files back to the same branch (and avoids infinite loops by skipping `github-actions[bot]` pushes).
+
+---
+
+## 📚 Changelog
+
+Recent manuscript and structure updates are tracked in [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

@@ -69,7 +69,7 @@ display_order: 9
 
 ### 8.1.1 什么是量化
 
-**定义**: 将高精度的数值表示转换为低精度表示
+**定义**：将高精度的数值表示转换为低精度表示
 
 ```
 FP32 (32位浮点):
@@ -83,20 +83,20 @@ INT8 (8位整数):
   精度: 整数
 ```
 
-**直观理解**:
+**直观理解**：
 ```
 FP32 权重: [0.23456789, -1.2345678, 0.00001234]
                 ↓ 量化
 INT8 权重:  [0, -1, 0]  (损失了精度!)
 ```
 
-**核心问题**: 如何在降低精度的同时,保持模型性能?
+**核心问题**：如何在降低精度的同时,保持模型性能?
 
 ---
 
 ### 8.1.2 为什么量化能节省显存
 
-**计算模型显存占用**:
+**计算模型显存占用**：
 
 ```
 模型总显存 = 模型权重 + KV Cache + 激活值 + 开销
@@ -116,7 +116,7 @@ Llama-2-70B（约 70B 参数）:
   INT4: 70B × 0.5 byte≈ 35 GB
 ```
 
-**量化效果(示意)**:
+**量化效果(示意)**：
 ```
 FP16 → INT8:
   权重显存: 2 bytes/param → 1 byte/param (节省约 50%)
@@ -129,7 +129,7 @@ FP16 → INT4:
   精度: 风险更高（尤其是长尾与数值敏感任务）
 ```
 
-**关键优势**:
+**关键优势**：
 - ✅ 显存占用减半或更多
 - ✅ 推理速度提升
 - ✅ 可以在更小的 GPU 上运行
@@ -139,7 +139,7 @@ FP16 → INT4:
 
 ### 8.1.3 精度 vs 性能的权衡
 
-**权衡曲线**:
+**权衡曲线**：
 ```
 精度
   ↑
@@ -152,7 +152,7 @@ FP16 → INT4:
   └────────────→ 性能 (显存、速度)
 ```
 
-**不同量化的效果**:
+**不同量化的效果**：
 
 | 格式 | 权重占用(相对) | 速度 | 精度损失 | 适用场景 |
 |------|---------------|------|---------|---------|
@@ -166,7 +166,7 @@ FP16 → INT4:
 
 > 说明：表中的“速度/精度损失”是常见趋势口径，不是保证值。实际结果强依赖硬件（是否支持低精度）、kernel 与框架实现、以及你的任务分布。
 
-**选择原则**:
+**选择原则**：
 ```
 追求精度: FP16/BF16
 追求性价比: INT8
@@ -178,7 +178,7 @@ FP16 → INT4:
 
 ### 8.1.4 为什么量化有效: 模型的冗余性
 
-**核心洞察**: 深度学习模型有大量冗余,量化不会破坏关键信息
+**核心洞察**：深度学习模型有大量冗余,量化不会破坏关键信息
 
 **为什么冗余?**
 1. **过参数化**: 模型参数远超需要
@@ -190,7 +190,7 @@ FP16 → INT4:
 - 许多 LLM 在较低精度下仍能保持可用质量，说明参数表示存在冗余与容错空间。
 - 但“可用”不等于“无损”：不同任务对量化误差的敏感度差异很大，尤其是长尾、结构化生成、工具调用与数值推理任务。
 
-**直观理解**:
+**直观理解**：
 ```
 神经网络: 不是所有参数都重要
   重要参数: 决定模型核心能力 (不能量化)
@@ -214,9 +214,9 @@ FP16 → INT4:
 
 ### 8.2.1 PTQ (Post-Training Quantization)
 
-**定义**: 训练后量化,无需重新训练
+**定义**：训练后量化,无需重新训练
 
-**流程**:
+**流程**：
 ```
 1. 训练 FP32/FP16 模型
 2. 收集校准数据 (Calibration Dataset)
@@ -225,23 +225,23 @@ FP16 → INT4:
 5. (可选) 微调恢复精度
 ```
 
-**常见方法**:
+**常见方法**：
 - **GPTQ**: Gradient-based Post-Training Quantization
 - **AWQ**: Activation-aware Quantization
 - **bitsandbytes**: 简单易用的 INT8 量化
 - **SpQR**: 混合精度量化
 
-**优点**:
+**优点**：
 - ✅ 快速 (几分钟到几小时)
 - ✅ 无需完整训练周期
 - ✅ 适合快速部署
 
-**缺点**:
+**缺点**：
 - ❌ 可能有一定精度损失
 - ❌ 对极端值敏感
 - ❌ 需要校准数据集
 
-**适用场景**:
+**适用场景**：
 ```
 ✅ 快速原型验证
 ✅ 不具备训练资源
@@ -253,9 +253,9 @@ FP16 → INT4:
 
 ### 8.2.2 QAT (Quantization-Aware Training) ⭐
 
-**定义**: 量化感知训练,在训练时模拟量化
+**定义**：量化感知训练,在训练时模拟量化
 
-**核心思想**:
+**核心洞察**：
 ```
 训练时:
   前向传播: Fake Quantization (模拟量化)
@@ -267,7 +267,7 @@ FP16 → INT4:
   导出 INT8 权重 → 直接 INT8 推理
 ```
 
-**Fake Quantization 原理**:
+**Fake Quantization 原理**：
 ```python
 def fake_quantize(x, scale, zero_point):
     """
@@ -294,17 +294,17 @@ class STE(torch.autograd.Function):
         return grad_output  # 反向: 直接传递梯度
 ```
 
-**优点**:
+**优点**：
 - ✅ 精度损失最小
 - ✅ Train-Infer 一致性好
 - ✅ 适合 RL 训练和高精度场景
 
-**缺点**:
+**缺点**：
 - ❌ 需要完整训练周期
 - ❌ 计算成本高
 - ❌ 实现复杂度高
 
-**适用场景**:
+**适用场景**：
 ```
 ✅ 需要最佳精度
 ✅ RL 训练 (需要 train-infer 一致)
@@ -323,7 +323,7 @@ class STE(torch.autograd.Function):
 | **Native Quantized Training** | 端到端低精度训练 | 研究和新算法 | ✅ 极致显存节省<br>❌ 实现极复杂<br>❌ 稳定性差 |
 | **QAT** | 改善量化推理精度 | 生产级量化部署 | ✅ 最佳精度<br>✅ Train-Infer 一致<br>❌ 需要完整训练周期 |
 
-**关系图**:
+**关系图**：
 ```
 训练阶段:
   Full Precision Training
@@ -341,7 +341,7 @@ class STE(torch.autograd.Function):
 
 ### 8.2.4 量化方法选择决策树
 
-**决策流程**:
+**决策流程**：
 
 ```
 问题 1: 你需要训练还是只需推理?
@@ -373,7 +373,7 @@ class STE(torch.autograd.Function):
     → 实验性,风险高
 ```
 
-**场景推荐**:
+**场景推荐**：
 ```
 场景 1: 快速部署 → PTQ
 场景 2: 精度要求高 → QAT
@@ -395,7 +395,7 @@ class STE(torch.autograd.Function):
 
 ### 8.3.1 FP32 (32位浮点) - 训练标准
 
-**表示**:
+**表示**：
 ```
 1 bit  符号
 8 bits 指数
@@ -405,19 +405,19 @@ class STE(torch.autograd.Function):
 精度: ~7 位十进制数字
 ```
 
-**特点**:
+**特点**：
 - ✅ 精度最高
 - ✅ 训练稳定
 - ❌ 显存占用大 (280GB for 70B)
 - ❌ 推理速度慢
 
-**用途**: 模型训练
+**用途**：模型训练
 
 ---
 
 ### 8.3.2 FP16/BF16 (16位浮点) - 推理常用
 
-**FP16 (半精度浮点)**:
+**FP16 (半精度浮点)**：
 ```
 1 bit  符号
 5 bits 指数
@@ -427,7 +427,7 @@ class STE(torch.autograd.Function):
 精度: ~3 位十进制数字
 ```
 
-**BF16 (Brain Float 16)**:
+**BF16 (Brain Float 16)**：
 ```
 1 bit  符号
 8 bits 指数 (与 FP32 相同)
@@ -437,19 +437,19 @@ class STE(torch.autograd.Function):
 精度: ~2 位十进制数字
 ```
 
-**对比**:
+**对比**：
 | 格式 | 范围 | 精度 | 稳定性 | 推荐度 |
 |------|------|------|--------|--------|
 | **FP16** | 小 | 高 | 一般 (可能下溢) | ⭐⭐⭐ |
 | **BF16** | 大 | 中 | 好 (不易下溢) | ⭐⭐⭐⭐⭐ |
 
-**推荐**: BF16 (范围与 FP32 相同,更稳定)
+**推荐**：BF16 (范围与 FP32 相同,更稳定)
 
 ---
 
 ### 8.3.3 INT8 (8位整数) - 经典量化
 
-**表示**:
+**表示**：
 ```
 有符号 INT8:
   范围: -128 到 127
@@ -460,7 +460,7 @@ class STE(torch.autograd.Function):
   精度: 整数
 ```
 
-**量化公式**:
+**量化公式**：
 ```python
 # Affine 量化
 Q = round(R / S) + Z
@@ -473,23 +473,23 @@ R = (Q - Z) * S
   Z: Zero Point (零点偏移)
 ```
 
-**优点**:
+**优点**：
 - ✅ 显存减半
 - ✅ 推理速度可能更快（强依赖硬件支持、kernel 实现与是否 memory-bound）
 - ✅ 精度损失通常较小，但必须用你的任务指标验证（不要只看 PPL）
 - ✅ 硬件支持好 (Tensor Core)
 
-**缺点**:
+**缺点**：
 - ❌ 需要校准数据集
 - ❌ 极端值处理
 
-**推荐度**: ⭐⭐⭐⭐⭐ (生产环境标准)
+**推荐度**：⭐⭐⭐⭐⭐ (生产环境标准)
 
 ---
 
 ### 8.3.4 INT4 (W4A16) ⭐
 
-**表示**:
+**表示**：
 ```
 INT4 权重:
   范围: -8 到 7 (有符号)
@@ -509,23 +509,23 @@ FP16 激活:
   硬件实现简单
 ```
 
-**优点**:
+**优点**：
 - ✅ 权重占用显著下降
 - ✅ 速度可能提升
 - ✅ 精度损失可控需验证
 - ✅ 硬件支持逐步完善
 
-**缺点**:
+**缺点**：
 - ❌ 常需更强的校准或训练手段保证精度
 - ❌ 实现复杂度高
 
-**推荐度**: ⭐⭐⭐⭐ (极限压缩首选)
+**推荐度**：⭐⭐⭐⭐ (极限压缩首选)
 
 ---
 
 ### 8.3.5 FP4 vs INT4
 
-**FP4 (4位浮点)**:
+**FP4 (4位浮点)**：
 ```
 2 bit 指数
 2 bit 尾数
@@ -534,7 +534,7 @@ FP16 激活:
 精度: 极低
 ```
 
-**对比**:
+**对比**：
 
 | 维度 | INT4 | FP4 |
 |------|------|-----|
@@ -546,7 +546,7 @@ FP16 激活:
 | **生态** | 成熟 | 发展中 |
 | **推荐度** | ⭐⭐⭐⭐ | ⭐⭐⭐ (未来) |
 
-**选择建议**:
+**选择建议**：
 - **当前**: INT4 (生态成熟,稳定可靠)
 - **未来**: FP4 (理论性能更高,需新一代硬件支持)
 
@@ -554,7 +554,7 @@ FP16 激活:
 
 ### 8.3.6 FP8 / NVFP4: 未来方向
 
-**FP8 (8位浮点)**:
+**FP8 (8位浮点)**：
 ```
 E4M3 (4 bit 指数, 3 bit 尾数):
   用于训练
@@ -567,19 +567,19 @@ E5M2 (5 bit 指数, 2 bit 尾数):
   精度: 低于 E4M3
 ```
 
-**NVFP4 (NVIDIA FP4)**:
+**NVFP4 (NVIDIA FP4)**：
 ```
 新一代硬件支持
 更优的硬件加速
 与 Tensor Core 深度集成
 ```
 
-**硬件支持**:
+**硬件支持**：
 - 新一代 GPU 通常提供 FP8 支持
 - FP4/FP8 的硬件支持仍在演进
 - 早期架构可能仅能通过软件模拟
 
-**性能潜力(示意)**:
+**性能潜力(示意)**：
 ```
 FP8 vs FP16:
   权重占用更低
@@ -596,7 +596,7 @@ FP4 vs INT4:
 
 ### 8.3.7 AWQ / GPTQ: 流行的 INT4 格式
 
-**AWQ (Activation-aware Quantization)**:
+**AWQ (Activation-aware Quantization)**：
 ```
 原理:
   基于激活值的重要性来量化权重
@@ -616,7 +616,7 @@ FP4 vs INT4:
   ❌ 实现复杂
 ```
 
-**GPTQ (Gradient-based Post-Training Quantization)**:
+**GPTQ (Gradient-based Post-Training Quantization)**：
 ```
 原理:
   基于梯度的二阶信息
@@ -637,7 +637,7 @@ FP4 vs INT4:
   ❌ 内存占用高
 ```
 
-**对比**:
+**对比**：
 | 特性 | AWQ | GPTQ |
 |------|-----|------|
 | **精度** | 更好 | 好 |
@@ -646,7 +646,7 @@ FP4 vs INT4:
 | **工具支持** | vLLM, AutoGPTQ | AutoGPTQ, llama.cpp |
 | **推荐度** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
 
-**推荐**:
+**推荐**：
 - 生产环境: AWQ (更快、精度更好)
 - 研究/离线: GPTQ (不需要校准数据)
 
@@ -664,13 +664,13 @@ FP4 vs INT4:
 
 ### 8.4.1 vLLM 量化支持
 
-**支持的格式**:
+**支持的格式**：
 - ✅ AWQ (推荐)
 - ✅ GPTQ
 - ✅ bitsandbytes (INT8)
 - ✅ FP8 (实验性)
 
-**使用示例**:
+**使用示例**：
 ```python
 from vllm import LLM, SamplingParams
 
@@ -694,7 +694,7 @@ sampling_params = SamplingParams(temperature=0.8)
 outputs = llm.generate(prompts, sampling_params)
 ```
 
-**KV Cache 量化**:
+**KV Cache 量化**：
 ```python
 llm = LLM(
     model="meta-llama/Llama-2-7b-hf",
@@ -703,7 +703,7 @@ llm = LLM(
 )
 ```
 
-**PagedAttention + 量化**:
+**PagedAttention + 量化**：
 ```
 优势:
   ✅ 内存利用率高 (PagedAttention)
@@ -715,7 +715,7 @@ llm = LLM(
 
 ### 8.4.2 SGLang INT4 推理 ⭐
 
-**Marlin 内核支持**:
+**Marlin 内核支持**：
 ```
 Marlin: 专为 INT4 设计的高效推理内核
   - Bit packing: 8 个 INT4 值打包到 1 个 INT32
@@ -724,7 +724,7 @@ Marlin: 专为 INT4 设计的高效推理内核
   - MoE 算子深度融合
 ```
 
-**W4A16 高效推理**:
+**W4A16 高效推理**：
 ```python
 # 启动 SGLang INT4 推理
 python -m sglang.launch_server \
@@ -736,7 +736,7 @@ python -m sglang.launch_server \
   --port 8000
 ```
 
-**Bit Packing 原理**:
+**Bit Packing 原理**：
 ```python
 def pack_int4(values):
     """
@@ -766,7 +766,7 @@ def unpack_int4(packed):
     return values
 ```
 
-**MoE 算子深度融合**:
+**MoE 算子深度融合**：
 ```python
 # 动态调整 MoE block size
 def dynamic_moe_align_block_size(block_size):
@@ -785,7 +785,7 @@ def dynamic_moe_align_block_size(block_size):
         return 32
 ```
 
-**性能 Benchmark(示意)**:
+**性能 Benchmark(示意)**：
 ```
 Llama-2-7B INT4 vs FP16:
   权重占用显著下降
@@ -797,7 +797,7 @@ Llama-2-7B INT4 vs FP16:
 
 ### 8.4.3 NVIDIA Model Optimizer ⭐
 
-**QAT 训练支持**:
+**QAT 训练支持**：
 ```python
 import torch
 import torch.nn as nn
@@ -823,7 +823,7 @@ for batch in dataloader:
     optimizer.step()
 ```
 
-**Megatron-LM 集成**:
+**Megatron-LM 集成**：
 ```
 大规模分布式训练:
   - Tensor Parallelism
@@ -832,7 +832,7 @@ for batch in dataloader:
   - 混合精度 (FP8 + INT4)
 ```
 
-**MXFP4 / NVFP4 格式支持**:
+**MXFP4 / NVFP4 格式支持**：
 ```python
 # NVIDIA 原生 FP4 量化
 from modelopt.torch.quantization import NVFP4Quantizer
@@ -841,7 +841,7 @@ quantizer = NVFP4Quantizer()
 model = quantizer.quantize(model)
 ```
 
-**Fake Quantization 实现**:
+**Fake Quantization 实现**：
 ```python
 class FakeQuantize(torch.autograd.Function):
     @staticmethod
@@ -863,7 +863,7 @@ class FakeQuantize(torch.autograd.Function):
 
 ### 8.4.4 AutoGPTQ / llama.cpp
 
-**AutoGPTQ**:
+**AutoGPTQ**：
 ```python
 from auto_gptq import AutoGPTQForCausalLM
 from transformers import AutoTokenizer
@@ -881,7 +881,7 @@ output = model.generate(input_ids, max_new_tokens=100)
 print(tokenizer.decode(output[0]))
 ```
 
-**llama.cpp (CPU 推理)**:
+**llama.cpp (CPU 推理)**：
 ```bash
 # 量化模型
 ./llama-cli \
@@ -897,7 +897,7 @@ print(tokenizer.decode(output[0]))
 # - Q8_0: 8-bit 量化
 ```
 
-**对比**:
+**对比**：
 | 工具 | GPU 推理 | CPU 推理 | 量化格式 | 易用性 |
 |------|---------|---------|---------|--------|
 | **vLLM** | ✅ | ❌ | AWQ, GPTQ | ⭐⭐⭐⭐⭐ |
@@ -935,7 +935,7 @@ Llama-2-7B (序列长度 32768,示意):
   总计: 可能超过单卡显存容量
 ```
 
-**长上下文场景尤其重要**:
+**长上下文场景尤其重要**：
 ```
 序列长度越长,KV Cache 越大(示意):
   4K tokens:   数 GB
@@ -949,7 +949,7 @@ Llama-2-7B (序列长度 32768,示意):
 
 ### 8.5.2 KV Cache 量化方法
 
-**INT8 KV Cache**:
+**INT8 KV Cache**：
 ```python
 from vllm import LLM
 
@@ -963,7 +963,7 @@ llm = LLM(
 # INT8: 约减半
 ```
 
-**动态量化 vs 静态量化**:
+**动态量化 vs 静态量化**：
 ```python
 # 静态量化 (推荐):
 kv_cache_dtype="int8"
@@ -976,7 +976,7 @@ kv_cache_dtype="dynamic_int8"
 # 更灵活,但略慢
 ```
 
-**Per-token 量化**:
+**Per-token 量化**：
 ```python
 # 每个 token 独立量化
 # 精度更高,但开销更大
@@ -991,7 +991,7 @@ llm = LLM(
 
 ### 8.5.3 精度与速度平衡
 
-**精度损失评估**:
+**精度损失评估**：
 ```python
 import torch
 from vllm import LLM
@@ -1016,7 +1016,7 @@ similarity = accuracy_score(
 print(f"Similarity: {similarity:.4f}")  # > 0.98
 ```
 
-**性能提升**:
+**性能提升**：
 ```
 显存:
   FP16: 19 GB
@@ -1027,7 +1027,7 @@ print(f"Similarity: {similarity:.4f}")  # > 0.98
   INT8: 45 requests/s (略快)
 ```
 
-**生产环境注意事项**:
+**生产环境注意事项**：
 ```
 ✅ 推荐:
   - 长序列 (>8K tokens)
@@ -1059,7 +1059,7 @@ print(f"Similarity: {similarity:.4f}")  # > 0.98
 
 ### 8.6.1 使用 vLLM 加载量化模型
 
-**AWQ/GPTQ 模型加载**:
+**AWQ/GPTQ 模型加载**：
 ```python
 from vllm import LLM, SamplingParams
 
@@ -1089,7 +1089,7 @@ prompts = ["Write a story about AI", "Explain quantum computing"]
 outputs = llm_awk.generate(prompts, sampling_params)
 ```
 
-**性能对比测试**:
+**性能对比测试**：
 ```python
 import time
 
@@ -1123,7 +1123,7 @@ print(f"AWQ:   {awq_stats}")
 print(f"Speedup: {awq_stats['avg_throughput'] / fp16_stats['avg_throughput']:.2f}x")
 ```
 
-**精度损失评估**:
+**精度损失评估**：
 ```python
 from datasets import load_dataset
 from evaluate import load
@@ -1155,7 +1155,7 @@ print(f"Accuracy Drop: {score_fp16['accuracy'] - score_awq['accuracy']:.4f}")
 
 ### 8.6.2 使用 SGLang 部署 INT4 模型 ⭐
 
-**W4A16 推理配置**:
+**W4A16 推理配置**：
 ```bash
 # 安装 SGLang
 pip install "sglang[all]"
@@ -1181,7 +1181,7 @@ curl http://localhost:8000/generate \
   }'
 ```
 
-**Marlin 内核启用**:
+**Marlin 内核启用**：
 ```python
 # SGLang 自动检测并启用 Marlin 内核
 # 如果检测到 GPTQ 格式的 INT4 权重,自动使用 Marlin
@@ -1194,7 +1194,7 @@ print(sgl.kernels.get_active_kernel())
 # 输出: "marlin_int4" ✅
 ```
 
-**性能 Benchmark**:
+**性能 Benchmark**：
 ```python
 import time
 import requests
@@ -1238,7 +1238,7 @@ print(f"Throughput: {stats['throughput']:.2f} req/s")
 
 ### 8.6.3 生产环境注意事项
 
-**模型格式选择**:
+**模型格式选择**：
 ```
 生产环境 (稳定性优先):
   → AWQ (精度更好,速度快)
@@ -1250,7 +1250,7 @@ print(f"Throughput: {stats['throughput']:.2f} req/s")
   → INT4 QAT (最佳精度)
 ```
 
-**硬件要求**:
+**硬件要求**：
 ```
 INT8:
   - 需要硬件支持 INT8 运算加速
@@ -1265,7 +1265,7 @@ FP8:
   - 老硬件可能仅支持软件模拟
 ```
 
-**监控指标**:
+**监控指标**：
 ```python
 # 关键指标
 metrics = {
@@ -1312,7 +1312,7 @@ if metrics["p95_latency"] > sla_target:
 
 ### 8.7.1 什么是 QAT
 
-**Fake Quantization 原理**:
+**Fake Quantization 原理**：
 ```python
 class FakeInt4QuantizationSTE(torch.autograd.Function):
     @staticmethod
@@ -1335,7 +1335,7 @@ class FakeInt4QuantizationSTE(torch.autograd.Function):
         return grad_output, None
 ```
 
-**STE (Straight-Through Estimator) 原理**:
+**STE (Straight-Through Estimator) 原理**：
 ```
 问题: round 操作不可导
   y = round(x)  # dy/dx = 0 (除了 0 点)
@@ -1350,7 +1350,7 @@ STE 解决方案:
   但大量样本的平均梯度准确
 ```
 
-**Train-Infer 一致性的重要性**:
+**Train-Infer 一致性的重要性**：
 ```
 训练时: Fake Quantization
   → 模型"看到"量化的噪声
@@ -1366,7 +1366,7 @@ STE 解决方案:
   → 性能崩溃
 ```
 
-**消融实验: QAT vs PTQ 的精度差异**:
+**消融实验: QAT vs PTQ 的精度差异**：
 ```
 PTQ (训练后量化):
   - 精度损失: 通常更明显
@@ -1383,7 +1383,7 @@ QAT (量化感知训练):
 
 ### 8.7.2 INT4 QAT 完整 Pipeline
 
-**Stage 1: QAT 训练 (模拟量化)**:
+**Stage 1: QAT 训练 (模拟量化)**：
 ```python
 class QATModel(nn.Module):
     def __init__(self, model):
@@ -1416,7 +1416,7 @@ class QATModel(nn.Module):
         loss.backward()
 ```
 
-**Stage 2: 权重转换 (真量化)**:
+**Stage 2: 权重转换 (真量化)**：
 ```python
 def convert_to_int4(model_fp16, scales):
     """
@@ -1450,7 +1450,7 @@ def convert_to_int4(model_fp16, scales):
     return model_int4
 ```
 
-**Stage 3: W4A16 推理**:
+**Stage 3: W4A16 推理**：
 ```python
 # SGLang 加载 INT4 权重
 python -m sglang.launch_server \
@@ -1469,7 +1469,7 @@ python -m sglang.launch_server \
 
 ### 8.7.3 训练端实现
 
-**Fake Quantization 和 STE 实现**:
+**Fake Quantization 和 STE 实现**：
 ```python
 class _FakeInt4QuantizationSTE(torch.autograd.Function):
     @staticmethod
@@ -1504,7 +1504,7 @@ def apply_fake_quantization(model):
             module.weight = _FakeInt4QuantizationSTE.apply(module.weight)
 ```
 
-**权重更新和格式适配**:
+**权重更新和格式适配**：
 ```python
 def restore_weights_before_loading(model):
     """
@@ -1544,7 +1544,7 @@ def process_weights_after_loading(model):
             del module.weight_fp16  # 释放显存
 ```
 
-**消融实验: QAT 的必要性**:
+**消融实验: QAT 的必要性**：
 ```
 实验 1: QAT INT4 训练 + BF16 rollout
   - 训练: Fake Quantization (INT4)
@@ -1561,14 +1561,14 @@ def process_weights_after_loading(model):
   - Rollout: INT4 权重
   - 结果: 误差收敛,与 BF16 baseline 接近
 
-**结论**: 训练和推理必须同时启用量化!
+**结论**：训练和推理必须同时启用量化!
 ```
 
 ---
 
 ### 8.7.4 推理端实现
 
-**SGLang W4A16 推理**:
+**SGLang W4A16 推理**：
 ```python
 # Bit packing: 8 个 INT4 值打包到 1 个 INT32
 def marlin_pack(int4_weights):
@@ -1613,7 +1613,7 @@ def marlin_unpack(packed):
     return int4_weights
 ```
 
-**计算和 IO 重叠,解包近零开销**:
+**计算和 IO 重叠,解包近零开销**：
 ```
 优化策略:
   1. 预取下一批权重 (Prefetch)
@@ -1625,7 +1625,7 @@ def marlin_unpack(packed):
   - 具体比例依实现与硬件而定
 ```
 
-**MoE 算子深度融合**:
+**MoE 算子深度融合**：
 ```python
 def dynamic_moe_align_block_size(num_experts):
     """
@@ -1687,17 +1687,17 @@ def fused_moe_kernel(gate, experts, block_size):
 
 ### 8.7.6 QAT 的适用场景
 
-**✅ 推荐**:
+**✅ 推荐**：
 - 大规模 RL 训练 (100B+ 参数)
 - 需要单节点部署超大模型
 - 需要 train-infer 一致性
 - PTQ 精度损失不可接受
 
-**⚠️ 注意**:
+**⚠️ 注意**：
 - 训练成本较高 (需要完整微调周期)
 - 实现复杂度较高 (需要理解 QAT、STE、格式转换)
 
-**❌ 不推荐**:
+**❌ 不推荐**：
 - 小规模模型 (成本不值得)
 - 只需要推理不需要微调 (用 PTQ 更快)
 
@@ -1726,7 +1726,7 @@ def fused_moe_kernel(gate, experts, block_size):
 
 ### 8.8.1 精度不对齐的问题
 
-**典型场景**:
+**典型场景**：
 ```
 训练时:
   - 自定义 kernel (如自己写的 Flash Attention)
@@ -1743,7 +1743,7 @@ def fused_moe_kernel(gate, experts, block_size):
   - 最终 accuracy 掉点
 ```
 
-**表现**:
+**表现**：
 ```
   症状:
 	  - 训练时 loss 正常下降
@@ -1761,7 +1761,7 @@ def fused_moe_kernel(gate, experts, block_size):
 
 ### 8.8.2 为什么精度不对齐?
 
-**开发团队分离**:
+**开发团队分离**：
 ```
 Training Team:
   - 关注收敛速度
@@ -1776,7 +1776,7 @@ Inference Team:
 问题: 两个团队没有协同
 ```
 
-**优化目标不同**:
+**优化目标不同**：
 ```
 Training:
   - 最大化训练吞吐
@@ -1791,7 +1791,7 @@ Inference:
 冲突: 优化方向不同,实现有差异
 ```
 
-**实现细节差异**:
+**实现细节差异**：
 ```
 Flash Attention:
   - 训练版本: 某种数值简化
@@ -1804,7 +1804,7 @@ Attention Mask:
   - 结果: 精度累积误差
 ```
 
-**测试场景不同**:
+**测试场景不同**：
 ```
 Training:
   - 合成数据 (随机输入)
@@ -1904,7 +1904,7 @@ def end_to_end_validation():
 
 ### 8.8.4 不同任务对精度的敏感度
 
-**LLM**: 离散采样,对低精度容忍度高
+**LLM**：离散采样,对低精度容忍度高
 ```
 为什么 LLM 对量化友好?
   - 输出是离散的 (token IDs)
@@ -1917,7 +1917,7 @@ def end_to_end_validation():
   - 结论: LLM 对量化具有一定容忍度
 ```
 
-**Diffusion**: 连续空间采样,误差累积严重
+**Diffusion**：连续空间采样,误差累积严重
 ```
 为什么 Diffusion 对量化敏感?
   - 输出是连续的 (像素值)
@@ -1932,7 +1932,7 @@ def end_to_end_validation():
 结论: Diffusion 模型至少使用 FP8
 ```
 
-**对比**:
+**对比**：
 | 任务类型 | 推荐格式 | 精度损失 | 说明 |
 |---------|---------|---------|------|
 | **LLM** | INT4/INT8 | 低~中 | 离散采样,容忍度高 |
@@ -1944,13 +1944,13 @@ def end_to_end_validation():
 
 ### 8.8.5 低精度的软件抽象复杂度
 
-**BF16/FP16**: 一个 tensor 就是一个数据
+**BF16/FP16**：一个 tensor 就是一个数据
 ```python
 weight = torch.randn(4096, 4096, dtype=torch.float16)
 # 简单、直观
 ```
 
-**FP8**: 一个 weight 变成 3 个 tensor
+**FP8**：一个 weight 变成 3 个 tensor
 ```python
 weight_fp8 = torch.randn(4096, 4096, dtype=torch.float8_e4m3)
 scale = weight_fp8.abs().max() / 127  # 缩放因子
@@ -1960,7 +1960,7 @@ weight_meta = {"dtype": "fp8_e4m3", "scale": scale}  # 元数据
 # 需要同时管理 3 个对象
 ```
 
-**FP4**: 需要 padding、pack 等操作
+**FP4**：需要 padding、pack 等操作
 ```python
 # FP4 打包: 2 个 FP4 → 1 byte
 weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
@@ -1971,7 +1971,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
 # 软件生态需要大规模演进
 ```
 
-**挑战**: 用户心智负担大
+**挑战**：用户心智负担大
 ```
 问题:
   - 如何平衡收益和复杂度?
@@ -1988,7 +1988,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
 
 ### 8.8.6 低精度训练的稳定性问题
 
-**常见症状**:
+**常见症状**：
 ```
 症状 1: 训练到一半 loss 炸了
   - 前 1000 steps: loss 正常下降
@@ -2004,7 +2004,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
   - FP8: 81% accuracy (掉 4 个点)
 ```
 
-**根本原因**: (张明星@清华)
+**根本原因**：(张明星@清华)
 ```
 不全是精度问题,而是算法没调好
 
@@ -2015,7 +2015,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
   - LR schedule 不适合低精度
 ```
 
-**解决方向**:
+**解决方向**：
 ```
 1. 把各种"内科" (张明星语) 检查得更细
    - Gradient clipping
@@ -2038,7 +2038,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
 
 ### 8.8.7 从历史看精度演进 (朱立耕@NVIDIA)
 
-**FP32 → FP16**: 见过类似问题,最终解决
+**FP32 → FP16**：见过类似问题,最终解决
 ```
 2016-2018 年:
   问题: FP16 训练不稳定
@@ -2046,7 +2046,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
   现状: 完全成熟,工业标准
 ```
 
-**FP16 → BF16**: 见过类似问题,最终解决
+**FP16 → BF16**：见过类似问题,最终解决
 ```
 2020-2022 年:
   问题: FP16 范围小,容易下溢
@@ -2054,7 +2054,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
   现状: 完全成熟,广泛使用
 ```
 
-**BF16 → FP8**: 现在是过渡期阵痛
+**BF16 → FP8**：现在是过渡期阵痛
 ```
 2023-2025 年:
   问题: FP8 训练稳定性
@@ -2062,7 +2062,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
   预期: 1-2 年内成熟
 ```
 
-**结论**:
+**结论**：
 ```
 随着算法 stabilize 和 config 摸清,问题可以解决
 低精度收益还是很大的,值得投入
@@ -2146,7 +2146,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
 
 ### 8.9.3 未来发展方向: FP4、NVFP4
 
-**新一代硬件对 FP4/FP8 的支持**:
+**新一代硬件对 FP4/FP8 的支持**：
 ```
 硬件特性:
   - 更高的算力与带宽
@@ -2162,7 +2162,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
   - 精度对齐问题
 ```
 
-**时间表**:
+**时间表**：
 ```
 时间表(示意):
   - FP8: 持续成熟
@@ -2174,14 +2174,14 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
 
 ### 8.9.4 算法和系统的 co-design (张博涵@浙大)
 
-**核心观点**:
+**核心观点**：
 ```
 不是系统等算法成熟
 不是算法等系统优化
 需要同步螺旋式上升
 ```
 
-**例子**:
+**例子**：
 ```
 算法进步:
   - 新的量化方法
@@ -2199,7 +2199,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
   - 共同演进
 ```
 
-**启示**:
+**启示**：
 ```
 不要等待"完美"的算法
 算法和系统要一起迭代
@@ -2227,21 +2227,21 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
 
 ## 📚 动手练习
 
-**练习 8.1**: 对比不同量化格式的性能和精度
+**练习 8.1**：对比不同量化格式的性能和精度
 
 任务:
 1. 加载 Llama-2-7B 的 FP16、INT8、INT4 版本
 2. 测量显存占用、推理速度、精度
 3. 绘制对比图表
 
-**练习 8.2**: 量化 Llama-3-70B 并测试 (使用 vLLM + AWQ)
+**练习 8.2**：量化 Llama-3-70B 并测试 (使用 vLLM + AWQ)
 
 任务:
 1. 下载 Llama-3-70B-AWQ 模型
 2. 使用 vLLM 加载并测试
 3. 对比 FP16 和 INT4 的性能
 
-**练习 8.3**: 使用 SGLang 部署 INT4 模型并 benchmark ⭐
+**练习 8.3**：使用 SGLang 部署 INT4 模型并 benchmark ⭐
 
 任务:
 1. 安装 SGLang
@@ -2249,7 +2249,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
 3. 进行性能 benchmark
 4. 评估精度损失
 
-**练习 8.4**: (进阶) 实现简单的 fake quantization ⭐
+**练习 8.4**：(进阶) 实现简单的 fake quantization ⭐
 
 任务:
 1. 实现 FakeInt4QuantizationSTE 类
@@ -2260,7 +2260,7 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
 
 ## 🎯 总结
 
-**关键要点**:
+关键要点：
 - 量化通过降低精度节省显存和提升速度
 - PTQ 快速但可能有精度损失,QAT 精度高但成本高
 - INT4 是当前极限压缩的首选 (75% 节省)
@@ -2268,6 +2268,8 @@ weight_fp4_packed = pack_fp4(weight_fp4)  # 自定义格式
 - 训练和推理必须精度对齐才能保证稳定性
 - FP4/FP8 是未来方向 (需新一代硬件支持)
 
-**下一章**: 第9章 投机采样——通过推测解码加速生成。
+## 章节衔接
+
+第8章解决的是“模型表示怎么压缩”，也就是在不改生成流程的前提下节省显存和带宽。接下来的第9章会换一个角度，不再主要压缩权重或 KV，而是直接改写生成阶段的执行路径，用投机采样去减少串行解码带来的等待。
 
 ---
