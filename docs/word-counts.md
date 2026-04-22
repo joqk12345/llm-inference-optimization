@@ -7,15 +7,15 @@
 
 | file | bytes | lines | chars | non_ws | cjk | words |
 | --- | --- | --- | --- | --- | --- | --- |
-| `chapters/chapter01-introduction.md` | 23975 | 449 | 9969 | 9021 | 6037 | 754 |
-| `chapters/chapter02-technology-landscape.md` | 27884 | 584 | 12499 | 11035 | 6400 | 1159 |
-| `chapters/chapter03-gpu-basics.md` | 22306 | 554 | 10819 | 9402 | 4885 | 1130 |
-| `chapters/chapter04-environment-setup.md` | 35110 | 1439 | 26955 | 21170 | 2898 | 3041 |
-| `chapters/chapter05-llm-inference-basics.md` | 49029 | 2039 | 33677 | 25754 | 6260 | 5513 |
-| `chapters/chapter06-kv-cache-optimization.md` | 35423 | 1394 | 25817 | 19972 | 4512 | 3991 |
-| `chapters/chapter07-request-scheduling.md` | 45293 | 1643 | 30798 | 22962 | 6520 | 3778 |
-| `chapters/chapter08-quantization.md` | 56118 | 2273 | 38012 | 29440 | 8332 | 5046 |
-| `chapters/chapter09-speculative-sampling.md` | 36510 | 1094 | 19383 | 15491 | 7127 | 2275 |
-| `chapters/chapter10-production-deployment.md` | 75095 | 2883 | 56151 | 41751 | 6903 | 5756 |
-| `chapters/chapter11-advanced-topics.md` | 51207 | 1956 | 35940 | 28803 | 7139 | 3912 |
-| **TOTAL** | 457950 | 16308 | 300020 | 234801 | 67013 | 36355 |
+| `chapters/chapter01-introduction.md` | 23969 | 449 | 9967 | 9019 | 6035 | 754 |
+| `chapters/chapter02-technology-landscape.md` | 28019 | 586 | 12550 | 11081 | 6440 | 1163 |
+| `chapters/chapter03-gpu-basics.md` | 22501 | 556 | 10886 | 9466 | 4944 | 1132 |
+| `chapters/chapter04-environment-setup.md` | 35353 | 1441 | 26978 | 21203 | 2943 | 3030 |
+| `chapters/chapter05-llm-inference-basics.md` | 36424 | 1391 | 22817 | 17981 | 6333 | 3655 |
+| `chapters/chapter06-kv-cache-optimization.md` | 36954 | 1418 | 26355 | 20476 | 4887 | 4018 |
+| `chapters/chapter07-request-scheduling.md` | 45309 | 1560 | 29370 | 22171 | 7135 | 3360 |
+| `chapters/chapter08-quantization.md` | 56590 | 2275 | 38064 | 29514 | 8405 | 5023 |
+| `chapters/chapter09-speculative-sampling.md` | 36800 | 1096 | 19445 | 15556 | 7188 | 2271 |
+| `chapters/chapter10-production-deployment.md` | 73784 | 2779 | 53892 | 40579 | 7626 | 5540 |
+| `chapters/chapter11-advanced-topics.md` | 52475 | 1969 | 36330 | 29187 | 7457 | 3914 |
+| **TOTAL** | 448178 | 15520 | 286654 | 226233 | 69393 | 33860 |
