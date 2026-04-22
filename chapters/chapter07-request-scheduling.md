@@ -11,7 +11,7 @@ concepts:
   - "prefill-decode-disaggregation"
   - "throughput-engineering"
 tools:
-  - "vllm"
+  - "vLLM"
   - "sglang"
 architecture_layer:
   - "optimization-techniques"
@@ -761,7 +761,7 @@ P95 延迟通常可改善
 
 **如何启用** (实验性):
 ```python
-from vllm import LLM
+from vLLM import LLM
 
 llm = LLM(
     model="meta-llama/Llama-2-7b-hf",
@@ -1073,7 +1073,7 @@ class AdaptiveScheduler:
 
 **关键参数**：
 ```bash
-vllm serve meta-llama/Llama-2-7b-hf \
+vLLM serve meta-llama/Llama-2-7b-hf \
   # Batch 相关
   --max-num-batched-tokens 8192 \        # 每次 iteration 最大 tokens
   --max-num-seqs 256 \                    # 最大并发请求数
@@ -1230,16 +1230,129 @@ Decode:
 
 ### 7.7.3 PD 分离的技术优势
 
-**异构部署**：
-```
-Prefill Worker: H100 (算力优化)
-  - 高 FLOPS
-  - 处理新请求的 Prefill
+#### 架构图：传统融合 vs PD 分离
 
-Decode Worker: A100 (带宽优化)
-  - 高内存带宽
-  - 处理 Decode 阶段
-  - 成本更低
+**传统融合架构（单体 GPU）**：
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   单 GPU 推理服务                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │           Prefill + Decode 混合处理          │   │
+│  │  ┌─────────┐    ┌─────────┐    ┌─────────┐  │   │
+│  │  │ Request │───▶│ Prefill │───▶│ Decode  │  │   │
+│  │  │   A     │    │         │    │         │  │   │
+│  │  └─────────┘    └─────────┘    └─────────┘  │   │
+│  │                      │              │        │   │
+│  │              ┌──────▼──────┐ ┌─────▼────┐   │   │
+│  │              │  KV Cache   │ │  KV Cache │   │   │
+│  │              │  (共享显存)  │ │  (共享显存)│   │   │
+│  │              └─────────────┘ └───────────┘   │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                      │
+│ 问题：两种 workload 抢同一 GPU，难以同时优化         │
+└─────────────────────────────────────────────────────┘
+```
+
+**PD 分离架构（双池）**：
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    PD 分离推理架构                                   │
+│                                                                      │
+│  ┌─────────────────┐           ┌─────────────────┐                 │
+│  │  Prefill 池      │           │  Decode 池       │                 │
+│  │  (H100 x N)      │           │  (A100 x M)      │                 │
+│  │                 │           │                  │                 │
+│  │  ┌───────────┐  │    KV     │  ┌───────────┐  │                 │
+│  │  │ Prefill   │──┼───传输───▶│─▶│ Decode    │  │                 │
+│  │  │ Worker 1  │  │           │  │ Worker 1  │  │                 │
+│  │  └───────────┘  │   ~100GB/s│  └───────────┘  │                 │
+│  │  ┌───────────┐  │  (RDMA)   │  ┌───────────┐  │                 │
+│  │  │ Prefill   │──┤           │  │ Decode    │  │                 │
+│  │  │ Worker 2  │  │           │  │ Worker 2  │  │                 │
+│  │  └───────────┘  │           │  └───────────┘  │                 │
+│  └────────┬────────┘           └────────┬────────┘                 │
+│           │                              │                          │
+│           │    ┌──────────────────┐      │                          │
+│           └───▶│  请求队列 (调度器) │◀─────┘                          │
+│                │  - 优先级队列      │                                │
+│                │  - 负载均衡        │                                │
+│                │  - KV 路由         │                                │
+│                └──────────────────┘                                │
+│                                                                      │
+│ 优势：                                                               │
+│  • Prefill 池：专注算力优化，TTFT 更稳定                              │
+│  • Decode 池：专注带宽优化，TPOT 更稳定                               │
+│  • 独立扩缩容：流量高峰可单独扩容                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**数据流详解**：
+
+```
+时间线：
+
+Request A (prompt=1000 tokens)
+│
+├─ 0ms: 到达调度器
+│
+├─ 10ms: 进入 Prefill 队列
+│
+├─ 50ms: Prefill Worker 处理
+│  ├─ 计算 prompt 的 KV Cache
+│  └─ 150ms: 完成，输出首 token
+│
+├─ 200ms: KV Cache 通过 RDMA 传输到 Decode 池
+│  └─ 传输时间 ≈ KV大小 / 带宽
+│      (1000 tokens × 0.5MB / 100GB/s ≈ 5ms)
+│
+├─ 205ms: 进入 Decode 队列
+│
+├─ 210ms: Decode Worker 处理
+│  ├─ 使用已缓存的 KV Cache
+│  └─ 逐 token 生成
+│
+└─ 2000ms: 生成完成 (100 tokens, ~18ms/token)
+```
+
+**异构部署配置示例**：
+
+```yaml
+# Kubernetes 下的 PD 分离配置
+# 注意：这需要支持跨节点 GPU 调度的编排系统
+
+# Prefill 池：H100，专注算力
+deployment:
+  name: vLLM-prefill
+  replicas: 4
+  gpu: nvidia-h100-80gb
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      memory: "80Gi"
+  env:
+    VLLM_WORKER_TYPE: "prefill"
+    VLLM_GPU_MEMORY_UTILIZATION: "0.95"
+
+# Decode 池：A100，专注成本
+deployment:
+  name: vLLM-decode
+  replicas: 8
+  gpu: nvidia-a100-80gb
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      memory: "80Gi"
+  env:
+    VLLM_WORKER_TYPE: "decode"
+    VLLM_GPU_MEMORY_UTILIZATION: "0.90"
+
+# 调度器：负责路由和 KV 传输
+deployment:
+  name: vLLM-scheduler
+  replicas: 2
+  # 需要支持 RDMA 的网络
 ```
 
 **资源隔离**：

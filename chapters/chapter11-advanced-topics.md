@@ -12,7 +12,7 @@ concepts:
   - "moe-inference"
   - "multimodal-inference"
 tools:
-  - "vllm"
+  - "vLLM"
   - "triton"
   - "torch-compile"
 architecture_layer:
@@ -943,7 +943,7 @@ def handle_expert_failure(failed_expert_id: int):
 
 ```bash
 # 使用vLLM部署Mixtral 8x7B
-vllm serve mistralai/Mixtral-8x7B-Instruct-v0.1 \
+vLLM serve mistralai/Mixtral-8x7B-Instruct-v0.1 \
   --tensor-parallel-size 4 \  # 示例
   --max-model-len 8192 \       # 示例
   --enable-prefix-caching
@@ -1164,7 +1164,7 @@ compiled_model = torch.compile(model)
 
 ```python
 import torch
-from vllm import LLM
+from vLLM import LLM
 
 # 原始模型
 llm = LLM(model="meta-llama/Llama-3.1-8B")  # 示例
@@ -1184,7 +1184,7 @@ compiled_model = torch.compile(
 
 ```python
 # vLLM 对 torch.compile 的支持随版本演进
-VLLM_USE_TORCH_COMPILE=1 vllm serve meta-llama/Llama-3.1-8B  # 示例
+VLLM_USE_TORCH_COMPILE=1 vLLM serve meta-llama/Llama-3.1-8B  # 示例
 
 # 性能影响需基准测试验证
 # 注意: 提升幅度依模型与负载而定
@@ -1328,7 +1328,7 @@ Flash Attention 2:
 
 ```bash
 # 示例：显式指定 attention backend（具体参数以你使用的版本为准）
-vllm serve meta-llama/Llama-3.1-8B \
+vLLM serve meta-llama/Llama-3.1-8B \
   --attention-backend flash \
   --max-model-len 32768
 
@@ -1558,7 +1558,7 @@ if __name__ == "__main__":
 
 ### 11.8.1 大规模MoE服务 (Large-scale Expert Parallelism)
 
-**参考链接（可选）**：[vLLM Blog - Large-scale Serving](https://blog.vllm.ai/2025/12/17/large-scale-serving.html)
+**参考链接（可选）**：[vLLM Blog - Large-scale Serving](https://blog.vLLM.ai/2025/12/17/large-scale-serving.html)
 
 **核心价值**：解决超大 MoE 模型的部署难题（把问题从“能不能训”变成“能不能稳态服务”）
 
@@ -1592,7 +1592,7 @@ if __name__ == "__main__":
 
 ### 11.8.2 EPD: Expert-Parallel Data Parallelism
 
-**参考链接（可选）**：[vLLM Blog - EPD](https://blog.vllm.ai/2025/12/15/vllm-epd.html)
+**参考链接（可选）**：[vLLM Blog - EPD](https://blog.vLLM.ai/2025/12/15/vLLM-epd.html)
 
 **核心价值**：把 EP 与 DP 组合起来，试图同时解决“模型太大放不下”和“利用率不均”的问题
 
@@ -1613,7 +1613,7 @@ EPD的创新:
 
 ### 11.8.3 Elastic Expert Parallelism
 
-**参考链接（可选）**：[vLLM Issue #20323](https://github.com/vllm-project/vllm/issues/20323)
+**参考链接（可选）**：[vLLM Issue #20323](https://github.com/vLLM-project/vLLM/issues/20323)
 
 **核心价值**：动态调整专家并行度,适应不同负载
 

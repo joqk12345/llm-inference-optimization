@@ -10,7 +10,7 @@ concepts: []
 tools:
   - "docker"
   - "cuda"
-  - "vllm"
+  - "vLLM"
 architecture_layer:
   - "hardware-and-runtime"
 learning_stage: "foundations"
@@ -444,17 +444,17 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 安装 vLLM
-pip install vllm
+pip install vLLM
 
 # 验证安装
-python -c "import vllm; print(vllm.__version__)"
+python -c "import vLLM; print(vLLM.__version__)"
 ```
 
 **方式 2: 从源码安装** (用于开发或最新功能):
 
 ```bash
-git clone https://github.com/vllm-project/vllm.git
-cd vllm
+git clone https://github.com/vLLM-project/vLLM.git
+cd vLLM
 
 # 安装依赖
 pip install -r requirements.txt
@@ -467,7 +467,7 @@ pip install -e .
 
 ```bash
 # 拉取官方镜像
-docker pull vllm/vllm-openai:latest
+docker pull vLLM/vLLM-openai:latest
 
 # 或者构建你自己的镜像（当你需要固定依赖与可复现交付时）
 # 参考本章 4.4 的 Dockerfile/Compose 模板
@@ -481,7 +481,7 @@ docker pull vllm/vllm-openai:latest
 
 ```bash
 # OpenAI API 兼容服务器
-python -m vllm.entrypoints.openai.api_server \
+python -m vLLM.entrypoints.openai.api_server \
     --model meta-llama/Llama-2-7b-chat-hf \
     --host 0.0.0.0 \
     --port 8000
@@ -493,7 +493,7 @@ python -m vllm.entrypoints.openai.api_server \
 docker run --gpus all \
     --shm-size 10g \
     -p 8000:8000 \
-    vllm/vllm-openai:latest \
+    vLLM/vLLM-openai:latest \
     --model meta-llama/Llama-2-7b-chat-hf
 ```
 
@@ -532,7 +532,7 @@ print(response.choices[0].message.content)
 **重要启动参数**：
 
 ```bash
-python -m vllm.entrypoints.openai.api_server \
+python -m vLLM.entrypoints.openai.api_server \
     --model meta-llama/Llama-2-7b-chat-hf \  # 模型名称或路径
     --tensor-parallel-size 2 \                # 张量并行度 (多GPU)
     --gpu-memory-utilization 0.9 \            # GPU 内存利用率 (0-1)
@@ -563,7 +563,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 vLLM
-RUN pip3 install --no-cache-dir vllm
+RUN pip3 install --no-cache-dir vLLM
 
 # 设置工作目录
 WORKDIR /app
@@ -572,7 +572,7 @@ WORKDIR /app
 EXPOSE 8000
 
 # 启动命令
-CMD ["python3", "-m", "vllm.entrypoints.openai.api_server", \
+CMD ["python3", "-m", "vLLM.entrypoints.openai.api_server", \
      "--host", "0.0.0.0", \
      "--port", "8000"]
 ```
@@ -645,7 +645,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 EXPOSE 8000
 
 # 启动命令
-CMD ["python3", "-m", "vllm.entrypoints.openai.api_server", \
+CMD ["python3", "-m", "vLLM.entrypoints.openai.api_server", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
      "--model", "${MODEL_PATH}"]
@@ -654,7 +654,7 @@ CMD ["python3", "-m", "vllm.entrypoints.openai.api_server", \
 **requirements.txt**：
 
 ```txt
-vllm==0.6.0
+vLLM==0.6.0
 torch==2.3.0
 transformers==4.41.0
 accelerate==0.30.0
@@ -673,12 +673,12 @@ pydantic==2.7.0
 version: '3.8'
 
 services:
-  vllm-server:
+  vLLM-server:
     build:
       context: .
       dockerfile: Dockerfile
     image: llm-inference:latest
-    container_name: vllm-server
+    container_name: vLLM-server
 
     # GPU 配置 (Compose 模式)
     gpus: all
@@ -737,7 +737,7 @@ services:
     networks:
       - llm-network
     depends_on:
-      - vllm-server
+      - vLLM-server
     restart: unless-stopped
 
   # 可选: Prometheus 监控
@@ -787,7 +787,7 @@ networks:
 docker compose up -d
 
 # 查看日志
-docker compose logs -f vllm-server
+docker compose logs -f vLLM-server
 
 # 停止服务
 docker compose down
@@ -873,7 +873,7 @@ volumes:
 **Python API**：
 
 ```python
-from vllm import LLM, SamplingParams
+from vLLM import LLM, SamplingParams
 
 # 初始化模型
 llm = LLM(
@@ -935,7 +935,7 @@ print(response.choices[0].message.content)
 **Python API**：
 
 ```python
-from vllm import LLM, SamplingParams
+from vLLM import LLM, SamplingParams
 
 # 初始化模型
 llm = LLM(
@@ -989,9 +989,9 @@ print(json.dumps(results, indent=2, ensure_ascii=False))
 **服务器端配置**：
 
 ```python
-from vllm.engine.arg_utils import AsyncEngineArgs
-from vllm.engine.async_llm_engine import AsyncLLMEngine
-from vllm.sampling_params import SamplingParams
+from vLLM.engine.arg_utils import AsyncEngineArgs
+from vLLM.engine.async_llm_engine import AsyncLLMEngine
+from vLLM.sampling_params import SamplingParams
 
 # 启用流式输出
 engine_args = AsyncEngineArgs(
@@ -1052,7 +1052,7 @@ curl http://localhost:8000/v1/chat/completions \
 ```python
 import time
 import numpy as np
-from vllm import LLM, SamplingParams
+from vLLM import LLM, SamplingParams
 
 def benchmark(llm, prompts, sampling_params, num_iterations=10):
     latencies = []
@@ -1271,7 +1271,7 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'vllm'
+  - job_name: 'vLLM'
     static_configs:
       - targets: ['localhost:8000']
 ```
@@ -1359,7 +1359,7 @@ sudo lsof -i :8000
 sudo kill -9 <PID>
 
 # 3. 或者使用其他端口
-docker run --gpus all -p 8001:8000 vllm/vllm-openai:latest
+docker run --gpus all -p 8001:8000 vLLM/vLLM-openai:latest
 ```
 
 ---
@@ -1378,10 +1378,10 @@ pip install --upgrade pip
 pip cache purge
 
 # 3. 使用预编译包
-pip install --only-binary :all: vllm
+pip install --only-binary :all: vLLM
 
 # 4. 如果还是失败,使用 conda
-conda install -c conda-forge vllm
+conda install -c conda-forge vLLM
 
 # 5. 检查 Python 版本 (需要 3.8+)
 python --version

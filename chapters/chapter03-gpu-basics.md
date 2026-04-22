@@ -155,17 +155,100 @@ GPU 访问数据的速度是分层的：
 - **Prefill** 更容易是 compute-bound（计算密集）。
 - **Decode** 更容易是 memory-bound（带宽/访存密集）。
 
-你可以用 Roofline 模型建立上限意识：
+#### Roofline Model：理解性能上限的核心工具
 
-```text
+> **为什么重要**：Roofline Model 能帮助你快速判断”优化方向在哪里”——是提升算力还是提升带宽。
+
+**模型公式**：
+
+```
 性能上限 = min( 计算峰值 , 带宽峰值 × 算术强度 )
 
-算术强度 = FLOPs / Bytes
+算术强度 = FLOPs / Bytes (每字节内存传输对应的计算量)
 ```
 
-当某个 kernel 的算术强度很低时，性能上限由带宽决定。很多 decode 阶段的工作正是如此：每一步产生一个 token，但要访问大量历史 KV 与权重相关数据，算术强度并不高。
+**图示**：
 
-因此，推理优化里大量“看起来像软件技巧”的东西（KV 组织、paged/chunked、连续批处理、前缀缓存）本质上都是在做同一件事：**减少无效访存与提升有效带宽利用率**。
+```
+                       性能 (TFLOPS)
+                         ↑
+    Compute-bound       |        ___________ (计算峰值: 1 PFLOPS)
+    区域                |       /
+    (算术强度高)        |      /
+                         |_____/____________________→ 算术强度 (FLOPs/Byte)
+                         |    ╱
+    Memory-bound         |   ╱  ← 带宽限制 (带宽: 3.35 TB/s)
+    区域                 |  ╱
+    (算术强度低)         |_╱_________________________
+                         0      100     200     300
+                                AI 算子算术强度示意
+```
+
+**典型 AI 算子的算术强度**：
+
+| 算子 | 算术强度 (FLOPs/Byte) | 瓶颈类型 | 优化方向 |
+|------|---------------------|----------|----------|
+| GEMM (矩阵乘) | 100-200+ | Compute | 算子融合、Tensor Core |
+| Attention (Batch大) | 50-100 | Compute | FlashAttention |
+| Attention (Decode) | 5-20 | **Memory** | KV Cache、量化 |
+| LayerNorm | 5-15 | Memory | 算子融合 |
+| Embedding lookup | 0.5-2 | Memory | 量化、缓存 |
+| Softmax | 1-5 | Memory | 算子融合 |
+
+**LLM 推理各阶段位置**：
+
+```
+                       性能 (TFLOPS)
+                         ↑
+                         |    _________ Prefill (compute-bound)
+                         |   /
+                         |  /
+                         |_/_______________
+                         | ╱       ↑
+                         |╱        | Decode (memory-bound)
+                         +----------------→ 算术强度
+                          0    5    10
+```
+
+**关键洞察**：
+- 当某个 kernel 的算术强度 < 带宽限制斜率时，性能由**带宽**决定
+- Decode 阶段的 Attention 算术强度很低（约 5-20），**必然受限于带宽**
+- 这就是为什么”提升带宽”（H100 → H200 → B200）能显著提升 Decode 性能
+- 这也是为什么 KV Cache 优化（减少重复访存）对 Decode 如此有效
+
+**工程意义**：
+
+| 瓶颈类型 | 判断方法 | 优化策略 |
+|----------|----------|----------|
+| **Compute-bound** | GPU Util 100% + Tensor Core 饱和 | 算子融合、更强 GPU |
+| **Memory-bound** | GPU Util < 50% + 显存带宽饱和 | KV Cache、量化、减少访存 |
+
+**实测诊断**：
+
+```bash
+# 判断瓶颈类型
+# 1. 查看 GPU 利用率
+nvidia-smi --query-gpu=utilization.gpu,utilization.memory --format=csv
+
+# 2. 高利用率 + 高显存 → Compute-bound
+# 3. 低利用率 + 高显存带宽 → Memory-bound
+
+# 4. 使用 nsight systems 做精确判断
+nsys profile -o profile.qdrep python your_inference.py
+# 查看 CUDA kernel 时间：计算密集型会有大量 matmul/attention
+```
+
+**优化收益预估**：
+
+| 优化手段 | 对 Compute-bound | 对 Memory-bound | 适用场景 |
+|----------|-----------------|-----------------|----------|
+| 算子融合 | ✅ 显著 | ✅ 中等 | 通用 |
+| FP8/INT8 量化 | ✅ 提升吞吐 | ✅ 减少带宽 | 通用 |
+| KV Cache | ❌ 无直接影响 | ✅ 显著减少访存 | Decode 阶段 |
+| PagedAttention | ❌ 无直接影响 | ✅ 减少碎片化 | 长序列 |
+| 连续批处理 | ✅ 提高利用率 | ✅ 稳定带宽 | 高并发 |
+
+> **核心结论**：推理优化里大量”看起来像软件技巧”的东西（KV 组织、paged/chunked、连续批处理、前缀缓存）本质上都是在做同一件事：**减少无效访存与提升有效带宽利用率**，因为 LLM 推理的 Decode 阶段天然是 memory-bound。
 
 ### 3.2.5 PCIe / NVLink：GPU 与 CPU 的桥梁
 

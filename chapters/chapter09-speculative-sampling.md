@@ -10,7 +10,7 @@ concepts:
   - "speculative-decoding"
   - "latency-budget"
 tools:
-  - "vllm"
+  - "vLLM"
   - "sglang"
 architecture_layer:
   - "optimization-techniques"

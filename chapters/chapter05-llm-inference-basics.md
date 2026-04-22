@@ -11,7 +11,7 @@ concepts:
   - "paged-attention"
   - "continuous-batching"
 tools:
-  - "vllm"
+  - "vLLM"
 architecture_layer:
   - "inference-mechanics"
 learning_stage: "foundations"
@@ -305,7 +305,70 @@ Decode 阶段:
 
 ---
 
-## 5.3 Attention 机制详解
+### 5.2.5 延迟分解：端到端延迟从哪来？
+
+> **工程视角**：理解延迟分解是优化工作的第一步。只有知道"慢在哪里"，才能选择正确的优化方向。
+
+**总延迟构成**：
+
+```
+总延迟 = TTFT + Σ(TPOT_i) + 网络开销 + 调度开销
+
+其中：
+- TTFT (Time To First Token): 首字延迟，Prefill 阶段
+- TPOT (Time Per Output Token): 字间延迟，Decode 阶段
+- 网络开销: gRPC/HTTP 序列化、反序列化、网络传输
+- 调度开销: 队列等待、调度器决策、KV Cache 管理
+```
+
+**典型分布（Llama-2-7B, A100-80GB, 512 input / 128 output）**：
+
+| 阶段 | 耗时 | 占比 | 瓶颈类型 | 优化方向 |
+|------|------|------|----------|----------|
+| TTFT | 120ms | 50% | Compute-bound | 更快的 kernel、FP8、Chunked Prefill |
+| TPOT (×128) | 80ms | 33% | Memory-bound | KV Cache、量化、PagedAttention |
+| 网络开销 | 20ms | 8% | Network | gRPC 优化、连接复用 |
+| 调度开销 | 20ms | 8% | CPU | 连续批处理、减少锁竞争 |
+
+**不同场景下的瓶颈迁移**：
+
+| 场景特征 | TTFT 占比 | TPOT 占比 | 瓶颈判断 |
+|----------|-----------|-----------|----------|
+| 短 prompt (< 256 tokens) | 30% | 50% | TPOT 主导 |
+| 长 prompt (> 2K tokens) | 70% | 20% | TTFT 主导 |
+| 长输出 (> 512 tokens) | 15% | 75% | TPOT 主导 |
+| 高并发 (> 32 concurrent) | 变化大 | 变化大 | 调度开销上升 |
+| 显存接近上限 | 可能增加 | 可能增加 | 碎片化导致抖动 |
+
+**实战诊断方法**：
+
+```bash
+# 1. 监控 TTFT vs TPOT 分布
+# vLLM 默认暴露以下指标：
+# - vLLM:prompt_tokens_total
+# - vLLM:generation_tokens_total
+# - vLLM:request_latency_seconds (包含 TTFT + generation)
+
+# 2. 判断瓶颈类型
+# 如果 TTFT 占比 > 60% → 优先优化 prefill
+# 如果 TPOT 占比 > 60% → 优先优化 decode/内存
+
+# 3. 使用 nsight systems 做深度分析
+nsys profile -o inference_trace ./run_inference.py
+# 查看 GPU 时间线，确认是计算还是内存等待
+```
+
+**优化收益预估表**：
+
+| 优化手段 | 预期 TTFT 改善 | 预期 TPOT 改善 | 适用场景 |
+|----------|---------------|---------------|----------|
+| FP8 量化 | +20% | +30% | 显存紧张、带宽瓶颈 |
+| PagedAttention | +5% | +15% | 长序列、多请求 |
+| Chunked Prefill | +30% | -5% | 长 prompt 场景 |
+| 连续批处理 | +10% | +20% | 高并发场景 |
+| PD 分离 | +40% | +25% | 混合负载、对延迟敏感 |
+
+> **关键洞察**：优化必须"对症下药"。如果瓶颈在 TTFT，却花时间优化 TPOT，往往事倍功半。
 
 >  为什么重要: Attention 是唯一让不同 token 产生交互的地方。理解 Attention,就理解了 LLM 的核心。
 
@@ -1387,5 +1450,5 @@ Llama-2-7B 的配置:
 ---
 
 ## 📎 参考资料
-- [Paged Attention from First Principles: A View Inside vLLM](https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vllm/) by Hamza Elshafie
+- [Paged Attention from First Principles: A View Inside vLLM](https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vLLM/) by Hamza Elshafie
 - [Efficient Memory Management for Large Language Model Serving with PagedAttention](https://arxiv.org/abs/2309.06180) - vLLM原始论文

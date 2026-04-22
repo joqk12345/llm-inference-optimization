@@ -184,7 +184,7 @@ display_order: 11
 
 ```bash
 # 单机部署示例
-vllm serve meta-llama/Llama-3.1-8B \
+vLLM serve meta-llama/Llama-3.1-8B \
   --tensor-parallel-size 1 \
   --gpu-memory-utilization 0.9 \
   --max-model-len 8192 \
@@ -227,7 +227,7 @@ ray start --head --port=6379
 ray start --address=<head-node-ip>:6379
 
 # 启动vLLM服务(自动分布式)
-vllm serve meta-llama/Llama-3.1-70B \
+vLLM serve meta-llama/Llama-3.1-70B \
   --tensor-parallel-size 4 \
   --pipeline-parallel-size 2 \
   --distributed-executor-backend ray
@@ -255,7 +255,7 @@ vllm serve meta-llama/Llama-3.1-70B \
 **1. 轮询(Round Robin)**
 
 ```nginx
-upstream vllm_backend {
+upstream vLLM_backend {
     server 10.0.1.10:8000;
     server 10.0.1.11:8000;
     server 10.0.1.12:8000;
@@ -264,7 +264,7 @@ upstream vllm_backend {
 server {
     listen 80;
     location /v1/chat/completions {
-        proxy_pass http://vllm_backend;
+        proxy_pass http://vLLM_backend;
     }
 }
 ```
@@ -272,7 +272,7 @@ server {
 **2. 最少连接(Least Connections)**
 
 ```nginx
-upstream vllm_backend {
+upstream vLLM_backend {
     least_conn;
     server 10.0.1.10:8000;
     server 10.0.1.11:8000;
@@ -371,27 +371,27 @@ def get_worker_id(session_id: str, num_workers: int) -> int:
 **Deployment配置**：
 
 ```yaml
-# vllm-deployment.yaml
+# vLLM-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vllm-llama3-8b
+  name: vLLM-llama3-8b
   labels:
-    app: vllm
+    app: vLLM
     model: llama3-8b
 spec:
   replicas: 3  # 3个副本
   selector:
     matchLabels:
-      app: vllm
+      app: vLLM
   template:
     metadata:
       labels:
-        app: vllm
+        app: vLLM
     spec:
       containers:
-      - name: vllm
-        image: vllm/vllm-openai:latest
+      - name: vLLM
+        image: vLLM/vLLM-openai:latest
         resources:
           limits:
             nvidia.com/gpu: 1  # 每个Pod 1个GPU
@@ -421,14 +421,14 @@ spec:
 **Service配置**：
 
 ```yaml
-# vllm-service.yaml
+# vLLM-service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: vllm-service
+  name: vLLM-service
 spec:
   selector:
-    app: vllm
+    app: vLLM
   ports:
   - protocol: TCP
     port: 80
@@ -440,15 +440,15 @@ spec:
 
 ```bash
 # 应用配置
-kubectl apply -f vllm-deployment.yaml
-kubectl apply -f vllm-service.yaml
+kubectl apply -f vLLM-deployment.yaml
+kubectl apply -f vLLM-service.yaml
 
 # 查看状态
 kubectl get pods -w
-kubectl logs -f deployment/vllm-llama3-8b
+kubectl logs -f deployment/vLLM-llama3-8b
 
 # 扩缩容
-kubectl scale deployment vllm-llama3-8b --replicas=5
+kubectl scale deployment vLLM-llama3-8b --replicas=5
 ```
 
 ### 10.3.3 配置管理
@@ -456,11 +456,11 @@ kubectl scale deployment vllm-llama3-8b --replicas=5
 **使用ConfigMap管理配置**：
 
 ```yaml
-# vllm-config.yaml
+# vLLM-config.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vllm-config
+  name: vLLM-config
 data:
   MODEL_NAME: "meta-llama/Llama-3.1-8B"
   GPU_MEMORY_UTILIZATION: "0.9"
@@ -474,7 +474,7 @@ data:
 ```yaml
 envFrom:
 - configMapRef:
-    name: vllm-config
+    name: vLLM-config
 ```
 
 ### 10.3.4 资源调度与GPU共享
@@ -486,11 +486,11 @@ envFrom:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: vllm-shared-gpu
+  name: vLLM-shared-gpu
 spec:
   containers:
-  - name: vllm
-    image: vllm/vllm-openai:latest
+  - name: vLLM
+    image: vLLM/vLLM-openai:latest
     resources:
       limits:
         nvidia.com/gpu: 1  # 请求1个GPU
@@ -503,7 +503,7 @@ spec:
 # 确保Pod调度到GPU节点
 spec:
   containers:
-  - name: vllm
+  - name: vLLM
     resources:
       limits:
         nvidia.com/gpu: 1
@@ -522,7 +522,7 @@ spec:
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
-  name: high-priority-vllm
+  name: high-priority-vLLM
 value: 1000
 globalDefault: false
 description: "高优先级vLLM服务"
@@ -596,7 +596,7 @@ df -h                      # 磁盘使用
 
 ```bash
 # 启动vLLM时启用metrics
-vllm serve meta-llama/Llama-3.1-8B \
+vLLM serve meta-llama/Llama-3.1-8B \
   --metrics-port 8000 \
   --enable-prometheus
 ```
@@ -609,9 +609,9 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'vllm'
+  - job_name: 'vLLM'
     static_configs:
-      - targets: ['vllm-service:8000']
+      - targets: ['vLLM-service:8000']
     metrics_path: /metrics
 ```
 
@@ -626,7 +626,7 @@ scrape_configs:
         "title": "TTFT (P95)",
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(vllm:ttft_seconds_bucket[5m]))"
+            "expr": "histogram_quantile(0.95, rate(vLLM:ttft_seconds_bucket[5m]))"
           }
         ]
       },
@@ -642,7 +642,7 @@ scrape_configs:
         "title": "Tokens per Second",
         "targets": [
           {
-            "expr": "rate(vllm:tokens_total[5m])"
+            "expr": "rate(vLLM:tokens_total[5m])"
           }
         ]
       }
@@ -655,19 +655,19 @@ scrape_configs:
 
 ```promql
 # TTFT P95
-histogram_quantile(0.95, rate(vllm_ttft_seconds_bucket[5m]))
+histogram_quantile(0.95, rate(vLLM_ttft_seconds_bucket[5m]))
 
 # 吞吐量
-rate(vllm_tokens_total[5m])
+rate(vLLM_tokens_total[5m])
 
 # GPU利用率
 nvidia_gpu_utilization
 
 # 请求错误率
-rate(vllm_requests_failed_total[5m]) / rate(vllm_requests_total[5m])
+rate(vLLM_requests_failed_total[5m]) / rate(vLLM_requests_total[5m])
 
 # KV Cache命中率
-vllm_kv_cache_hit_rate
+vLLM_kv_cache_hit_rate
 ```
 
 ### 10.4.3 日志收集与分析
@@ -675,7 +675,7 @@ vllm_kv_cache_hit_rate
 **结构化日志配置**：
 
 ```python
-# vllm_logging_config.json
+# vLLM_logging_config.json
 {
   "version": 1,
   "formatters": {
@@ -705,7 +705,7 @@ vllm_kv_cache_hit_rate
 filebeat.inputs:
 - type: container
   paths:
-    - /var/log/containers/vllm*.log
+    - /var/log/containers/vLLM*.log
   processors:
   - add_kubernetes_metadata:
 
@@ -843,7 +843,7 @@ python benchmark_serving.py \
 
 # 2. 采集trace
 nsys profile -o report.qdrep \
-  python your_vllm_app.py
+  python your_vLLM_app.py
 
 # 3. 分析结果
 nsys-ui report.qdrep
@@ -881,10 +881,10 @@ GPU利用率偏低?
 
 解决方案:
   # 1. 启用Prefix Caching
-  vllm serve ... --enable-prefix-caching
+  vLLM serve ... --enable-prefix-caching
 
   # 2. 使用Chunked Prefill
-  vllm serve ... --max-model-len 32768
+  vLLM serve ... --max-model-len 32768
 
   # 3. 优化prompt
   - 移除冗余内容
@@ -903,13 +903,13 @@ GPU利用率偏低?
 
 解决方案:
   # 1. 增加batch size
-  vllm serve ... --max-num-seqs 256
+  vLLM serve ... --max-num-seqs 256
 
   # 2. 调整GPU内存利用率
-  vllm serve ... --gpu-memory-utilization 0.95
+  vLLM serve ... --gpu-memory-utilization 0.95
 
   # 3. 启用continuous batching
-  vllm serve ... --enable-chunked-context
+  vLLM serve ... --enable-chunked-context
 ```
 
 **问题3: OOM频繁**
@@ -924,13 +924,13 @@ GPU利用率偏低?
 
 解决方案:
   # 1. 减少max_model_len
-  vllm serve ... --max-model-len 4096
+  vLLM serve ... --max-model-len 4096
 
   # 2. KV Cache量化
-  vllm serve ... --kv-cache-dtype fp8
+  vLLM serve ... --kv-cache-dtype fp8
 
   # 3. 减少并发请求数
-  vllm serve ... --max-num-batched-tokens 8192
+  vLLM serve ... --max-num-batched-tokens 8192
 ```
 
 ### 10.5.4 调优参数参考(示例)
@@ -942,6 +942,161 @@ GPU利用率偏低?
 | **max-model-len** | 模型max | 2048-8192 | 根据实际需求 |
 | **dtype** | auto | half/bf16 | FP16/BF16 |
 | **kv-cache-dtype** | auto | fp8/int8 | KV缓存量化 |
+
+### 10.5.4.1 vLLM 生产配置完整示例
+
+> **使用场景**：高并发在线服务，对延迟和稳定性有较高要求
+
+#### 启动命令
+
+```bash
+# 基础配置
+vLLM serve meta-llama/Llama-3.1-8B-Instruct \
+  --tensor-parallel-size 1 \
+  --gpu-memory-utilization 0.90 \
+  --max-num-seqs 256 \
+  --max-num-batched-tokens 8192 \
+  --max-model-len 8192 \
+  --dtype half \
+  --enforce-eager \
+  --enable-prefix-caching \
+  --quantization fp8 \
+  --kv-cache-dtype fp8
+
+# 生产环境推荐配置
+# --enforce-eager: 禁用 CUDA graph，减少首次调用延迟波动
+# --enable-prefix-caching: 启用前缀缓存，重复 prompt 场景收益大
+# --quantization fp8: 启用 FP8 量化，平衡性能与质量
+```
+
+#### 完整 docker-compose.yml 示例
+
+```yaml
+version: '3.8'
+
+services:
+  vLLM:
+    image: vLLM/vLLM:latest
+    container_name: vLLM-production
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - VLLM_WORKER_MULTIPROC_MODULE=vLLM.worker.multiprocessing.main
+    volumes:
+      - ./models:/models
+      - vLLM-data:/root/.cache/vLLM
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >
+      vLLM serve /models/meta-llama/Llama-3.1-8B-Instruct
+      --host 0.0.0.0
+      --port 8000
+      --tensor-parallel-size 1
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 256
+      --max-num-batched-tokens 8192
+      --max-model-len 8192
+      --dtype half
+      --enforce-eager
+      --enable-prefix-caching
+      --quantization fp8
+      --kv-cache-dtype fp8
+      --api-key token-xxx
+      --trust-remote-code
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  vLLM-data:
+```
+
+#### Prometheus 监控配置
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'vLLM'
+    static_configs:
+      - targets: ['vLLM:8000']
+    metrics_path: '/metrics'
+```
+
+**关键监控指标**：
+
+| 指标名 | 类型 | 说明 | 告警阈值 |
+|--------|------|------|----------|
+| `vLLM:prompt_tokens_total` | Counter | 总输入 token 数 | - |
+| `vLLM:generation_tokens_total` | Counter | 总输出 token 数 | - |
+| `vLLM:request_latency_seconds` | Histogram | 请求延迟 | P99 > 5s |
+| `vLLM:block_manager_used_blocks` | Gauge | 使用中的 KV block | > 90% 容量 |
+| `vLLM:block_manager_free_blocks` | Gauge | 空闲 KV block | < 10% 容量 |
+| `vLLM:gpu_memory_used_bytes` | Gauge | GPU 显存使用 | > 95% |
+| `vLLM:prefix_cache_hit_rate` | Gauge | 前缀缓存命中率 | < 30% (若适用) |
+
+#### 告警规则示例 (Prometheus AlertManager)
+
+```yaml
+groups:
+  - name: vLLM-alerts
+    rules:
+      # GPU 显存告警
+      - alert: VLLMGpuMemoryHigh
+        expr: vLLM:gpu_memory_used_bytes / vLLM:gpu_memory_total_bytes > 0.95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GPU 显存使用率超过 95%"
+
+      # KV Cache 碎片化告警
+      - alert: VLLMKVCacheFragmentation
+        expr: vLLM:block_manager_free_blocks / vLLM:block_manager_total_blocks < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "KV Cache 碎片化严重，可能影响并发"
+
+      # 前缀缓存命中率低
+      - alert: VLLMPrefixCacheLow
+        expr: vLLM:prefix_cache_hit_rate < 0.3
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "前缀缓存命中率低于 30%，可能未启用或场景不适用"
+
+      # 请求延迟过高
+      - alert: VLLMRequestLatencyHigh
+        expr: histogram_quantile(0.99, rate(vLLM:request_latency_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "P99 延迟超过 5 秒"
+```
+
+#### 生产环境检查清单
+
+| 检查项 | 验证方法 | 通过标准 |
+|--------|----------|----------|
+| 服务启动正常 | `curl http://localhost:8000/v1/models` | 返回模型信息 |
+| GPU 利用率 | `nvidia-smi` | 稳定在 60-90% |
+| 无 OOM | 检查日志 | 无 CUDA OOM 错误 |
+| 延迟稳定 | 连续压测 | P99/P50 < 3 |
+| 缓存命中 | 查看 metrics | 符合预期（场景相关）|
+| 日志正常 | 检查 stdout/stderr | 无 ERROR 级别日志 |
 
 ---
 
@@ -955,7 +1110,7 @@ GPU利用率偏低?
 
 ```python
 import torch
-from vllm import LLM, SamplingParams
+from vLLM import LLM, SamplingParams
 
 # 启用profiler
 with torch.profiler.profile(
@@ -994,15 +1149,15 @@ with torch.profiler.profile(
 
 ```bash
 # 采集trace
-nsys profile -y 30 -o vllm_report \
+nsys profile -y 30 -o vLLM_report \
   --force-overwrite=true \
-  python your_vllm_app.py
+  python your_vLLM_app.py
 
 # 查看GUI
-nsys-ui vllm_report.qdrep
+nsys-ui vLLM_report.qdrep
 
 # 或导出报告
-nsys stats vllm_report.qdrep --report csv > stats.csv
+nsys stats vLLM_report.qdrep --report csv > stats.csv
 ```
 
 **关键指标解读**：
@@ -1038,7 +1193,7 @@ CPU Overhead:
 ncu --set full \
   --target-processes all \
   -o output_report \
-  python your_vllm_app.py
+  python your_vLLM_app.py
 
 # 查看报告
 ncu-ui output_report.ncu-rep
@@ -1054,10 +1209,10 @@ ncu-ui output_report.ncu-rep
 
 ```bash
 # vLLM 0.6.0+内置profiling
-VLLM_USE_TRACING=1 vllm serve meta-llama/Llama-3.1-8B
+VLLM_USE_TRACING=1 vLLM serve meta-llama/Llama-3.1-8B
 
 # 查看trace
-# 生成的chrome trace文件: /tmp/vllm_trace.json
+# 生成的chrome trace文件: /tmp/vLLM_trace.json
 ```
 
 ### 10.5.5.5 性能优化checklist
@@ -1108,7 +1263,7 @@ pip install guidellm
 # 运行benchmark
 guidellm benchmark \
   --model meta-llama/Llama-3.1-8B \
-  --framework vllm \
+  --framework vLLM \
   --dataset mmlu \
   --output results.json
 ```
@@ -1158,7 +1313,7 @@ python benchmark_serving.py \
 # Step 3: 硬件对比(GuideLLM)
 guidellm benchmark \
   --model meta-llama/Llama-3.1-8B \
-  --framework vllm
+  --framework vLLM
 
 # Step 4: vLLM专用优化
 # 使用vLLM内置benchmark_serving.py
@@ -1217,7 +1372,7 @@ guidellm benchmark \
 # 使用Ray Autoscaler自动管理Spot实例
 # cluster.yaml
 
-cluster_name: vllm-spot-cluster
+cluster_name: vLLM-spot-cluster
 
 provider:
   type: aws
@@ -1284,12 +1439,12 @@ def graceful_shutdown():
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: vllm-hpa
+  name: vLLM-hpa
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: vllm-llama3-8b
+    name: vLLM-llama3-8b
   minReplicas: 2
   maxReplicas: 10
   metrics:
@@ -1322,11 +1477,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 def scale_up_before_peak():
     """在业务高峰前扩容"""
-    os.system("kubectl scale deployment vllm --replicas=10")
+    os.system("kubectl scale deployment vLLM --replicas=10")
 
 def scale_down_after_peak():
     """业务高峰后缩容"""
-    os.system("kubectl scale deployment vllm --replicas=2")
+    os.system("kubectl scale deployment vLLM --replicas=2")
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(scale_up_before_peak, 'cron', hour=8)  # 早上8点
@@ -2233,7 +2388,7 @@ def readiness_check():
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vllm
+  name: vLLM
 spec:
   replicas: 3
   strategy:
@@ -2545,7 +2700,7 @@ metrics = [
 验收:
 ```bash
 kubectl get pods  # 3个Pod运行中
-kubectl port-forward service/vllm-service 8000:80
+kubectl port-forward service/vLLM-service 8000:80
 curl http://localhost:8000/v1/models
 ```
 
@@ -2624,24 +2779,24 @@ curl http://localhost:8000/v1/models
 **练习10.1: 部署vLLM到Kubernetes**
 
 ```yaml
-# vllm-deployment.yaml
+# vLLM-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vllm-llama3-8b
+  name: vLLM-llama3-8b
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: vllm
+      app: vLLM
   template:
     metadata:
       labels:
-        app: vllm
+        app: vLLM
     spec:
       containers:
-      - name: vllm
-        image: vllm/vllm-openai:latest
+      - name: vLLM
+        image: vLLM/vLLM-openai:latest
         resources:
           limits:
             nvidia.com/gpu: 1
@@ -2666,10 +2821,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: vllm-service
+  name: vLLM-service
 spec:
   selector:
-    app: vllm
+    app: vLLM
   ports:
   - port: 80
     targetPort: 8000
@@ -2689,9 +2844,9 @@ data:
     global:
       scrape_interval: 15s
     scrape_configs:
-    - job_name: 'vllm'
+    - job_name: 'vLLM'
       static_configs:
-        - targets: ['vllm-service:8000']
+        - targets: ['vLLM-service:8000']
       metrics_path: /metrics
 ---
 apiVersion: v1
