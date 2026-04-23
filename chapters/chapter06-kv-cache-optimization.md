@@ -1067,9 +1067,183 @@ Q: 你的主要瓶颈是什么？
 
 ---
 
-## 6.6 实战对比
+## 6.6 混合模型的状态管理
 
-### 6.6.1 无 KV Cache vs 有 KV Cache
+> **💡 核心洞察**：当 Attention 与 Mamba/线性注意力混合部署时，状态管理不再只是 KV Cache 的问题，而是两种不同状态机制的统一协调问题。
+
+前面几节我们讨论了纯 Attention 架构下的 KV Cache 管理。但当你使用混合模型（Hybrid Models）时，系统需要同时管理两类状态：
+
+- **Attention 层**：Paged KV Cache（分页管理的 Key-Value 缓存）
+- **Mamba/线性注意力层**：固定大小的隐状态（Hidden State）
+
+理解这两种状态的差异，是掌握混合模型推理的基础。
+
+### 6.6.1 Attention 与 Mamba 的状态对比
+
+**Attention 层状态（KV Cache）**：
+
+```
+特征：
+- 状态大小随序列长度线性增长
+- 每个新 token 追加新的 KV 向量
+- 以固定大小 blocks 组织（默认 16 tokens/block，每块约 64 KiB）
+- 支持分页管理和页面对齐
+
+示例（基于 NVIDIA Nemotron-Nano-12B-v2）：
+- 1 个 block：16 tokens，~64 KiB
+- 128K 序列：8,192 blocks
+```
+
+**Mamba 层状态**：
+
+```
+特征：
+- 固定大小的隐状态，与序列长度无关
+- 每个时间步原地更新（in-place update）
+- 状态大小由模型结构决定（通常 ~2.57 MiB/序列）
+
+示例（基于 NVIDIA Nemotron-Nano-12B-v2）：
+- 每层 Mamba 状态：~2.57 MiB
+- 总状态大小与序列长度无关
+```
+
+### 6.6.2 长上下文下的状态大小对比
+
+关键洞察：**在长序列场景下，两类状态的大小关系会发生戏剧性变化**。
+
+| 序列长度 | KV Cache 大小 | Mamba 状态大小 | KV/Mamba 比率 |
+|----------|--------------|----------------|---------------|
+| 1K tokens | ~0.5 GB | 2.57 MB | ~195× |
+| 4K tokens | ~2 GB | 2.57 MB | ~780× |
+| 16K tokens | ~8 GB | 2.57 MB | ~3,100× |
+| 128K tokens | ~64 GB | 2.57 MB | ~25,000× |
+
+> **数据来源**：估算基于 NVIDIA Nemotron-Nano-12B-v2 配置，实际数值因模型而异。
+
+**核心结论**：
+
+- 短序列：两者状态大小相近，Mamba 状态可能略大
+- **长序列（> 4K）**：KV Cache 远大于 Mamba 状态，128K 时可达 **200 倍以上**
+- 这就是混合架构的吸引力所在：Mamba 用固定成本覆盖长距离依赖，Attention 只处理关键局部上下文
+
+### 6.6.3 vLLM V0 的混合状态管理
+
+vLLM V0 对混合模型的支持是通过一个实用的变通方案实现的：
+
+```
+架构特点：
+- KV Cache：使用 Block 分配器管理（与纯 Attention 相同）
+- Mamba 状态：为每个活跃序列单独分配 tensor
+- 用户配置：手动设置 max_num_seqs 参数，控制最大并发 Mamba 状态数
+```
+
+**V0 的问题**：
+
+```
+问题 1：用户需要猜测合适的 max_num_seqs
+- 设置过高 → CUDA OOM
+- 设置过低 → 并发受限，吞吐下降
+
+问题 2：状态分配与 KV Cache 分配独立
+- 无法共享内存预算
+- 资源利用率不佳
+
+问题 3：缺乏高级特性
+- 不支持前缀缓存（Prefix Caching）
+- 不支持 KV 传输
+- 不支持 PD 分离
+```
+
+### 6.6.4 vLLM V1 的统一状态管理
+
+vLLM V1 重构了混合模型支持，实现了**统一分配器**（Unified Allocator）：
+
+```
+架构特点：
+- 同时管理 KV Cache blocks 和 Mamba 状态 pages
+- 统一的内存池，自动协调分配
+- 支持前缀缓存、KV 传输、PD 分离
+- 可利用 torch.compile 优化
+```
+
+**KVCacheGroups 机制**：
+
+V1 将相同类型的层分组管理：
+
+```
+示例模型结构：
+- Attention 层 (A)：32 层
+- Sliding Window Attention 层 (SWA)：8 层
+- Mamba 层 (M)：12 层
+
+KVCacheGroups：
+- Group A：32 层共享
+- Group SWA：8 层共享
+- Group M：12 层共享
+```
+
+**页面对齐策略**：
+
+Mamba 的页面大小远大于 Attention blocks，为了统一管理：
+
+1. **Attention block 自动扩大**：直到与 Mamba page size 对齐
+2. **Mamba page 轻微填充**：使页面大小完全相等
+3. **共享底层 KVCacheTensors**：不同 group 共用物理存储
+
+```
+对齐示例（NVIDIA Nemotron-Nano-12B-v2）：
+- 原始 Attention block size：16 tokens
+- 对齐后 Attention block size：64 tokens（或更大）
+- Mamba page size：已是较大固定值
+- 结果：所有 group 使用统一的页面大小
+```
+
+### 6.6.5 混合模型实战配置
+
+**在 vLLM 中启用混合模型**：
+
+```bash
+vLLM serve NVIDIA/Nemotron-Nano-12B-v2 \
+  --gpu-memory-utilization 0.9 \
+  --enforce-eager  # 某些混合模型需要 eager 模式
+```
+
+**监控混合状态使用**：
+
+```python
+from vLLM import LLM
+
+llm = LLM(model="NVIDIA/Nemotron-Nano-12B-v2")
+
+# 获取混合状态统计
+stats = llm.llm_engine.cache_engine.get_stats()
+print(f"KV Cache blocks: {stats['num_used_blocks']}")
+print(f"Mamba states: {stats.get('num_mamba_states', 'N/A')}")
+```
+
+### 6.6.6 混合模型决策清单
+
+> **使用场景**：你的业务是否适合混合模型？
+
+| 条件 | 判断方法 | 建议 |
+|------|----------|------|
+| 序列长度经常 > 4K | 流量分析 | 认真评估混合模型 |
+| 显存瓶颈明显 | KV Cache 占比 > 70% | 混合模型可显著缓解 |
+| 使用支持混合的模型 | vLLM 支持列表 | 直接部署 |
+| 短序列为主 (< 1K) | 流量分析 | 纯 Attention 可能足够 |
+
+**评估步骤**：
+
+1. 确认你的模型是否被 vLLM V1 支持
+2. 在真实流量下测试，对比混合模型 vs 纯 Attention 的 TTFT 和显存占用
+3. 监控 Mamba 状态 vs KV Cache 的实际大小比例
+4. 评估调度和运维复杂度是否可接受
+
+---
+
+## 6.8 实战对比
+
+### 6.8.1 无 KV Cache vs 有 KV Cache
 
 **性能测试(示意)**：
 ```
@@ -1090,7 +1264,7 @@ Q: 你的主要瓶颈是什么？
 
 ---
 
-### 6.6.2 性能提升量化分析
+### 6.8.2 性能提升量化分析
 
 **不同序列长度的加速比**：
 ```
@@ -1114,7 +1288,7 @@ Q: 你的主要瓶颈是什么？
 
 ---
 
-### 6.6.3 vLLM 的 KV Cache 实现
+### 6.8.3 vLLM 的 KV Cache 实现
 
 **关键特性**：
 1. ✅ PagedAttention (高内存利用率)
@@ -1141,7 +1315,7 @@ outputs = llm.generate(prompts)
 
 ---
 
-## 6.7 Prefix Caching ⭐⭐⭐
+## 6.9 Prefix Caching ⭐⭐⭐
 
 > **💡 核心洞察**：重复的 prompt (如系统提示词) 只需要计算一次,后续请求直接复用 KV Cache。
 >
@@ -1149,7 +1323,7 @@ outputs = llm.generate(prompts)
 >
 > **📌 与第7章的边界**：Prefix Caching 决定“哪些 KV 资产可以复用”; 第7章的调度器再决定“哪些请求优先利用这些资产进入执行”。
 
-### 6.7.1 什么是 Prefix Caching
+### 6.9.1 什么是 Prefix Caching
 
 **定义**：跨请求复用相同 prompt 的 KV Cache
 
@@ -1173,7 +1347,7 @@ Request 3: "System: You are helpful. User: How are you?"
 
 ---
 
-### 6.7.2 Prefix Caching 的核心思想
+### 6.9.2 Prefix Caching 的核心思想
 
 **传统 KV Cache**：单次请求内复用
 - Token 0 的 KV 被 token 1, 2, 3...复用
@@ -1192,7 +1366,7 @@ Prefix Caching: 全局 distributed cache (如 Redis)
 
 ---
 
-### 6.7.3 vLLM 的实现: Hash-based KV Cache
+### 6.9.3 vLLM 的实现: Hash-based KV Cache
 
 **挑战**：如何检测两个请求的 prefix 是否相同?
 
@@ -1230,7 +1404,7 @@ def compute_block_hash(block_kv):
 
 ---
 
-### 6.7.4 Prefix Caching 的工作流程
+### 6.9.4 Prefix Caching 的工作流程
 
 **首次请求 (Cold Path)**：
 ```
@@ -1263,7 +1437,7 @@ def compute_block_hash(block_kv):
 
 ---
 
-### 6.7.5 性能提升分析
+### 6.9.5 性能提升分析
 
 **理论加速比**：
 ```
@@ -1304,7 +1478,7 @@ def compute_block_hash(block_kv):
 
 ---
 
-### 6.7.6 vLLM 配置
+### 6.9.6 vLLM 配置
 
 **启用 Prefix Caching** (v0.6.0+):
 ```bash
@@ -1335,7 +1509,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ---
 
-### 6.7.7 实战案例
+### 6.9.7 实战案例
 
 **案例 1: Chatbot 服务 (示意)**
 ```
@@ -1372,7 +1546,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ---
 
-### 6.7.8 最佳实践
+### 6.9.8 最佳实践
 
 **1. 识别可缓存的 Prefix**
 ```
@@ -1435,6 +1609,9 @@ def monitor_prefix_cache(llm):
 - [ ] 计算 Prefix Caching 的加速比
 - [ ] 配置 vLLM 启用 Prefix Caching
 - [ ] 监控 cache hit rate 并优化
+- [ ] 对比 Attention 状态 (KV Cache) 和 Mamba 状态的差异
+- [ ] 解释 vLLM V1 如何实现统一状态管理
+- [ ] 评估混合模型是否适合你的业务场景
 
 ---
 
@@ -1493,6 +1670,8 @@ GPU 总显存: 2048 tokens
 - Prefix Caching 通过跨请求复用,在高重复前缀场景可带来从 2x 到数十倍的加速
 - GQA 是质量与速度的最佳平衡
 - vLLM 自动启用 PagedAttention 和 Prefix Caching
+- 混合模型（Attention + Mamba/线性注意力）通过固定大小隐状态解决长序列下的 KV Cache 爆炸问题
+- vLLM V1 通过统一分配器实现 KV Cache 和 Mamba 状态的协同管理
 
 ## 章节衔接
 
