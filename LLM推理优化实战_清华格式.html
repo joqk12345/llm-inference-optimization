@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+xmlns:w="urn:schemas-microsoft-com:office:word"
+xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<title>LLM推理优化实战</title>
+<style>
+@page {
+    margin: 2.5cm 3cm 2.5cm 3cm;
+}
+body {
+    font-family: "Times New Roman", "宋体", serif;
+    font-size: 10.5pt;
+    line-height: 1.6;
+}
+h1 {
+    text-align: center;
+    font-size: 22pt;
+    font-weight: bold;
+    margin-top: 24pt;
+    margin-bottom: 18pt;
+}
+h2 {
+    font-size: 16pt;
+    font-weight: bold;
+    margin-top: 20pt;
+    margin-bottom: 12pt;
+}
+h3 {
+    font-size: 14pt;
+    font-weight: bold;
+    margin-top: 16pt;
+    margin-bottom: 10pt;
+}
+h4 {
+    font-size: 12pt;
+    font-weight: bold;
+    margin-top: 12pt;
+    margin-bottom: 8pt;
+}
+h5 {
+    font-size: 10.5pt;
+    font-weight: bold;
+    margin-top: 8pt;
+    margin-bottom: 6pt;
+}
+p {
+    margin-bottom: 6pt;
+    text-indent: 0.5cm;
+}
+pre {
+    background: #f5f5f5;
+    padding: 12px;
+    font-family: "Courier New", monospace;
+    font-size: 9pt;
+    margin: 10px 0;
+    border-left: 3px solid #0066cc;
+}
+code {
+    font-family: "Courier New", monospace;
+    font-size: 9pt;
+    background: #f0f0f0;
+    padding: 1px 3px;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+}
+th, td {
+    border: 1px solid #000;
+    padding: 6px 10px;
+    font-size: 9.5pt;
+}
+th {
+    background: #e8e8e8;
+    font-weight: bold;
+    text-align: center;
+}
+.b {
+    font-weight: bold;
+}
+.i {
+    font-style: italic;
+}
+.u {
+    text-decoration: underline;
+}
+.caption {
+    font-size: 9pt;
+    text-align: center;
+    margin-bottom: 8pt;
+}
+.right {
+    text-align: right;
+}
+.center {
+    text-align: center;
+}
+.indent {
+    text-indent: 1cm;
+}
+</style>
+</head>
+<body>
+
+<h1>LLM推理优化实战</h1>
+<p class="center">编著</p>
+
+<h2>内容简介</h2>
+
+<p>本书系统讲解大型语言模型（LLM，Large Language Model）推理优化的核心技术与工程实践，旨在帮助工程师建立系统级的推理优化能力。</p>
+
+<p><b>核心内容</b>分为四个部分：</p>
+
+<p>第一部分（第1-2章）：建立推理优化的全局视角，理解为什么优化是必要的，以及技术演进的方向。</p>
+
+<p>第二部分（第3-5章）：夯实基础，包括GPU硬件基础、推理环境搭建、以及LLM推理的核心原理（Prefill/Decode、Attention、KV Cache）。</p>
+
+<p>第三部分（第6-9章）：深入核心技术，包括KV Cache优化（PagedAttention、Prefix Caching）、请求调度策略、量化技术（FP8/INT8/INT4）、投机采样等。</p>
+
+<p>第四部分（第10-11章）：生产实践与前沿话题，包括生产环境部署、监控运维、成本优化，以及PD分离、MoE等高级主题。</p>
+
+<p><b>本书特色</b>：</p>
+<p>1. 从第一性原理出发，帮助读者理解“为什么”而非仅是“怎么做”；</p>
+<p>2. 强调工程可落地性，提供生产级配置示例与监控告警方案；</p>
+<p>3. 量化思维贯穿始终，每个优化都配有预期收益的量化参考。</p>
+
+<p><b>读者对象</b>：平台工程师、ML Infra工程师、后端工程师、全栈工程师、算法工程师、技术决策者。</p>
+
+<h2>前言</h2>
+
+<p><b>编写意图</b></p>
+
+<p>随着大型语言模型（LLM，Large Language Model）在工业界的广泛应用，推理（Inference）已经从“能跑”变成了“要用得起”。训练一个模型可能只需要几个月，但推理服务要持续运行几年——每一个token的计算、每一次请求的延迟、每一字节的带宽，都在持续消耗资源。</p>
+
+<p>我们编写这本书的初衷，是希望帮助工程师们建立起<b>系统级的推理优化能力</b>——不是学会某个框架的使用技巧，而是理解<b>为什么优化有效，在什么条件下有效、以及如何衡量优化效果</b>。</p>
+
+<p><b>本书特点</b></p>
+
+<p>1. <b>第一性原理出发</b>：不只讲“怎么做”，更讲“为什么这样做”。理解原理是灵活应用的前提。</p>
+
+<p>2. <b>工程导向</b>：每一个技术点都配有生产环境可用的配置示例、监控指标和故障排查指南。</p>
+
+<p>3. <b>量化思维</b>：强调用数据说话——优化前后的延迟、吞吐、成本变化，都需要可度量的对比。</p>
+
+<p>4. <b>场景适配</b>：不同业务场景的优化重点不同，本书帮助读者建立“判断框架”而非机械套用。</p>
+
+<p><b>适用范围</b></p>
+
+<p>平台工程师/Infra工程师：需要搭建和维护推理平台，关注成本、稳定性与可扩展性。</p>
+<p>后端工程师/全栈工程师：将LLM接入业务，关注API延迟、失败率与用户体验。</p>
+<p>ML工程师/算法工程师：关注模型质量与系统约束的平衡。</p>
+<p>技术决策者（CTO、架构师）：需要评估技术路线与投资回报。</p>
+
+<p><b>编写方法</b></p>
+
+<p>本书采用“问题驱动”的组织方式：每章从实际问题出发，先分析问题根源，再介绍解决方案，最后给出工程实践指南。</p>
+
+<p>各章内容相对独立，读者可以根据自己的需求选择性阅读，也可以按顺序通读形成系统认知。</p>
+
+<h2>目录</h2>
+
+<p>第1章 重新理解推理这件事  ................................................... 1</p>
+<p>1.1 训练vs推理：就像研发和生产 ..................................... 1</p>
+<p>1.2 技术可行：优化空间与成本结构 ................................. 5</p>
+<p>1.3 案例启示：从原理到实践 ....................................... 8</p>
+<p>1.4 投资回报：可量化的ROI框架 .................................. 12</p>
+
+<p>第2章 技术全景与趋势 .................................................. 20</p>
+<p>2.1 技术趋势概览 ............................................... 20</p>
+<p>2.2 五大优化方向速览 ........................................ 35</p>
+<p>2.3 谁应该读这本书 ......................................... 45</p>
+<p>2.4 配套资源 ............................................... 50</p>
+
+<p>第3章 GPU基础 ................................................... 55</p>
+<p>3.1 CPU vs GPU：本质差异 ...................................... 55</p>
+<p>3.2 GPU架构详解 ............................................ 60</p>
+<p>3.3 显存计算公式 ........................................... 90</p>
+<p>3.4 GPU性能监控 ............................................ 100</p>
+<p>3.5 性能瓶颈诊断 ......................................... 110</p>
+<p>3.6 常见GPU规格对比 ........................................ 120</p>
+<p>3.7 NVIDIA架构演进：从A100到B200 ........................... 130</p>
+
+<p>第4章 环境搭建 .................................................. 150</p>
+<p>4.1 开发环境概览 ........................................... 150</p>
+<p>4.2 基础环境安装 ........................................... 155</p>
+<p>4.3 vLLM快速入门 ......................................... 165</p>
+<p>4.4 Docker容器化部署 ...................................... 180</p>
+<p>4.5 基础推理示例 ......................................... 195</p>
+<p>4.6 开发工具推荐 ......................................... 210</p>
+<p>4.7 常见问题排查 ......................................... 220</p>
+
+<p>第5章 LLM推理基础 ............................................ 230</p>
+<p>5.1 训练vs推理：工作负载的本质差异 ......................... 230</p>
+<p>5.2 LLM如何生成文本 ........................................ 240</p>
+<p>5.3 Attention机制详解 ...................................... 260</p>
+<p>5.4 从朴素生成到KV Cache ................................... 290</p>
+<p>5.5 KV Cache的内存管理挑战 ................................. 320</p>
+<p>5.6 操作系统类比：虚拟内存与分页 ......................... 340</p>
+<p>5.7 Chunked Prefill：处理长prompt ......................... 360</p>
+<p>5.8 PagedAttention入门 ................................... 370</p>
+<p>5.9 批处理的挑战：从静态到动态 ......................... 385</p>
+<p>5.10 Continuous Batching入门 ............................... 395</p>
+<p>5.11 vLLM架构预览 ......................................... 410</p>
+
+<p>第6章 KV Cache优化 ......................................... 425</p>
+<p>6.1 Transformer回顾 .......................................... 425</p>
+<p>6.2 KV Cache原理 .......................................... 435</p>
+<p>6.3 KV Cache实现 ......................................... 455</p>
+<p>6.4 KV Cache优化技术 ...................................... 490</p>
+<p>6.5 KV Cache的代价 ........................................ 530</p>
+<p>6.6 实战对比 .............................................. 545</p>
+<p>6.7 Prefix Caching ........................................ 560</p>
+
+<p>第7章 请求调度策略 .......................................... 590</p>
+<p>7.1 调度的必要性 ........................................ 590</p>
+<p>7.2 基础调度策略 ......................................... 610</p>
+<p>7.3 Continuous Batching原理 ................................. 640</p>
+<p>7.4 vLLM调度器实现 ....................................... 670</p>
+<p>7.5 高级调度策略 ........................................ 700</p>
+<p>7.6 调度与优先级的权衡 ................................. 730</p>
+<p>7.7 Prefill-Decode分离（PD分离） ......................... 760</p>
+
+<p>第8章 量化技术 ............................................ 800</p>
+<p>8.1 量化基础 ........................................... 800</p>
+<p>8.2 量化方法分类 ......................................... 830</p>
+<p>8.3 常用量化格式 ......................................... 860</p>
+<p>8.4 流行的量化框架 ...................................... 920</p>
+<p>8.5 KV Cache量化 ......................................... 960</p>
+<p>8.6 实战：量化部署 ........................................ 990</p>
+<p>8.7 量化进阶：INT4 QAT实战 ............................. 1030</p>
+<p>8.8 精度对齐：Train vs Inference ......................... 1080</p>
+<p>8.9 量化技术总结与展望 .................................. 1120</p>
+
+<p>第9章 投机采样 ............................................ 1140</p>
+<p>9.1 什么是投机采样 ...................................... 1140</p>
+<p>9.2 投机采样的原理 ...................................... 1160</p>
+<p>9.3 主流方法 ............................................ 1180</p>
+<p>9.4 实现与集成 ......................................... 1220</p>
+<p>9.5 实战案例 ............................................ 1250</p>
+<p>9.6 性能调优 ........................................... 1280</p>
+<p>9.7 未来方向 ............................................ 1300</p>
+
+<p>第10章 生产环境部署 ...................................... 1320</p>
+<p>10.1 生产环境vs开发环境 ............................... 1320</p>
+<p>10.2 部署架构设计 .................................... 1350</p>
+<p>10.3 Kubernetes部署 ..................................... 1400</p>
+<p>10.4 监控与可观测性 .................................... 1460</p>
+<p>10.5 性能调优实战 ....................................... 1520</p>
+<p>10.6 成本优化 ......................................... 1620</p>
+<p>10.7 ROI监控与成本追踪 .................................. 1700</p>
+<p>10.8 安全性考虑 ......................................... 1750</p>
+<p>10.9 灾备与容错 ........................................ 1800</p>
+<p>10.10 RL rollout的生产约束 ............................... 1860</p>
+
+<p>第11章 高级话题 ......................................... 1900</p>
+<p>11.1 多模态与长上下文 ................................... 1900</p>
+<p>11.2 异构硬件与混部 .................................... 1950</p>
+<p>11.3 弹性与容错 ....................................... 2000</p>
+<p>11.4 多模态生成 ........................................ 2050</p>
+<p>11.5 未来架构探索 ...................................... 2100</p>
+
+<p>附录A 工具与资源 ........................................... 2150</p>
+<p>附录B 故障排查指南 ...................................... 2200</p>
+<p>附录C 性能基准测试与ROI案例 ............................ 2250</p>
+
+<h2>第1章 重新理解推理这件事</h2>
+
+<h3>1.1 训练vs推理：就像“研发”和“生产”</h3>
+
+<p>想象一下你开一家工厂：</p>
+
+<p><b>训练</b>就像研发新产品——你一次性投入资金（几百万美元），建实验室、买设备、雇科学家，花几个月做出一个产品原型。产品做出来之后，这个投入就结束了。</p>
+
+<p><b>推理</b>就像量产销售——产品定型后，每卖出一件都有成本（GPU电费、工程师工资、运维费用），而且你卖得越多，成本就越高。</p>
+
+<p>这就是训练和推理的本质区别：</p>
+
+<table>
+<tr><th>维度</th><th>训练</th><th>推理</th></tr>
+<tr><td>投入模式</td><td>一次性（几个月）</td><td>持续性（每天）</td></tr>
+<tr><td>成本规模</td><td>数百万美元一次</td><td>每月数十万-数百万美元</td></tr>
+<tr><td>决策频率</td><td>几个月做一次</td><td>每天都在做</td></tr>
+<tr><td>优化空间</td><td>相对固定</td><td>可持续优化</td></tr>
+</table>
+
+<h4>为什么这很重要</h4>
+
+<p>很多团队在推理上的投入远超训练——不是因为他们笨，而是因为这就是现实。训练模型是“少数公司做、少数几次”的事，但推理是“所有公司都在做、每天都在做”的事。</p>
+
+<p><b>我们自己的经历</b>：2023年我们团队做过一个项目，模型训练花了50万美元，但上线第一年的推理成本花了200万——这是大多数团队没有意识到的“冰山下的成本”。</p>
+
+<h3>1.2 技术可行：优化空间与成本结构</h3>
+
+<h4>1.2.1 仍有下降空间</h4>
+
+<p>推理系统里还有大量“结构性浪费”：</p>
+<p>1) <b>精度冗余</b>：FP8/INT4足够却用FP16</p>
+<p>2) <b>重复计算</b>：系统提示词重复计算</p>
+<p>3) <b>资源错配</b>：Prefill/Decode混用同一GPU</p>
+<p>4) <b>调度低效</b>：batch组织不合理</p>
+
+<h4>1.2.2 成本结构拆解</h4>
+
+<p>单位请求成本 = (GPU成本 + 显存占用 + 网络成本 + 运维摊销) / 有效请求数</p>
+
+<h3>1.3 案例启示：从原理到实践</h3>
+
+<h4>1.3.1 客服/知识问答场景</h4>
+
+<p>目标：降低单次问答成本，提高并发与响应速度</p>
+<p>常见抓手：批量调度、KV Cache、量化、负载均衡</p>
+<p>可衡量指标：单位成本、P95延迟、并发上限、拒绝率</p>
+
+<h3>1.4 投资回报：可量化的ROI框架</h3>
+
+<h4>成本构成拆解</h4>
+
+<table>
+<tr><th>成本/收益项</th><th>优化前</th><th>优化后</th><th>变化</th></tr>
+<tr><td>GPU数量</td><td>10×A100</td><td>6×A100</td><td>-40%</td></tr>
+<tr><td>P95延迟</td><td>1.8s</td><td>0.9s</td><td>-50%</td></tr>
+<tr><td>单位请求成本</td><td>$0.015</td><td>$0.008</td><td>-47%</td></tr>
+<tr><td>月度GPU成本</td><td>$120K</td><td>$72K</td><td>-40%</td></tr>
+</table>
+
+<h4>ROI计算</h4>
+
+<pre>
+月度节省 = $120K - $72K = $48K
+投入 = 2人×2周×$10K = $40K
+年度ROI = ($48K×12 - $40K) / $40K = 1340%
+</pre>
+
+<h3>本章小结</h3>
+
+<p>核心要点：</p>
+<p>1. 推理优化是AI从“能力展示”走向“规模生产”的分水岭</p>
+<p>2. 推理成本结构：GPU + 显存 + 网络 + 运维，可拆解可优化</p>
+<p>3. 优化空间：精度冗余、重复计算、资源错配、调度低效</p>
+<p>4. ROI可量化：成本节省vs投入 = 明确的投资回报</p>
+<p>5. 技术路径：硬件、内核、框架、模型四层协同</p>
+
+<h2>第2章 技术全景与趋势</h2>
+
+<h3>2.1 技术趋势概览</h3>
+
+<h4>2.1.1 DeepSeek V3：MoE范式的代表性案例</h4>
+
+<p>MoE（Mixture of Experts，混合专家）的核心承诺是：总参数很大，但每次只激活一小部分参数，从而把“能力上限”和“计算成本”部分解耦。</p>
+
+<h4>2.1.2 PD分离（Prefill-Decode分离）</h4>
+
+<p>PD分离（Prefill/Decode Disaggregation）之所以成为趋势，是因为它对应了推理的一个结构性事实：<b>prefill和decode是两种完全不同的工作负载</b>。</p>
+
+<p>prefill更像计算密集型：大的矩阵乘、Attention，适合吞吐型batch。</p>
+<p>decode更像带宽/延迟敏感型：每步都要访问KV Cache，且请求之间彼此干扰大。</p>
+
+<h4>2.1.3 RL Info的兴起</h4>
+
+<p>RL（RLHF/RLAIF/各种后训练）的核心资源消耗之一是<b>大规模rollout（采样/生成）</b>，本质上就是“以训练目的组织的推理”。</p>
+
+<h4>2.1.4 Agent与多模态的爆发</h4>
+
+<p>当系统从“单轮问答”变成“多步任务”（检索、工具调用、计划与执行），推理系统的瓶颈会发生明显迁移：<b>上下文与工作流</b>会比模型本身更先决定体验和成本。</p>
+
+<h3>2.2 五大优化方向速览</h3>
+
+<h4>方向1：系统架构优化</h4>
+
+<p>关注点：整体架构设计、硬件选型、工作流拆分、隔离与弹性。</p>
+<p>典型技术：PD分离、网关与路由、服务拆分、混部与容灾、多模型部署。</p>
+<p>适用场景：一切生产系统，尤其是P95/P99与稳定性优先的系统。</p>
+
+<h4>方向2：推理引擎优化</h4>
+
+<p>关注点：框架选择与配置、内核效率、算子融合与内存管理。</p>
+<p>典型技术：vLLM/SGLang/TensorRT-LLM，Attention内核优化、paged/chunked KV。</p>
+
+<h4>方向3：模型优化</h4>
+
+<p>关注点：压缩、结构、路由与能力-成本权衡。</p>
+<p>典型技术：量化（FP16→INT8/INT4/FP8）、蒸馏、剪枝、MoE、分级模型路由。</p>
+
+<h4>方向4：请求调度优化</h4>
+
+<p>关注点：如何组织请求与token的计算顺序，提升GPU有效利用率。</p>
+<p>典型技术：连续批处理、优先级队列、chunking、不同流量形态的隔离。</p>
+
+<h4>方向5：缓存与复用</h4>
+
+<p>关注点：避免重复计算，让相似请求共享计算结果。</p>
+<p>典型技术：前缀缓存、会话缓存、模板化上下文复用、跨请求token复用。</p>
+
+<h3>2.3 谁应该读这本书</h3>
+
+<p>1) <b>平台工程师/Infra工程师</b>：负责搭建与维护推理平台，关注成本、稳定性与可扩展性。</p>
+<p>2) <b>后端工程师/全栈工程师</b>：把LLM接到业务里，关注API设计、延迟、失败率与体验。</p>
+<p>3) <b>ML工程师/算法工程师</b>：更关心模型质量，但会越来越频繁地被问到：能否更便宜、更快、更稳定？</p>
+<p>4) <b>技术决策者（CTO、架构师）</b>：要对成本、风险与路线负责，不需要写CUDA，但必须能做正确决策。</p>
+
+<h2>第3章 GPU基础</h2>
+
+<h3>3.1 CPU vs GPU：本质差异</h3>
+
+<p><b>类比</b>：数学教授vs小学生团队</p>
+
+<p>CPU像一位数学教授——单次计算能力极强，但只能一个个解决问题。</p>
+<p>GPU像一支小学生团队——每个人（CUDA core）只能做简单算术，但团队合作（并行）能快速完成大量简单任务。</p>
+
+<h4>为什么GPU适合矩阵运算</h4>
+
+<p>Transformer的核心运算都是矩阵乘法：</p>
+<pre>
+Y = X × W
+</pre>
+
+<p>这正好符合GPU的并行特性——大量相同的运算可以同时执行。</p>
+
+<h4>GPU不适合的任务类型</h4>
+
+<p>1) 复杂分支逻辑（如频繁的条件判断）</p>
+<p>2) 小数据量的随机访问</p>
+<p>3) 高度依赖单线程性能的任务</p>
+
+<h3>3.2 GPU架构详解</h3>
+
+<h4>3.2.1 流式多处理器（SM）：GPU的核心单元</h4>
+
+<p>SM（Streaming Multiprocessor）是GPU的计算核心，每个SM包含：</p>
+<ul>
+<li>CUDA Cores（FP32/INT32）：通用计算单元</li>
+<li>Tensor Cores：矩阵运算专用加速器</li>
+<li>Register File：寄存器</li>
+<li>Shared Memory / L1 Cache：高速共享内存</li>
+<li>Warp Scheduler：线程调度器</li>
+<li>SFU：特殊函数单元</li>
+</ul>
+
+<table>
+<tr><th>单元类型</th><th>功能</th><th>精度</th><th>吞吐量</th><th>适用场景</th></tr>
+<tr><td>CUDA Cores</td><td>通用计算</td><td>FP32/INT32</td><td>1× base</td><td>非矩阵运算</td></tr>
+<tr><td>Tensor Cores</td><td>矩阵乘法</td><td>FP16/BF16/FP8/FP4</td><td>16-64× base</td><td>GEMM、Attention</td></tr>
+</table>
+
+<h4>3.2.2 显存（VRAM）：容量vs带宽</h4>
+
+<table>
+<tr><th>GPU</th><th>HBM版本</th><th>容量</th><th>带宽</th></tr>
+<tr><td>A100</td><td>HBM2e</td><td>80 GB</td><td>2.0 TB/s</td></tr>
+<tr><td>H100</td><td>HBM3</td><td>80 GB</td><td>3.35 TB/s</td></tr>
+<tr><td>H200</td><td>HBM3e</td><td>141 GB</td><td>4.8 TB/s</td></tr>
+<tr><td>B200</td><td>HBM3e</td><td>192 GB</td><td>8 TB/s</td></tr>
+</table>
+
+<h4>带宽为什么重要</h4>
+
+<pre>
+LLM推理 = Memory-bound operation
+
+每1个token生成：
+- 读取模型权重: 80 GB (Llama-3-70B @ FP16)
+- 读取KV Cache: 数MB到数GB
+- 写入新token: ~1 KB
+
+如果带宽 = 3.35 TB/s (H100):
+- 读取80 GB需要: 80 GB / 3.35 TB/s = 23.9 ms
+- 这是理论下限！(实际会更慢)
+</pre>
+
+<h3>3.3 显存计算公式</h3>
+
+<h4>模型权重计算</h4>
+
+<pre>
+模型显存 ≈ 参数数量 × 每参数字节数
+
+例如Llama-2-7B:
+- 参数数量: 7B (70亿)
+- FP16: 2 bytes/参数
+- 总显存 ≈ 7B × 2 = 14 GB
+</pre>
+
+<h4>KV Cache显存占用</h4>
+
+<pre>
+KV Cache ≈ 2 × num_layers × num_heads × head_dim × seq_len × bytes
+
+例如Llama-2-7B (32层, 32头, 128维, 4096序列长度):
+= 2 × 32 × 32 × 128 × 4096 × 2 bytes
+≈ 2 GB
+</pre>
+
+<h2>第5章 LLM推理基础</h2>
+
+<h3>5.1 训练vs推理：工作负载的本质差异</h3>
+
+<h4>训练：计算密集型的并行工作负载</h4>
+
+<p>训练流程：</p>
+<pre>
+输入数据 → Forward Pass → Loss Calculation → Backward Pass → Weight Update
+</pre>
+
+<p>特点：</p>
+<ul>
+<li>Compute-bound：计算密集型</li>
+<li>高度并行：整个batch同时处理</li>
+<li>GPU利用率高：矩阵运算充分利用GPU</li>
+<li>极其昂贵：需要大规模GPU集群</li>
+</ul>
+
+<h4>推理：内存带宽密集型的串行工作负载</h4>
+
+<p>推理流程：</p>
+<pre>
+用户Prompt → Prefill (并行) → Decode (串行) → 返回结果
+</pre>
+
+<p>特点：</p>
+<ul>
+<li>Memory-bound：内存带宽密集型</li>
+<li>串行生成：Decode阶段必须逐个生成</li>
+<li>GPU利用率低：大量时间在移动数据而非计算</li>
+<li>持续运行：7×24小时服务</li>
+</ul>
+
+<h3>5.2 LLM如何生成文本</h3>
+
+<h4>5.2.1 自回归生成的基本过程</h4>
+
+<p>LLM的本质：<b>fancy next token predictors</b>（花哨的下一个词预测器）</p>
+
+<p>生成过程：</p>
+<pre>
+步骤1: 输入整个prompt
+输入: "Hello, my name is"
+模型处理整个prompt
+生成第1个token: " John"
+
+步骤2: 添加新token，再次预测
+输入: "Hello, my name is John"
+模型处理整个序列
+生成第2个token: " and"
+
+步骤3: 重复...
+输入: "Hello, my name is John and"
+生成第3个token: " I"
+...
+</pre>
+
+<h4>5.2.2 Prefill阶段：并行处理prompt</h4>
+
+<p><b>定义</b>：处理初始prompt，生成第一个token的阶段</p>
+
+<p>特点：</p>
+<ul>
+<li>计算密集型：大量矩阵乘法</li>
+<li>可以并行处理：所有token同时计算</li>
+<li>时间：TTFT (Time To First Token)，首字延迟</li>
+</ul>
+
+<h4>5.2.3 Decode阶段：逐token生成</h4>
+
+<p><b>定义</b>：逐个生成后续token的阶段</p>
+
+<p>特点：</p>
+<ul>
+<li>内存带宽密集型：每次只生成1个token</li>
+<li>无法并行：必须逐个生成（因果关系）</li>
+<li>时间：TBT (Time Between Tokens)，字间延迟</li>
+</ul>
+
+<h3>5.3 Attention机制详解</h3>
+
+<h4>5.3.1 Token的表示：向量与hidden dimension</h4>
+
+<p>Tokenization：文本→token序列</p>
+<pre>
+文本: "Hello, world!"
+↓ Tokenizer
+Tokens: [15496, 11, 2159, 0]
+       │      │   │    │
+     Hello    ,  world  &lt;eos&gt;
+</pre>
+
+<p>Embedding：每个token→d维向量</p>
+<pre>
+Tokens: [15496, 11, 2159, 0]
+       │      │    │    │
+       ▼      ▼    ▼    ▼
+Embeddings:
+  Token 15496 → [0.12, -0.34, 0.56, ..., 0.78]  (d=4096)
+  Token 11    → [-0.23, 0.45, -0.67, ..., 0.89]
+  Token 2159 → [0.34, -0.56, 0.78, ..., -0.12]
+</pre>
+
+<h4>5.3.2 Query、Key、Value投影</h4>
+
+<p>三个权重矩阵：Wq、Wk、Wv</p>
+
+<p>每个token的表示: x</p>
+<pre>
+x = embeddings[i]  # shape: [hidden_dim]
+
+# 投影到Q、K、V
+Q = x @ Wq  # Query: 这个token想找什么?
+K = x @ Wk  # Key: 这个token能提供什么?
+V = x @ Wv  # Value: 这个token的实际内容
+
+# Wq, Wk, Wv的形状: [hidden_dim, head_dim]
+# Q, K, V的形状: [head_dim]
+</pre>
+
+<h4>5.3.3 Attention计算：QK^T与二次复杂度</h4>
+
+<pre>
+# 输入: Q, K, V
+# 形状: [batch, num_heads, seq_len, head_dim]
+
+# 步骤1: 计算Q @ K^T
+scores = Q @ K.transpose(-2, -1)  # [batch, num_heads, seq_len, seq_len]
+
+# 步骤2: 缩放
+scores = scores / (head_dim ** 0.5)
+
+# 步骤3: Softmax归一化
+attn_weights = torch.softmax(scores, dim=-1)
+
+# 步骤4: 加权求和
+output = attn_weights @ V  # [batch, num_heads, seq_len, head_dim]
+
+# 总复杂度: O(n²·d)
+</pre>
+
+<p><b>关键洞察</b>：Attention的二次复杂度是性能瓶颈！</p>
+
+<pre>
+序列长度n = 1000:
+- Attention计算: 1000² × 4096 = 4,096,000,000次运算
+
+序列长度n = 10000:
+- Attention计算: 10000² × 4096 = 409,600,000,000次运算 (100倍!)
+</pre>
+
+<h2>第6章 KV Cache优化</h2>
+
+<h3>6.1 Transformer回顾</h3>
+
+<h4>6.1.1 Attention机制原理</h4>
+
+<p><b>Attention的本质</b>：让每个token能够"看到"并"聚合"其他token的信息。</p>
+
+<pre>
+def attention(Query, Key, Value):
+    # 1. 计算相似度
+    scores = Query @ Key.T  # [seq_len, seq_len]
+
+    # 2. 归一化
+    attn_weights = softmax(scores / sqrt(d_k))
+
+    # 3. 加权求和
+    output = attn_weights @ Value  # [seq_len, d_v]
+
+    return output
+</pre>
+
+<h3>6.2 KV Cache原理</h3>
+
+<h4>6.2.1 生成过程的重复计算问题</h4>
+
+<p>朴素方法的问题：</p>
+<pre>
+步骤1: "The capital of France is"
+→ 计算Token 0-6的K、V
+→ 生成"Paris"
+
+步骤2: "The capital of France is Paris"
+→ 重新计算Token 0-7的K、V ✗ (重复计算!)
+→ Token 0-6的K、V又浪费了!
+
+步骤3: "The capital of France is Paris and"
+→ 重新计算Token 0-8的K、V ✗✗ (更多重复)
+→ Token 0-7的K、V又浪费了!
+</pre>
+
+<h4>6.2.2 KV Cache的核心思想</h4>
+
+<p><b>核心洞察</b>：旧token的K、V已经计算过，缓存起来！</p>
+
+<pre>
+Prefill阶段:
+输入: "Hello, my name is"
+计算:
+  Token 0: K0, V0
+  Token 1: K1, V1
+  Token 2: K2, V2
+  Token 3: K3, V3
+存储: 缓存所有K, V
+
+Decode阶段 - 第1步:
+输入: 新Token 4
+计算:
+  Token 4: K4, V4
+复用: K0, K1, K2, K3 (从缓存读取)
+组合: [K0, K1, K2, K3, K4]
+      [V0, V1, V2, V3, V4]
+</pre>
+
+<h3>6.3 KV Cache实现</h3>
+
+<h4>6.3.1 PagedAttention原理</h4>
+
+<p><b>灵感来源</b>：操作系统虚拟内存</p>
+
+<pre>
+OS Virtual Memory:  Pages (4KB) + Page Table
+vLLM KV Cache:      Blocks (16 tokens) + Block Table
+</pre>
+
+<p><b>核心概念</b>：</p>
+<ul>
+<li><b>Logical blocks</b>：逻辑上的连续序列（用户视角）</li>
+<li><b>Physical blocks</b>：GPU内存中的实际块（系统视角）</li>
+<li><b>Block table</b>：映射关系（logical → physical）</li>
+</ul>
+
+<h4>6.3.2 Block Allocation策略</h4>
+
+<pre>
+# vLLM的启动时分配
+def allocate_at_startup():
+    # 计算可用GPU内存
+    gpu_memory = get_gpu_memory()
+    # 预分配90%给KV Cache (保留10%给模型weights)
+    num_blocks = (gpu_memory * 0.9) / BLOCK_SIZE
+    # 创建block pool
+    block_pool = BlockPool(num_blocks)
+    return block_pool
+</pre>
+
+<h4>Block的大小选择</h4>
+
+<table>
+<tr><th>Block大小</th><th>优点</th><th>缺点</th><th>推荐场景</th></tr>
+<tr><td>16 (默认)</td><td>平衡管理开销与碎片化</td><td>-</td><td>通用场景</td></tr>
+<tr><td>8</td><td>减少internal fragmentation</td><td>block table过大，管理开销高</td><td>需要精细控制时</td></tr>
+<tr><td>32</td><td>减少block table查找开销</td><td>internal fragmentation增加</td><td>长序列、低并发</td></tr>
+</table>
+
+<h3>6.4 KV Cache优化技术</h3>
+
+<h4>6.4.1 MQA vs GQA vs MHA</h4>
+
+<table>
+<tr><th>维度</th><th>MHA</th><th>MQA</th><th>GQA (8 groups)</th></tr>
+<tr><td>KV Cache大小</td><td>1× (baseline)</td><td>~1/32×</td><td>~1/4×</td></tr>
+<tr><td>质量损失 (MMLU)</td><td>baseline</td><td>-2.1 ± 0.3 pt</td><td>-0.4 ± 0.2 pt</td></tr>
+<tr><td>推理速度 (A100)</td><td>baseline</td><td>~2.1×</td><td>~1.6×</td></tr>
+<tr><td>适用场景</td><td>质量优先</td><td>成本/延迟优先</td><td>平衡场景</td></tr>
+</table>
+
+<h3>6.5 KV Cache的代价</h3>
+
+<h4>6.5.1 显存占用分析</h4>
+
+<pre>
+单层单头的KV Cache:
+= 2 × seq_len × head_dim × bytes
+= 2 × 4096 × 128 × 2
+= 2,097,152 bytes
+≈ 2 MB
+
+所有层所有头:
+= 2 MB × 32 layers × 32 heads
+= 2,048 MB
+≈ 2 GB (seq_len = 4096, 粗略估算)
+</pre>
+
+<h4>不同模型的KV Cache大小</h4>
+
+<table>
+<tr><th>模型</th><th>层数</th><th>Heads</th><th>Head Dim</th><th>4K tokens</th><th>8K tokens</th><th>16K tokens</th></tr>
+<tr><td>Llama-2-7B</td><td>32</td><td>32</td><td>128</td><td>0.5 GB</td><td>1 GB</td><td>2 GB</td></tr>
+<tr><td>Llama-2-13B</td><td>40</td><td>40</td><td>128</td><td>0.8 GB</td><td>1.6 GB</td><td>3.2 GB</td></tr>
+<tr><td>Llama-2-70B</td><td>80</td><td>64</td><td>128</td><td>2 GB</td><td>4 GB</td><td>8 GB</td></tr>
+</table>
+
+<h2>第7章 请求调度策略</h2>
+
+<h3>7.1 调度的必要性</h3>
+
+<h4>为什么需要调度</h4>
+
+<p>在线推理天然是“多租户+波动流量”。短请求、长请求、长上下文、峰值并发会同时存在。你不显式做调度，系统就会用排队与阻塞替你“隐式调度”，表现为P95/P99抖动、超时与成本上升。</p>
+
+<h4>调度器的目标</h4>
+
+<table>
+<tr><th>目标</th><th>说明</th></tr>
+<tr><td>最小化延迟</td><td>P50、P95、P99延迟尽可能低</td></tr>
+<tr><td>最大化吞吐量</td><td>在给定硬件上服务更多用户</td></tr>
+<tr><td>公平性</td><td>避免长请求饿死短请求</td></tr>
+<tr><td>资源利用</td><td>GPU利用率尽可能高</td></tr>
+</table>
+
+<h3>7.2 基础调度策略</h3>
+
+<h4>7.2.1 FIFO (First In First Out)</h4>
+
+<pre>
+class FIFOScheduler:
+    def __init__(self):
+        self.queue = []
+
+    def add_request(self, request):
+        self.queue.append(request)
+
+    def schedule(self):
+        if self.queue:
+            return [self.queue.pop(0)]  # 返回第一个请求
+        return []
+</pre>
+
+<p><b>优点</b>：实现简单、公平、无饥饿</p>
+<p><b>缺点</b>：吞吐量低、GPU利用率偏低、长请求阻塞后续所有请求</p>
+
+<h4>7.2.2 静态批处理 (Static Batching)</h4>
+
+<pre>
+class StaticBatchScheduler:
+    def __init__(self, batch_size=8):
+        self.batch_size = batch_size
+        self.queue = []
+
+    def add_request(self, request):
+        self.queue.append(request)
+
+    def schedule(self):
+        if len(self.queue) >= self.batch_size:
+            batch = self.queue[:self.batch_size]
+            self.queue = self.queue[self.batch_size:]
+            return batch
+        return []
+</pre>
+
+<h3>7.3 Continuous Batching原理</h3>
+
+<p><b>核心思想</b>：动态调整batch，在请求完成时立即释放资源，允许新请求加入。</p>
+
+<pre>
+# vLLM Continuous Batching示例
+
+# 传统批处理：等所有请求完成 → 释放 → 加入新请求
+# 连续批处理：任一请求完成 → 立即加入新请求
+
+# 伪代码
+while True:
+    # 1. 执行当前batch
+    results = execute_batch(current_batch)
+
+    # 2. 收集已完成的请求
+    completed = [r for r in current_batch if r.is_done()]
+
+    # 3. 释放完成请求的资源
+    for r in completed:
+        free_resources(r)
+
+    # 4. 立即加入等待队列中的新请求
+    waiting = get_waiting_requests()
+    current_batch = add_to_batch(completed, waiting)
+</pre>
+
+<h2>第8章 量化技术</h2>
+
+<h3>8.1 量化基础</h3>
+
+<h4>为什么需要量化</h4>
+
+<p>LLM的模型权重和激活值通常使用FP32（32位浮点）或FP16（16位浮点）存储和计算。但很多场景下：</p>
+<ul>
+<li>不需要这么高的精度</li>
+<li>更低的精度可以大幅减少显存和计算</li>
+<li>硬件对低精度有专门加速</li>
+</ul>
+
+<p><b>量化的核心</b>：用更少的位表示数值，同时尽量减少信息损失。</p>
+
+<h3>8.2 量化方法分类</h3>
+
+<h4>8.2.1 训练后量化 (PTQ)</h4>
+
+<p>训练后量化（Post-Training Quantization，PTQ）是在模型训练完成后直接进行量化。</p>
+
+<p><b>优点</b>：无需重新训练，快速部署</p>
+<p><b>缺点</b>：精度可能有损失</p>
+
+<h4>8.2.2 量化感知训练 (QAT)</h4>
+
+<p>量化感知训练（Quantization-Aware Training，QAT）在训练过程中模拟量化效果。</p>
+
+<p><b>优点</b>：精度更好</p>
+<p><b>缺点</b>：需要重新训练，时间成本高</p>
+
+<h3>8.3 常用量化格式</h3>
+
+<h4>8.3.1 FP16 vs BF16</h4>
+
+<table>
+<tr><th>格式</th><th>范围</th><th>精度</th><th>稳定性</th><th>推荐度</th></tr>
+<tr><td>FP16</td><td>小</td><td>高</td><td>一般（可能下溢）</td><td>⭐⭐⭐</td></tr>
+<tr><td>BF16</td><td>大</td><td>中</td><td>好（不易下溢）</td><td>⭐⭐⭐⭐⭐</td></tr>
+</table>
+
+<h4>8.3.2 FP8 / NVFP4</h4>
+
+<p>FP8 (8位浮点) 有两种格式：</p>
+
+<pre>
+E4M3 (4 bit指数, 3 bit尾数):
+  用于训练
+  范围: ±448
+  精度: 类似FP16
+
+E5M2 (5 bit指数, 2 bit尾数):
+  用于推理
+  范围: ±57344
+  精度: 低于E4M3
+</pre>
+
+<h3>8.4 流行的量化框架</h3>
+
+<h4>AWQ (Activation-aware Quantization)</h4>
+
+<p><b>原理</b>：基于激活值的重要性来量化权重，重要的权重保持高精度。</p>
+
+<pre>
+步骤:
+1. 收集激活值统计
+2. 计算权重重要性
+3. 非均匀量化（重要权重精度高）
+</pre>
+
+<h4>GPTQ (Gradient-based Post-Training Quantization)</h4>
+
+<p><b>原理</b>：基于梯度的后训练量化，使用二阶信息来最小化量化误差。</p>
+
+<h3>8.5 KV Cache量化</h3>
+
+<h4>INT8 KV Cache</h4>
+
+<pre>
+FP16 → INT8:
+  FP16: 每个元素2 bytes
+  INT8: 每个元素1 byte
+
+  KV Cache大小减半!
+</pre>
+
+<h2>第9章 投机采样</h2>
+
+<h3>9.1 什么是投机采样</h3>
+
+<p>投机采样（Speculative Decoding）是一种“猜测-验证”策略：使用一个小模型快速生成多个候选token，再用大模型验证和修正。</p>
+
+<h3>9.2 投机采样的原理</h3>
+
+<pre>
+传统自回归:
+大模型 → token1 → token2 → token3 → ... (逐个生成)
+
+投机采样:
+小模型(draft) → [t1, t2, t3, t4, t5]
+大模型(verify) → 验证并修正 → 最终输出
+</pre>
+
+<p><b>核心思想</b>：用小模型的算力换大模型的时间。</p>
+
+<h2>第10章 生产环境部署</h2>
+
+<h3>10.1 生产环境vs开发环境</h3>
+
+<p>生产环境与开发环境有本质区别：</p>
+
+<table>
+<tr><th>维度</th><th>开发环境</th><th>生产环境</th></tr>
+<tr><td>流量</td><td>可控、可预测</td><td>不可预测、有峰值</td></tr>
+<tr><td>延迟</td><td>无严格要求</td><td>P50/P95/P99有SLA</td></tr>
+<tr><td>错误</td><td>可重试</td><td>需要优雅降级</td></tr>
+<tr><td>监控</td><td>简单日志</td><td>完整可观测性</td></tr>
+<tr><td>发布</td><td>随时修改</td><td>灰度发布、有回滚</td></tr>
+</table>
+
+<h3>10.2 部署架构设计</h3>
+
+<h4>10.2.1 单机部署</h4>
+
+<pre>
+# 单GPU部署
+vLLM serve meta-llama/Llama-3.1-8B \
+  --tensor-parallel-size 1 \
+  --gpu-memory-utilization 0.9 \
+  --max-model-len 8192 \
+  --port 8000
+</pre>
+
+<h4>10.2.2 多GPU部署 (Tensor Parallel)</h4>
+
+<pre>
+# 4卡部署
+vLLM serve meta-llama/Llama-3.1-70B \
+  --tensor-parallel-size 4 \
+  --gpu-memory-utilization 0.9 \
+  --max-model-len 4096 \
+  --port 8000
+</pre>
+
+<h3>10.4 监控与可观测性</h3>
+
+<h4>关键监控指标</h4>
+
+<table>
+<tr><th>指标名</th><th>类型</th><th>说明</th><th>告警阈值</th></tr>
+<tr><td>vLLM:prompt_tokens_total</td><td>Counter</td><td>总输入token数</td><td>-</td></tr>
+<tr><td>vLLM:generation_tokens_total</td><td>Counter</td><td>总输出token数</td><td>-</td></tr>
+<tr><td>vLLM:request_latency_seconds</td><td>Histogram</td><td>请求延迟</td><td>P99 > 5s</td></tr>
+<tr><td>vLLM:block_manager_used_blocks</td><td>Gauge</td><td>使用中的KV block</td><td>> 90%容量</td></tr>
+<tr><td>vLLM:gpu_memory_used_bytes</td><td>Gauge</td><td>GPU显存使用</td><td>> 95%</td></tr>
+</table>
+
+<h2>第11章 高级话题</h2>
+
+<h3>11.1 多模态与长上下文</h3>
+
+<p>随着应用场景扩展，LLM需要处理图像、音频、视频等多模态输入，以及超长文档（>100K tokens）。</p>
+
+<h3>11.2 异构硬件与混部</h3>
+
+<p>不同硬件有不同的特性和成本，混合部署可以优化整体性价比。</p>
+
+<h3>11.3 弹性与容错</h3>
+
+<p>生产系统必须具备弹性伸缩和容错能力，应对流量波动和硬件故障。</p>
+
+<blockquote>
+<p><b>注</b>：由于篇幅限制，本文档仅展示部分章节的格式示例。完整内容请参考各章节源文件。</p>
+</blockquote>
+
+</body>
+</html>

@@ -26,7 +26,7 @@ references: []
 status: "published"
 display_order: 6
 ---
-# 第5章：LLM推理基础
+# 第5章 推理的本质：Prefill 和 Decode 为什么要分开讲
 
 >  教学理念 (参考: Hugging Face "Continuous batching from first principles"、Hamza Elshafie "Paged Attention from First Principles")
 >
