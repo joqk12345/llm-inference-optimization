@@ -2,21 +2,21 @@
   "chapters": [
     {
       "file": "chapters/chapter01-introduction.md",
-      "bytes": 15711,
-      "lines": 338,
-      "chars": 7016,
-      "non_ws": 6116,
-      "cjk": 3761,
-      "words": 762
+      "bytes": 15760,
+      "lines": 337,
+      "chars": 7004,
+      "non_ws": 6108,
+      "cjk": 3802,
+      "words": 757
     },
     {
       "file": "chapters/chapter02-technology-landscape.md",
-      "bytes": 32565,
-      "lines": 676,
-      "chars": 15350,
-      "non_ws": 13313,
-      "cjk": 7187,
-      "words": 1710
+      "bytes": 32780,
+      "lines": 679,
+      "chars": 15446,
+      "non_ws": 13395,
+      "cjk": 7250,
+      "words": 1723
     },
     {
       "file": "chapters/chapter03-gpu-basics.md",
@@ -38,12 +38,12 @@
     },
     {
       "file": "chapters/chapter05-llm-inference-basics.md",
-      "bytes": 38969,
+      "bytes": 39010,
       "lines": 1454,
-      "chars": 24522,
-      "non_ws": 19358,
-      "cjk": 6714,
-      "words": 3968
+      "chars": 24545,
+      "non_ws": 19377,
+      "cjk": 6723,
+      "words": 3972
     },
     {
       "file": "chapters/chapter06-kv-cache-optimization.md",
@@ -102,11 +102,11 @@
   ],
   "total": {
     "file": "TOTAL",
-    "bytes": 469238,
-    "lines": 16081,
-    "chars": 304090,
-    "non_ws": 237807,
-    "cjk": 70179,
-    "words": 36965
+    "bytes": 469543,
+    "lines": 16083,
+    "chars": 304197,
+    "non_ws": 237900,
+    "cjk": 70292,
+    "words": 36977
   }
 }
