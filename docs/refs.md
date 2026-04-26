@@ -57,6 +57,85 @@ display_order: 203
   - URL: https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
 
 #### MoE架构与推理
+
+> 横向对照阅读：如果你想把 `MiniMax-01`、`Kimi Linear` 和 `DeepSeek-V4` 放在同一条 attention 演进链里看，优先读
+> [注意力架构演进案例研究 - MiniMax-01、Kimi Linear 与 DeepSeek-V4](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/attention-architecture-evolution.md:1)。
+
+- **DeepSeek-V4: Towards Highly Efficient Million-Token Context Intelligence**
+  - 作者：DeepSeek-AI
+  - 发布日期：2026年4月
+  - 核心内容：
+    - 百万 token 上下文下的推理成本重构
+    - 混合注意力设计：CSA（Compressed Sparse Attention）与 HCA（Heavily Compressed Attention）
+    - MoE 推理中的通信-计算重叠与 fused kernel
+    - FP4 在 MoE expert 权重与 attention indexer 路径中的使用
+    - 异构 KV Cache 与 shared-prefix reuse 的系统实现思路
+  - 建议引用章节：2.1.1, 5.4.6, 6.x, 8.3, 11.3, 11.8
+  - 文件路径：/Users/mac/Downloads/DeepSeek_V4.pdf
+
+- **Kimi Linear: An Expressive, Efficient Attention Architecture**
+  - 作者：Kimi Team
+  - 提交日期：2025年10月30日；修订版：2025年11月1日
+  - 核心内容：
+    - 用混合线性注意力路线挑战 full attention
+    - 提出 KDA（Kimi Delta Attention）并与 MLA 做 layerwise hybrid
+    - 在公平对比下宣称覆盖短上下文、长上下文与 RL scaling 场景
+    - 在 1M context 下给出更高 decode throughput 与更低 KV cache 占用
+    - 提供 KDA kernel 与 vLLM 实现
+  - 建议引用章节：2.1.6, 5.4.6, 6.x, 11.6, 11.8
+  - URL: https://arxiv.org/abs/2510.26692
+
+- **MiniMax-01: Scaling Foundation Models with Lightning Attention**
+  - 作者：MiniMax
+  - 提交日期：2025年1月14日
+  - 核心内容：
+    - 以 Lightning Attention 为核心扩展百万级上下文
+    - 将 Lightning Attention 与 MoE 结合到超大模型训练和推理体系中
+    - 强调 computation-communication overlap 与并行策略对长上下文推理的重要性
+    - 训练支持 1M context，并宣称推理可外推到 4M context
+  - 建议引用章节：2.1.6, 5.4.6, 11.6, 11.8
+  - URL: https://arxiv.org/abs/2501.08313
+
+- **DeepSeek-V4 昇腾 Day 0 首发：基于 CANN 的高性能推理优化实践**
+  - 作者：许可、宦睿智
+  - 发布日期：2026年4月
+  - 核心内容：
+    - DeepSeek-V4 在昇腾 950PR/DT 与 Atlas-A3 集群上的高性能推理适配
+    - CANN 对 mHC、Sparse Attention、Compressor、MoE、MTP 等结构的算子与图模式优化
+    - FP8/MXFP8、MXFP4、INT8、KV/Indexer cache 量化等低比特推理路径
+    - Prefill CP+EP、Decode DP+EP、HCCL AIV、SHMEM/HIXL 等并行与通信优化
+    - vLLM/SGLang、TileLang、torch.compile/NpuGraphEx 等生态接入
+  - 建议引用章节：2.1.5, 10.3, 11.2, 11.8
+  - 文件路径：/Users/mac/Downloads/DeepSeek-V4昇腾首发_基于CANN的高性能推理优化实践.pdf
+  - 横向案例：[DeepSeek-V4 昇腾 CANN 推理优化案例研究](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/deepseek-v4-ascend-cann-inference.md:1)
+
+- **DeepSeek V4 in vLLM: Efficient Long-context Attention**
+  - 来源：vLLM Blog
+  - 发布日期：2026年4月24日
+  - 核心内容：
+    - DeepSeek-V4-Pro / Flash 在 vLLM 中的 serving 支持
+    - c4a / c128a / SWA 混合 attention 的 first-principles 解释
+    - 单一 logical block size、compressor state sliding window、统一 page size 等 hybrid KV cache 管理
+    - compressor、inverse RoPE、KV RoPE、indexer 等 kernel fusion 与 multi-stream overlap
+    - 通过插件系统支持更多硬件后端的扩展方向
+  - 建议引用章节：6.4, 7.7, 10.2, 11.3, 11.8
+  - URL: https://vllm.ai/blog/deepseek-v4
+
+- **DeepSeek-V4 on Day 0: From Fast Inference to Verified RL with SGLang and Miles**
+  - 来源：LMSYS / SGLang Blog
+  - 发布日期：2026年4月25日
+  - 核心内容：
+    - SGLang 与 Miles 对 DeepSeek-V4 的 Day-0 inference 与 RL training 支持
+    - ShadowRadix 原生 prefix caching、HiSparse 分层 KV offload、MTP speculative decoding
+    - Flash Compressor、Lightning TopK、FlashMLA、DeepGEMM Mega MoE、TileLang mHC 等 kernel 集成
+    - CP/DP/TP/EP/PP/SP 等并行与 PD disaggregation 的 page-indexed KV transfer
+    - FP8 rollout / training、attention QAT、R3 与 indexer replay 等 RL 训练闭环
+  - 建议引用章节：6.4, 7.7, 9.7, 10.2, 11.3, 11.8
+  - URL: https://www.lmsys.org/blog/2026-04-25-deepseek-v4/
+
+> 推理引擎适配横向阅读：如果你想比较 vLLM 与 SGLang 如何分别承接 DeepSeek-V4，优先读
+> [DeepSeek-V4 推理引擎适配案例研究 - vLLM 与 SGLang](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/deepseek-v4-inference-engines.md:1)。
+
 - **Large-scale Expert Parallelism (大EP)**
   - 来源：vLLM Blog
   - 发布日期：2025年12月17日

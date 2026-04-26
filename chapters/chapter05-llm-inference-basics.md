@@ -876,6 +876,42 @@ Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
 | MQA | 1组 | 减少H倍 | 可能下降 | 内存极度受限 |
 | MLA | 1组latent | 最小 | 有竞争力 | 超大模型 |
 
+如果把这几种做法和近两年的前沿模型放在一起看，你会发现它们其实对应了三类不同路线：
+
+**第一类：表示压缩路线**
+
+- 代表：`MQA`、`GQA`、`MLA`
+- 核心问题：每个 token 的 K/V 表示是否可以更小
+- 典型收益：在不改写整体 attention 机制的前提下，直接降低 KV Cache 占用
+
+这类方法最像“给每个 token 减肥”。token 数量没有变，但每个 token 背后的 K/V 存储成本下降了。
+
+**第二类：线性化路线**
+
+- 代表：`Lightning Attention`、`Kimi Linear`
+- 核心问题：能否让 attention 不再随序列长度保持二次增长
+- 典型收益：在超长上下文下，把显存与 decode 吞吐重新拉回可接受范围
+
+这类方法不是简单缩小 K/V，而是在重写 attention 的计算方式。`MiniMax-01` 把 `Lightning Attention` 推到百万级上下文与大规模 MoE 体系里，`Kimi Linear` 则继续把 hybrid linear attention 往“full attention 的可替代方案”方向推进。
+
+**第三类：压缩 + 稀疏 + 局部保真路线**
+
+- 代表：`DeepSeek-V4` 的 `CSA/HCA`
+- 核心问题：上下文变长后，KV 条目数量本身能不能减少，同时尽量保住局部依赖
+- 典型收益：既压缩 KV，又让模型在超长上下文下不必对所有历史位置做同样昂贵的处理
+
+这类方法更像是在改写“哪些历史信息值得被完整保留、哪些可以被压缩摘要”。
+
+所以这里有一个很重要的认知边界：
+
+- `MQA/GQA/MLA` 主要在解决 **每个 token 存多大**
+- `Lightning/Kimi Linear` 主要在解决 **attention 怎么算**
+- `CSA/HCA` 主要在解决 **历史 token 是否都要原样保留**
+
+这也是为什么第6章会继续把 KV 问题拆开讲：你不能把“分页管理”“低比特量化”“线性 attention”“压缩 attention”都混成同一类优化，它们作用在不同层面。
+
+把这组路线和 DeepSeek-V4 放在一起看，会更容易理解 attention 为什么正在被重新组织：`MQA/GQA/MLA` 更像表示压缩，`MiniMax-01 / Kimi Linear` 更像线性化路线，而 `DeepSeek-V4` 的 `CSA/HCA` 更像压缩 + 稀疏 + 局部保真路线。它们共同说明的一件事是，长上下文问题已经不只是“KV 够不够大”，而是 attention 该以什么结构继续向前扩展。
+
 ---
 
 ## 5.5 KV Cache的内存管理挑战

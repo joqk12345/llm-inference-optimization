@@ -592,6 +592,18 @@ templates = [
    - File system usage
    - Cache effectiveness
 
+### 11.1.8 DeepSeek-V4 对 Agent 基础设施的提醒
+
+近期围绕 DeepSeek-V4 的技术解读里，一个容易被低估的点是：前沿模型正在把 Agent 场景作为核心服务形态之一，而不是普通聊天接口的附属功能。
+
+对推理系统来说，这会带来三个直接影响：
+
+- **上下文状态要可恢复**：长任务、Coding Agent、工具调用链和中断恢复，需要保留计划、工具结果、文件引用、错误轨迹等可复现状态。这里说的不是把模型不可见的内部推理链原样暴露或长期保存，而是把 Agent 执行所需的外部状态做成可审计、可压缩、可恢复的上下文。
+- **工具调用协议会影响兼容性**：如果模型侧调整 tool-call schema，Agent 框架、解析器、日志系统和回放评测都可能需要同步更新。生产系统不能只测“模型能不能回答”，还要测“工具调用 JSON、错误恢复、权限边界、schema 漂移”。
+- **沙箱和评测会变成基础设施**：Agent 能力越强，越需要隔离文件系统、网络、凭证和执行环境。沙箱不是安全附属品，而是让长任务可重复、可回放、可治理的运行时。
+
+这也是 DeepSeek-V4 与长上下文、压缩 attention、prefix caching 之间的连接点：Agent 不是单次长 prompt，而是一串会持续增长、部分可复用、部分要外部化、部分必须保留错误证据的状态机。优化 Agent 推理，最终会落到 KV/cache 命中率、上下文增长率、工具调用成功率、错误恢复率和每任务成本这些系统指标上。
+
 ---
 
 ## 11.2 异构硬件部署 ⭐
@@ -754,6 +766,33 @@ class HeterogeneousCluster:
         # 压缩
         pass
 ```
+
+### 11.2.7 DeepSeek-V4 on Ascend/CANN：硬件中立推理的现实样本
+
+DeepSeek-V4 在昇腾/CANN 体系中的 Day 0 支持，是一个很适合放进本章的样本。它的意义不是简单证明“某一张推理卡也能跑大模型”，而是说明前沿推理优化正在形成一种更现实的硬件中立范式：
+
+**模型结构和服务接口尽量可复用，底层 kernel、编译、通信和量化路径针对不同硬件深度优化。**
+
+这和“硬件无差异”不是一回事。恰恰相反，DeepSeek-V4 这类模型足够复杂，包含 `CSA/HCA`、`Compressor`、`Lightning Indexer`、`MoE`、`MTP`、低比特量化和多种并行策略。要在非 CUDA 后端跑出可用性能，必须有完整后端栈承接：
+
+- 模型结构适配：mHC、Sparse Attention、Compressor、MoE、MTP
+- 融合算子：SparseAttnSharedKV、Compressor、LightningIndexer、GroupedMatmul、MoE Dispatch/Combine
+- 低比特路径：FP8/MXFP8、MXFP4、INT8、KV/Indexer cache 量化策略
+- 图执行：`torch.compile` 入口、FX 图处理、ACLGraph/NpuGraphEx、编译缓存
+- 通信与并行：Prefill CP+EP、Decode DP+EP、HCCL AIV、SHMEM/HIXL、超节点互联
+- 服务框架：对接 vLLM/SGLang 这类推理服务框架，而不是从业务层重写整套系统
+
+这给工程团队的启发很直接：
+
+- 评估硬件时，不要只看理论 FLOPS 或单卡价格，要看端到端 recipe 是否成熟。
+- 评估框架时，不要只问“能不能启动”，要问关键 attention/MoE/量化路径是否有后端优化。
+- 做异构部署时，不要把非 NVIDIA 卡当成简单替换件，而要把它视为一套新的 runtime、编译、通信和观测体系。
+
+**工程判断**：硬件中立的目标不是抹平硬件差异，而是降低对单一生态的绑定，同时保留每种硬件自己的性能路径。上层统一的是模型和服务抽象；底层分化的是算子、图编译、通信、内存层次和控核策略。
+
+更完整的横向案例见：
+
+- [DeepSeek-V4 昇腾 CANN 推理优化案例研究](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/deepseek-v4-ascend-cann-inference.md:1)
 
 ---
 
@@ -959,6 +998,94 @@ export LOAD_BALANCE_STRATEGY=capacity_factor
 export USE_NCCL=1
 export NCCL_IB_DISABLE=0  # 启用InfiniBand
 ```
+
+### 11.3.6 DeepSeek-V4：MoE 与长上下文的协同设计
+
+**为什么值得单独看它**：很多 MoE 案例主要回答“稀疏激活能不能省推理成本”。DeepSeek-V4 更进一步，它把问题改写成：**当 MoE、超长上下文、低比特精度和分布式推理同时存在时，系统瓶颈会迁移到哪里？**
+
+这正是本书第6章、第8章和第11章的交汇点。它不是在证明某一个技巧最强，而是在提醒我们：前沿模型正在把“推理优化”从单点技巧推进到架构级协同设计。
+
+**模型层面的关键信号**：
+
+- 它保留了 DeepSeekMoE 与 MTP（Multi-Token Prediction）主线，说明稀疏激活仍然是大模型成本控制的重要方向。
+- 它把重点放在长上下文 attention 重写上，引入 `CSA (Compressed Sparse Attention)` 和 `HCA (Heavily Compressed Attention)`。
+- 它不再把 KV Cache 当成“只能管理、不能改写”的既定对象，而是直接在序列维度上做压缩。
+
+对推理工程师来说，最重要的不是记住缩写，而是看清这条演进路径：
+
+- 第一步是 **系统侧管理**：PagedAttention、Prefix Caching、块分配与回收。
+- 第二步是 **表示侧压缩**：GQA、MQA、MLA，减少每个 token 的 K/V 表示成本。
+- 第三步是 **结构侧改写**：压缩后的 KV + 稀疏选择 + 局部窗口保真，把“上下文变长”本身变成可控成本。
+
+也就是说，当上下文进入几十万到百万 token 级别后，只靠更好的 KV 分配器通常不够，attention 结构本身会进入主战场。
+
+**从系统视角看，它回答了四个关键问题**：
+
+**第一，为什么长上下文会重新定义成本模型？**
+
+- 在中短上下文下，很多团队的主矛盾是模型权重、并发和调度。
+- 在超长上下文下，单 token 推理 FLOPs、KV Cache 累积大小和 TTFT 会一起变坏。
+- 这意味着“模型激活参数更少”并不自动等于“长上下文更便宜”。
+
+**第二，为什么 KV 优化不能只停留在内存管理层？**
+
+- PagedAttention 解决的是碎片化和分配/回收问题。
+- Prefix Caching 解决的是跨请求复用问题。
+- KV 量化解决的是存储精度问题。
+- DeepSeek-V4 这一类压缩注意力路线解决的是：序列长度继续增长时，KV 条目数量本身能否减少。
+
+这四类手段不是互斥关系，而是不同层面的杠杆。
+
+**第三，为什么 MoE 的难点已经明显转向通信与 kernel？**
+
+论文里最值得推理工程师重视的，不是参数规模，而是它强调：
+
+- fused kernel 里重叠 computation、communication 和 memory access
+- 把 Expert Parallelism 切成更细粒度的 wave
+- 尽量把通信隐藏在计算之下
+
+这说明在大规模 MoE 服务里，“是不是稀疏激活”只是入场券，真正决定能不能稳定交付的，往往是：
+
+- All-to-All 通信是否成为尾延迟瓶颈
+- 热点专家是否拉低整体利用率
+- kernel 设计是否把 CPU 开销、launch 开销和访存开销压到足够低
+
+**第四，为什么 FP4 的价值不只是‘一种新格式’？**
+
+DeepSeek-V4 给出的工程信号很明确：低比特精度未必是全模型平均铺开，而更可能先落在收益最明确的路径上，例如：
+
+- MoE expert weights
+- attention indexer 的 QK 路径
+
+这对量化章节有一个重要启发：真正值得讨论的问题不是“FP4 好不好”，而是 **哪些路径能吃低精度，哪些路径必须保住 BF16 / FP8 的数值稳定性**。
+
+**对本书主线的启发**：
+
+- 对第6章：它说明 KV 问题不只是怎么分配和复用，还包括是否要在模型结构层面对 KV 做压缩。
+- 对第8章：它说明低比特精度正在从“部署技巧”走向“架构共设计”。
+- 对第11章：它说明 MoE、长上下文、通信和 kernel 已经开始强耦合，不能再分开看。
+
+**Preview 定位的工程含义**：
+
+如果把 DeepSeek-V4 看成 preview，而不是最终生产形态，它的意义会更清楚：这更像一次底层路线验证，而不是一次单纯刷榜。它验证的是一组长期目标能否同时成立：
+
+- 低激活 MoE 是否能继续压低单位 token 计算成本。
+- 压缩/稀疏 attention 是否能让接近百万 token 的上下文仍然可服务。
+- Agent 长任务是否能通过更稳定的上下文与工具调用语义承接。
+- 非单一硬件生态是否能通过推理引擎、kernel DSL、图编译和通信库获得可用性能。
+
+所以评估这类模型时，不要只问“现在是否全面超过 GPT/Claude”。更合理的问题是：它是否把未来两三年推理系统的关键矛盾提前暴露出来，并给出一条可工程化的路线。
+
+**工程判断**：
+
+- 如果你的场景还是 8K-32K 上下文、单机或单节点部署，DeepSeek-V4 这类路线更多是“趋势观察”，未必是当前第一优先级。
+- 如果你的场景已经明显走向长文档分析、Agent 长任务、海量检索拼接或超长代码仓上下文，那么它提供的不是一个具体实现模板，而是一张很清楚的路线图：下一阶段的优化，不会只发生在调度器，也不会只发生在量化器，而会发生在 attention、KV、精度与系统协同的交叉地带。
+
+从推理引擎视角看，vLLM 与 SGLang 对 DeepSeek-V4 的 Day-0 支持也给了一个很强的信号：这类模型不是加一个 `model class` 就能跑好的，真正的门槛在异构 KV/cache 状态管理、prefix caching 语义、spec decode metadata、MoE 专家并行、低比特 kernel、PD 传输和图模式执行是否能组合起来。换句话说，DeepSeek-V4 正在把现代推理引擎从“高性能 batch executor”推向“复杂模型状态管理系统”。
+
+更完整的推理引擎适配对照见：
+
+- [DeepSeek-V4 推理引擎适配案例研究 - vLLM 与 SGLang](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/deepseek-v4-inference-engines.md:1)
 
 ---
 
@@ -1532,6 +1659,10 @@ if __name__ == "__main__":
 
 **背景**：当模型走到 MoE、更长上下文、更高并发之后，瓶颈会从“单机算子优化”逐步迁移到“分布式通信、调度与资源编排”。这一节的目标不是追热点名词，而是给你一套判断框架：哪些变化会真的影响你的成本与 SLA，哪些只是概念包装。
 
+先给一个对 2025-2026 年很重要的判断：**注意力机制本身正在重新变成推理系统的一等变量。** 过去很多工程团队默认“attention 结构大体固定，优化主要发生在 kernel、KV 管理和调度层”；现在这个前提已经开始松动。MiniMax-01 代表的是 `Lightning Attention` 进入百万级上下文与大规模 MoE 体系的早期标志，DeepSeek-V4 代表的是“压缩式/稀疏式混合 attention”路线，Kimi Linear 代表的是“hybrid linear attention”路线。它们都在做同一件事：把“长上下文可用”推进到“长上下文可负担”。
+
+这意味着一个重要变化：未来的推理优化讨论里，“你用什么模型”与“这个模型内部用什么 attention 结构”会越来越难分开。第6章讲 KV，第8章讲精度，第11章讲 MoE、通信和系统协同，这几条线在前沿模型里已经开始交叉收敛。
+
 **决策**：面对“大规模 MoE / 分离式架构 / 更深的网络优化”等趋势，优先回答三类问题：
 
 - 你的瓶颈在单机还是在跨机（带宽/延迟/All-to-All）
@@ -1965,5 +2096,11 @@ print(result)  # 6
 ## 继续深入
 
 读到这里，主线已经收束。后续如果要继续往前走，建议把附录和参考资料当成“工程工具箱”而不是补充阅读：一边回到自己的系统里做 profiling、压测和故障复盘，一边挑选与你当前阶段最相关的专题继续深挖，而不是同时追所有前沿方向。
+
+如果你想把这一章里提到的前沿 attention 路线放在一张图里看，建议直接阅读这个横向案例：
+
+- [注意力架构演进案例研究 - MiniMax-01、Kimi Linear 与 DeepSeek-V4](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/attention-architecture-evolution.md:1)
+
+它会把三条路线放到同一套问题框架下比较：它们各自在改写什么、分别适合回答哪类工程问题、以及为什么它们共同说明 attention 已经重新变成推理系统的一等变量。
 
 ---
