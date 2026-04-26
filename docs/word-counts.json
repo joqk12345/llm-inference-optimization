@@ -11,12 +11,12 @@
     },
     {
       "file": "chapters/chapter02-technology-landscape.md",
-      "bytes": 32780,
-      "lines": 679,
-      "chars": 15446,
-      "non_ws": 13395,
-      "cjk": 7250,
-      "words": 1723
+      "bytes": 36466,
+      "lines": 736,
+      "chars": 17248,
+      "non_ws": 14986,
+      "cjk": 8081,
+      "words": 1912
     },
     {
       "file": "chapters/chapter03-gpu-basics.md",
@@ -47,12 +47,12 @@
     },
     {
       "file": "chapters/chapter06-kv-cache-optimization.md",
-      "bytes": 40846,
-      "lines": 1501,
-      "chars": 28942,
-      "non_ws": 22499,
-      "cjk": 5426,
-      "words": 4483
+      "bytes": 46637,
+      "lines": 1680,
+      "chars": 32440,
+      "non_ws": 25419,
+      "cjk": 6455,
+      "words": 5007
     },
     {
       "file": "chapters/chapter07-request-scheduling.md",
@@ -102,11 +102,11 @@
   ],
   "total": {
     "file": "TOTAL",
-    "bytes": 469543,
-    "lines": 16083,
-    "chars": 304197,
-    "non_ws": 237900,
-    "cjk": 70292,
-    "words": 36977
+    "bytes": 479020,
+    "lines": 16319,
+    "chars": 309497,
+    "non_ws": 242411,
+    "cjk": 72152,
+    "words": 37690
   }
 }
