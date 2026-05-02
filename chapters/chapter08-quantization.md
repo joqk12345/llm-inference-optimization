@@ -26,6 +26,7 @@ related:
   - "chapters-chapter06-kv-cache-optimization"
   - "chapters-chapter09-speculative-sampling"
   - "chapters-chapter11-advanced-topics"
+  - "docs-cases-turboquant-kv-cache-compression"
 references: []
 status: "published"
 display_order: 9
@@ -1130,6 +1131,38 @@ print(f"Similarity: {similarity:.4f}")  # > 0.98
   - 序列长度 <1K (节省有限)
   - 精度要求极高
 ```
+
+---
+
+### 8.5.4 前沿案例: TurboQuant 与低开销向量量化
+
+普通 KV Cache 量化容易被一个细节拖住:当位宽降到 4 bit 甚至 3 bit 时,真正占空间的不只是量化后的数值,还包括 scale、zero point、codebook、normalization constants 等元数据。位宽越低,这些“隐藏开销”越容易吞掉压缩收益。
+
+Google Research 在 2026 年发布的 TurboQuant 就是在解决这个问题。它不是权重量化方法,而是面向 KV Cache 和向量检索的在线向量量化方法。根据 Google 的介绍,TurboQuant 可以在无需训练或微调的情况下把 KV Cache 压到 3 bit,并在 LongBench、Needle In A Haystack、RULER、L-Eval 等长上下文基准上保持很强的下游表现;4-bit TurboQuant 在 H100 上还报告了最高 8× 的 attention logits 计算加速。
+
+它的核心不是简单把 FP16 改成 INT4,而是两阶段压缩:
+
+```
+Stage 1: PolarQuant
+  - 对 KV 向量做随机旋转
+  - 用极坐标结构拆分强度和方向
+  - 减少传统分块量化对额外归一化常数的依赖
+
+Stage 2: QJL residual correction
+  - 用 Quantized Johnson-Lindenstrauss 处理残差
+  - 用 1 bit sign 信息校正第一阶段误差
+  - 目标是减少 attention score 偏差
+```
+
+这类方法对本章的启发是:KV Cache 量化不能只看“几 bit”。低 bit 真正可用,还取决于三件事:
+
+- **元数据开销**: scale/codebook 是否把压缩收益吃掉。
+- **误差形态**: attention score 是否出现系统性偏差,而不只是元素级误差变大。
+- **内核路径**: 解压、反量化、矩阵乘和 attention logits 计算能否融合,否则显存省了但 TPOT 不一定降。
+
+所以 TurboQuant 更适合作为“长上下文 KV 压缩的前沿案例”,而不是今天就能无脑打开的生产开关。落地时仍应按第 10 章的生产流程做模型级 A/B、长上下文回归、灰度和回滚。
+
+更多分析见 [TurboQuant 案例研究 - 极限 KV Cache 压缩](../docs/cases/turboquant-kv-cache-compression.md)。
 
 ---
 

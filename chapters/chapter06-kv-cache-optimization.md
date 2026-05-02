@@ -24,6 +24,7 @@ related:
   - "chapters-chapter05-llm-inference-basics"
   - "chapters-chapter07-request-scheduling"
   - "chapters-chapter08-quantization"
+  - "docs-cases-turboquant-kv-cache-compression"
 references: []
 status: "published"
 display_order: 7
@@ -904,13 +905,16 @@ def dequantize_kv(kv_int8, scale):
 | FP8 | 2× | -0.2 ± 0.1 pt | ~1.2× | 推荐首选 |
 | INT8 | 2× | -0.5 ± 0.2 pt | ~1.3× | 显存紧张 |
 | INT4 | 4× | -1.5 ± 0.5 pt | ~1.5× | 激进压缩 |
+| TurboQuant 类向量量化 | 约 4-6×（研究结果） | 需任务级验证 | 最高 8× attention logits 计算加速（研究结果） | 前沿长上下文压缩 |
 
 > **数据来源**：vLLM 基准测试、AWQ 论文。测试条件：Llama-2-7B，A100-80GB。
+> **前沿补充**：Google Research 在 2026 年发布的 TurboQuant 把 KV Cache 量化推进到 3-4 bit 的向量压缩路线。它结合 PolarQuant 与 QJL residual correction,目标是在减少 scale/codebook 等元数据开销的同时保持 attention score 质量。相关案例见 [TurboQuant 案例研究 - 极限 KV Cache 压缩](../docs/cases/turboquant-kv-cache-compression.md)。
 
 **工程决策**：
 - 显存瓶颈优先：INT8 是最佳平衡点（2× 压缩，< 0.5% 质量损失）
 - 质量敏感场景：使用 FP8（vLLM 0.5.0+ 原生支持）
 - 复杂推理任务（数学、代码）：谨慎使用量化，建议 FP16 或 FP8
+- 超长上下文场景：可以关注 TurboQuant/KIVI 这类 KV 专用量化，但必须等待框架支持并用业务长上下文回归集复测
 
 ---
 

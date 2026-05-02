@@ -178,6 +178,19 @@ display_order: 203
   - URL: https://docs.vllm.ai/en/stable/contributing/profiling/
 
 #### 量化技术
+- **TurboQuant: Redefining AI efficiency with extreme compression**
+  - 来源：Google Research
+  - 发布日期：2026年3月24日
+  - 核心内容：
+    - 面向 KV Cache 和向量检索的在线向量量化
+    - PolarQuant + QJL residual correction 两阶段压缩
+    - 目标是在 3-4 bit KV Cache 下减少传统量化元数据开销并保持 attention score 质量
+    - Google 报告了 3-bit KV Cache 量化、长上下文基准表现稳定、H100 上 4-bit attention logits 计算最高 8x 加速
+  - 引用章节：6.4.4, 8.5.4, 11.x
+  - URL: https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/
+  - 补充解读：https://towardsdatascience.com/kv-cache-is-eating-your-vram-heres-how-google-fixed-it-with-turboquant/
+  - 横向案例：[TurboQuant 案例研究 - 极限 KV Cache 压缩](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/turboquant-kv-cache-compression.md:1)
+
 - **Quantization-Aware Training (QAT)**
   - 引用章节：8.2.2
   - 核心内容：训练时量化，SGLang团队验证
@@ -400,6 +413,10 @@ display_order: 203
 - **6.7.8** Agent系统的KV Cache优化实战
   - Manus Blog - Context Engineering
 
+- **6.4.4** KV Cache 量化与 TurboQuant
+  - Google Research - PolarQuant + QJL residual correction
+  - Towards Data Science - TurboQuant 工程化解读
+
 ### 第7章 - 请求调度策略
 - **7.4** vLLM的调度器实现
   - Berkeley EECS-2025-192 - CPU overheads, Iteration-level scheduling
@@ -423,6 +440,7 @@ display_order: 203
 - **8.3.2** INT4 (W4A16)
 - **8.4.2** SGLang INT4推理
 - **8.4.3** NVIDIA Model Optimizer
+- **8.5.4** TurboQuant 与低开销 KV Cache 向量量化
 - **8.8** 精度对齐：Train vs Inference (朱立耕@NVIDIA)
 
 ### 第9章 - 投机采样

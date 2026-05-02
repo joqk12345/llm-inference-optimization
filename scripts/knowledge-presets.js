@@ -13,7 +13,8 @@ const SECONDARY_FILES = [
   'docs/cases/qingke-ai-infra-2025-analysis.md',
   'docs/cases/sglang-int4-qat-rl-analysis.md',
   'docs/cases/lmsys-qat-mxfp4-analysis.md',
-  'docs/cases/dflash-block-diffusion-analysis.md'
+  'docs/cases/dflash-block-diffusion-analysis.md',
+  'docs/cases/turboquant-kv-cache-compression.md'
 ];
 
 const PRESET_METADATA = {
@@ -85,7 +86,7 @@ const PRESET_METADATA = {
     architecture_layer: ['optimization-techniques'],
     learning_stage: 'core-techniques',
     optimization_axes: ['memory', 'latency', 'throughput', 'cost'],
-    related: ['chapters-chapter05-llm-inference-basics', 'chapters-chapter07-request-scheduling', 'chapters-chapter08-quantization']
+    related: ['chapters-chapter05-llm-inference-basics', 'chapters-chapter07-request-scheduling', 'chapters-chapter08-quantization', 'docs-cases-turboquant-kv-cache-compression']
   },
   'chapters/chapter07-request-scheduling.md': {
     type: 'article',
@@ -105,7 +106,7 @@ const PRESET_METADATA = {
     architecture_layer: ['optimization-techniques'],
     learning_stage: 'core-techniques',
     optimization_axes: ['memory', 'cost', 'quality', 'latency'],
-    related: ['chapters-chapter06-kv-cache-optimization', 'chapters-chapter09-speculative-sampling', 'chapters-chapter11-advanced-topics']
+    related: ['chapters-chapter06-kv-cache-optimization', 'chapters-chapter09-speculative-sampling', 'chapters-chapter11-advanced-topics', 'docs-cases-turboquant-kv-cache-compression']
   },
   'chapters/chapter09-speculative-sampling.md': {
     type: 'article',
@@ -321,6 +322,20 @@ const PRESET_METADATA = {
     learning_stage: 'core-techniques',
     optimization_axes: ['latency', 'throughput', 'quality'],
     related: ['chapters-chapter09-speculative-sampling', 'chapters-chapter11-advanced-topics']
+  },
+  'docs/cases/turboquant-kv-cache-compression.md': {
+    type: 'case-study',
+    topics: ['case-studies', 'kv-cache', 'quantization', 'advanced-systems'],
+    concepts: ['kv-cache', 'quantization', 'memory-bandwidth', 'throughput-engineering'],
+    tools: [],
+    architecture_layer: ['optimization-techniques'],
+    learning_stage: 'core-techniques',
+    optimization_axes: ['memory', 'latency', 'throughput', 'cost', 'quality'],
+    related: ['chapters-chapter06-kv-cache-optimization', 'chapters-chapter08-quantization', 'chapters-chapter11-advanced-topics', 'docs-refs'],
+    references: [
+      'https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/',
+      'https://towardsdatascience.com/kv-cache-is-eating-your-vram-heres-how-google-fixed-it-with-turboquant/'
+    ]
   }
 };
 

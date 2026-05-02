@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-03-11T15:11:27.681Z",
-  "nodeCount": 107,
-  "edgeCount": 380,
+  "generatedAt": "2026-05-02T00:30:34.806Z",
+  "nodeCount": 108,
+  "edgeCount": 407,
   "nodes": [
     {
       "id": "readme",
@@ -42,12 +42,12 @@
     },
     {
       "id": "chapters-chapter01-introduction",
-      "label": "第1章 AI推理的宏观意义",
+      "label": "第1章 重新理解推理这件事",
       "type": "article",
       "file": "chapters/chapter01-introduction.md",
       "metadata": {
         "id": "chapters-chapter01-introduction",
-        "title": "第1章 AI推理的宏观意义",
+        "title": "第1章 重新理解推理这件事",
         "slug": "chapters-chapter01-introduction",
         "date": "2026-03-11",
         "type": "article",
@@ -270,7 +270,8 @@
         "related": [
           "chapters-chapter05-llm-inference-basics",
           "chapters-chapter07-request-scheduling",
-          "chapters-chapter08-quantization"
+          "chapters-chapter08-quantization",
+          "docs-cases-turboquant-kv-cache-compression"
         ],
         "references": [],
         "status": "published",
@@ -358,7 +359,8 @@
         "related": [
           "chapters-chapter06-kv-cache-optimization",
           "chapters-chapter09-speculative-sampling",
-          "chapters-chapter11-advanced-topics"
+          "chapters-chapter11-advanced-topics",
+          "docs-cases-turboquant-kv-cache-compression"
         ],
         "references": [],
         "status": "published",
@@ -1199,6 +1201,56 @@
       }
     },
     {
+      "id": "docs-cases-turboquant-kv-cache-compression",
+      "label": "TurboQuant 案例研究 - 极限 KV Cache 压缩",
+      "type": "case-study",
+      "file": "docs/cases/turboquant-kv-cache-compression.md",
+      "metadata": {
+        "id": "docs-cases-turboquant-kv-cache-compression",
+        "title": "TurboQuant 案例研究 - 极限 KV Cache 压缩",
+        "slug": "docs-cases-turboquant-kv-cache-compression",
+        "date": "2026-05-02",
+        "type": "case-study",
+        "topics": [
+          "case-studies",
+          "kv-cache",
+          "quantization",
+          "advanced-systems"
+        ],
+        "concepts": [
+          "kv-cache",
+          "quantization",
+          "memory-bandwidth",
+          "throughput-engineering"
+        ],
+        "tools": [],
+        "architecture_layer": [
+          "optimization-techniques"
+        ],
+        "learning_stage": "core-techniques",
+        "optimization_axes": [
+          "memory",
+          "latency",
+          "throughput",
+          "cost",
+          "quality"
+        ],
+        "related": [
+          "chapters-chapter06-kv-cache-optimization",
+          "chapters-chapter08-quantization",
+          "chapters-chapter11-advanced-topics",
+          "docs-refs"
+        ],
+        "references": [
+          "https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/",
+          "https://towardsdatascience.com/kv-cache-is-eating-your-vram-heres-how-google-fixed-it-with-turboquant/"
+        ],
+        "status": "published",
+        "display_order": 215,
+        "source_scope": "secondary"
+      }
+    },
+    {
       "id": "topic:llm-inference",
       "label": "llm-inference",
       "type": "topic"
@@ -1322,11 +1374,11 @@
       }
     },
     {
-      "id": "url:https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vllm/",
+      "id": "url:https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vLLM/",
       "label": "hamzaelshafie.bearblog.dev",
       "type": "external-reference",
       "metadata": {
-        "url": "https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vllm/",
+        "url": "https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vLLM/",
         "domain": "hamzaelshafie.bearblog.dev"
       }
     },
@@ -1488,29 +1540,29 @@
       "type": "tool"
     },
     {
-      "id": "url:https://blog.vllm.ai/2025/12/17/large-scale-serving.html",
+      "id": "url:https://blog.vLLM.ai/2025/12/17/large-scale-serving.html",
       "label": "blog.vllm.ai",
       "type": "external-reference",
       "metadata": {
-        "url": "https://blog.vllm.ai/2025/12/17/large-scale-serving.html",
+        "url": "https://blog.vLLM.ai/2025/12/17/large-scale-serving.html",
         "domain": "blog.vllm.ai"
       }
     },
     {
-      "id": "url:https://blog.vllm.ai/2025/12/15/vllm-epd.html",
+      "id": "url:https://blog.vLLM.ai/2025/12/15/vLLM-epd.html",
       "label": "blog.vllm.ai",
       "type": "external-reference",
       "metadata": {
-        "url": "https://blog.vllm.ai/2025/12/15/vllm-epd.html",
+        "url": "https://blog.vLLM.ai/2025/12/15/vLLM-epd.html",
         "domain": "blog.vllm.ai"
       }
     },
     {
-      "id": "url:https://github.com/vllm-project/vllm/issues/20323",
+      "id": "url:https://github.com/vLLM-project/vLLM/issues/20323",
       "label": "github.com",
       "type": "external-reference",
       "metadata": {
-        "url": "https://github.com/vllm-project/vllm/issues/20323",
+        "url": "https://github.com/vLLM-project/vLLM/issues/20323",
         "domain": "github.com"
       }
     },
@@ -1711,6 +1763,11 @@
     {
       "source": "readme",
       "target": "url:https://img.shields.io/badge/license-MIT-blue",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "docs-content-summary",
       "type": "references"
     },
     {
@@ -1995,7 +2052,7 @@
     },
     {
       "source": "chapters-chapter05-llm-inference-basics",
-      "target": "url:https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vllm/",
+      "target": "url:https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vLLM/",
       "type": "references"
     },
     {
@@ -2065,7 +2122,17 @@
     },
     {
       "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "docs-cases-turboquant-kv-cache-compression",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
       "target": "url:https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "docs-cases-turboquant-kv-cache-compression",
       "type": "references"
     },
     {
@@ -2207,6 +2274,16 @@
       "source": "chapters-chapter08-quantization",
       "target": "chapters-chapter11-advanced-topics",
       "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "docs-cases-turboquant-kv-cache-compression",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "docs-cases-turboquant-kv-cache-compression",
+      "type": "references"
     },
     {
       "source": "chapters-chapter09-speculative-sampling",
@@ -2435,17 +2512,17 @@
     },
     {
       "source": "chapters-chapter11-advanced-topics",
-      "target": "url:https://blog.vllm.ai/2025/12/17/large-scale-serving.html",
+      "target": "url:https://blog.vLLM.ai/2025/12/17/large-scale-serving.html",
       "type": "references"
     },
     {
       "source": "chapters-chapter11-advanced-topics",
-      "target": "url:https://blog.vllm.ai/2025/12/15/vllm-epd.html",
+      "target": "url:https://blog.vLLM.ai/2025/12/15/vLLM-epd.html",
       "type": "references"
     },
     {
       "source": "chapters-chapter11-advanced-topics",
-      "target": "url:https://github.com/vllm-project/vllm/issues/20323",
+      "target": "url:https://github.com/vLLM-project/vLLM/issues/20323",
       "type": "references"
     },
     {
@@ -3500,6 +3577,116 @@
     },
     {
       "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "topic:case-studies",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "topic:kv-cache",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "topic:quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "topic:advanced-systems",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "concept:kv-cache",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "concept:quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "concept:memory-bandwidth",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "concept:throughput-engineering",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "optimization-axis:memory",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "optimization-axis:quality",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "chapters-chapter06-kv-cache-optimization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "chapters-chapter08-quantization",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "docs-refs",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "https://towardsdatascience.com/kv-cache-is-eating-your-vram-heres-how-google-fixed-it-with-turboquant/",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "chapters-chapter06-kv-cache-optimization",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "chapters-chapter08-quantization",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-turboquant-kv-cache-compression",
       "target": "chapters-chapter11-advanced-topics",
       "type": "extends"
     },
