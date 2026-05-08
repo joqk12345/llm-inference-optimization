@@ -155,6 +155,19 @@ display_order: 203
   - 核心内容： disaggregated架构
   - 引用章节：11.8.4
 
+- **Serving Agentic Workloads at Scale with vLLM x Mooncake**
+  - 来源：vLLM Blog
+  - 发布日期：2026年5月6日
+  - 核心内容：
+    - 面向 Codex / SWE-bench Pro 这类多轮 Agent trace 的分布式 KV Cache pool
+    - Mooncake master 管理 KV block 元数据、服务发现和节点健康，Mooncake clients 管理本地 DRAM/SSD 并通过 RDMA 传输 KV blocks
+    - 使用 GPUDirect RDMA 实现 SM-free、zero-copy KV transfer
+    - 通过 MultiConnector 同时组合 PD connector 与 Mooncake Store connector
+    - vLLM 报告在真实 agentic traces 上吞吐 3.8x、P50 TTFT 46x、端到端延迟 8.6x 改善，并在 60 张 GB200 GPU 上接近线性扩展
+  - 建议引用章节：7.7, 10.2.3, 11.1, 11.8.4
+  - URL: https://vllm.ai/blog/mooncake-store
+  - 横向案例：[vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/vllm-mooncake-store-agentic-serving.md:1)
+
 #### vLLM架构与实现
 - **Berkeley EECS-2025-192**: Deconstructing vLLM
   - 作者：UC Berkeley Research Team
@@ -434,6 +447,7 @@ display_order: 203
 
 - **7.7** Prefill-Decode分离（PD分离）
   - vLLM、SGLang社区合作
+  - vLLM x Mooncake Store - MultiConnector 组合 PD connector 与分布式 KV Cache pool
 
 ### 第8章 - 量化技术
 - **8.2.2** QAT (SGLang团队验证)
@@ -449,6 +463,9 @@ display_order: 203
 - **9.7.7** vLLM Speculators v0.3.0
 
 ### 第10章 - 生产环境部署
+- **10.2.3** Session-Aware 路由与分布式 KV 池
+  - vLLM x Mooncake Store - 跨实例 cache hit 与 Agent 长任务路由
+
 - **10.5.5** 性能分析工具与实战
   - vLLM Profiling Documentation
   - NVIDIA Nsight Systems

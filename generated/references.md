@@ -104,3 +104,6 @@
 - [TurboQuant 案例研究 - 极限 KV Cache 压缩](/docs/cases/turboquant-kv-cache-compression) => [第6章：KV Cache 优化](/chapters/chapter06-kv-cache-optimization)
 - [TurboQuant 案例研究 - 极限 KV Cache 压缩](/docs/cases/turboquant-kv-cache-compression) => [第8章：量化技术](/chapters/chapter08-quantization)
 - [TurboQuant 案例研究 - 极限 KV Cache 压缩](/docs/cases/turboquant-kv-cache-compression) => [第11章：高级话题](/chapters/chapter11-advanced-topics)
+- [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第7章：请求调度策略](/chapters/chapter07-request-scheduling)
+- [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
+- [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第11章：高级话题](/chapters/chapter11-advanced-topics)

@@ -24,6 +24,7 @@ related:
   - "chapters-chapter05-llm-inference-basics"
   - "chapters-chapter06-kv-cache-optimization"
   - "chapters-chapter10-production-deployment"
+  - "docs-cases-vllm-mooncake-store-agentic-serving"
 references: []
 status: "published"
 display_order: 8
@@ -1473,6 +1474,17 @@ def schedule_for_pd(requests):
 
     return prefill_requests, decode_requests
 ```
+
+**Mooncake Store 补充案例**：
+
+2026 年 vLLM x Mooncake Store 的实践把 PD 分离再往前推了一步：KV 不只是在 prefill 和 decode worker 之间传输,还可以写入一个集群级分布式 KV Cache 池。调度器在请求到达时对 prompt token blocks 做 hash,查询 Mooncake master 是否已有匹配 KV blocks,再把命中信息纳入调度决策。这样,Agent 多轮任务即使被路由到不同 vLLM 实例,也有机会复用前几轮的长前缀 KV,而不是重新 prefill。
+
+这说明 PD 分离的调度输入正在扩展:
+
+- 过去: 请求长度、队列长度、prefill/decode 水位。
+- 现在: 还要看 prefix KV 是否已存在、在哪个节点、加载成本是多少。
+
+相关案例见 [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](../docs/cases/vllm-mooncake-store-agentic-serving.md)。
 
 ---
 

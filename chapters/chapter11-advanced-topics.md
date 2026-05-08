@@ -27,6 +27,7 @@ related:
   - "chapters-chapter10-production-deployment"
   - "chapters-chapter08-quantization"
   - "chapters-chapter09-speculative-sampling"
+  - "docs-cases-vllm-mooncake-store-agentic-serving"
 references: []
 status: "published"
 display_order: 12
@@ -603,6 +604,25 @@ templates = [
 - **沙箱和评测会变成基础设施**：Agent 能力越强，越需要隔离文件系统、网络、凭证和执行环境。沙箱不是安全附属品，而是让长任务可重复、可回放、可治理的运行时。
 
 这也是 DeepSeek-V4 与长上下文、压缩 attention、prefix caching 之间的连接点：Agent 不是单次长 prompt，而是一串会持续增长、部分可复用、部分要外部化、部分必须保留错误证据的状态机。优化 Agent 推理，最终会落到 KV/cache 命中率、上下文增长率、工具调用成功率、错误恢复率和每任务成本这些系统指标上。
+
+### 11.1.9 vLLM x Mooncake Store: Agent 多轮前缀变成集群级 KV 资产
+
+vLLM 在 2026 年发布的 Mooncake Store 集成给 Agent Infra 补上了一个很重要的系统视角：Agent 的上下文状态不只要在应用层可恢复,也要在推理层可复用。
+
+在 Codex / SWE-bench Pro 这类 coding agent trace 中,一次任务可能包含几十轮模型调用。到后期,上下文长度可以增长到数万 token 以上,但每一轮新增内容通常只是工具输出、用户增量或少量中间状态。也就是说,绝大多数输入是已经见过的 prefix。如果下一轮被调度到另一个 vLLM 实例,本地 KV Cache miss 会把这些 prefix 重新 prefill 一遍。
+
+Mooncake Store 的思路是把 KV Cache 从“单个 vLLM 实例的内部状态”升级为“集群级共享状态”:
+
+- 调度器根据 prompt token blocks 查询分布式 KV metadata。
+- vLLM worker 通过 Mooncake client 在后台拉取或写入 KV blocks。
+- GPUDirect RDMA 让 KV block 在 GPU HBM 与远端内存之间传输,尽量避免占用 SM。
+- `MultiConnector` 允许 PD connector 和 Mooncake Store connector 同时存在,把 PD 分离和分布式 KV 池组合起来。
+
+这对 Agent Infra 的启发很直接:
+
+**长任务 Agent 的推理成本,很大一部分取决于历史状态能否跨轮、跨副本、跨节点复用。**
+
+如果只做 prompt engineering,而推理集群每次都重新 prefill 80K token 的历史,系统成本仍然会失控。更合理的架构是把稳定前缀设计、cache-aware routing、分布式 KV 池和故障降级放在一起设计。完整案例见 [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](../docs/cases/vllm-mooncake-store-agentic-serving.md)。
 
 ---
 
@@ -1818,6 +1838,16 @@ kv_cache_cluster = Cluster(
 - 吞吐可能提升（若网络/调度不成为新瓶颈）
 - 资源利用率有机会提高，但尾延迟与故障域也更复杂
 - 更易做弹性扩缩容：prefill 与 decode 独立扩缩
+
+**Mooncake Store 的新变化**：
+
+早期 MoonCake/Mooncake 讨论更偏 PD 分离里的 KV 传输。vLLM x Mooncake Store 把它扩展成了分布式 KV Cache pool:Mooncake master 管理 KV block 元数据和服务发现,各 GPU 节点上的 Mooncake clients 管理本地 DRAM/SSD 资源并通过 RDMA 传输 KV blocks。这样,系统不只是在 P/D 两端搬一次 KV,还可以让多个 vLLM 实例共享长前缀缓存。
+
+对分离式架构来说,这意味着一个新判断:
+
+**KV 传输层正在从“点对点传输协议”演进为“分布式状态存储 + 调度器协同”。**
+
+这会带来更好的跨实例 cache hit,但也引入新的故障域:metadata master、client health、远端 cache eviction、RDMA 路径、后台 I/O 线程都需要纳入监控和降级策略。
 
 ### 11.8.5 技术栈深化: 从框架到网络
 

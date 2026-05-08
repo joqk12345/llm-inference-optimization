@@ -14,7 +14,8 @@ const SECONDARY_FILES = [
   'docs/cases/sglang-int4-qat-rl-analysis.md',
   'docs/cases/lmsys-qat-mxfp4-analysis.md',
   'docs/cases/dflash-block-diffusion-analysis.md',
-  'docs/cases/turboquant-kv-cache-compression.md'
+  'docs/cases/turboquant-kv-cache-compression.md',
+  'docs/cases/vllm-mooncake-store-agentic-serving.md'
 ];
 
 const PRESET_METADATA = {
@@ -96,7 +97,7 @@ const PRESET_METADATA = {
     architecture_layer: ['optimization-techniques'],
     learning_stage: 'core-techniques',
     optimization_axes: ['throughput', 'latency', 'operability'],
-    related: ['chapters-chapter05-llm-inference-basics', 'chapters-chapter06-kv-cache-optimization', 'chapters-chapter10-production-deployment']
+    related: ['chapters-chapter05-llm-inference-basics', 'chapters-chapter06-kv-cache-optimization', 'chapters-chapter10-production-deployment', 'docs-cases-vllm-mooncake-store-agentic-serving']
   },
   'chapters/chapter08-quantization.md': {
     type: 'article',
@@ -131,7 +132,7 @@ const PRESET_METADATA = {
     architecture_layer: ['production-systems'],
     learning_stage: 'production',
     optimization_axes: ['operability', 'cost', 'latency', 'throughput'],
-    related: ['chapters-chapter07-request-scheduling', 'chapters-chapter11-advanced-topics', 'appendix-b-troubleshooting', 'appendix-c-benchmarks-roi']
+    related: ['chapters-chapter07-request-scheduling', 'chapters-chapter11-advanced-topics', 'appendix-b-troubleshooting', 'appendix-c-benchmarks-roi', 'docs-cases-vllm-mooncake-store-agentic-serving']
   },
   'chapters/chapter11-advanced-topics.md': {
     type: 'article',
@@ -141,7 +142,7 @@ const PRESET_METADATA = {
     architecture_layer: ['frontier-and-ecosystem'],
     learning_stage: 'advanced',
     optimization_axes: ['operability', 'quality', 'latency', 'throughput'],
-    related: ['chapters-chapter10-production-deployment', 'chapters-chapter08-quantization', 'chapters-chapter09-speculative-sampling']
+    related: ['chapters-chapter10-production-deployment', 'chapters-chapter08-quantization', 'chapters-chapter09-speculative-sampling', 'docs-cases-vllm-mooncake-store-agentic-serving']
   },
   'appendix-a-tools-resources.md': {
     type: 'reference',
@@ -335,6 +336,19 @@ const PRESET_METADATA = {
     references: [
       'https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/',
       'https://towardsdatascience.com/kv-cache-is-eating-your-vram-heres-how-google-fixed-it-with-turboquant/'
+    ]
+  },
+  'docs/cases/vllm-mooncake-store-agentic-serving.md': {
+    type: 'case-study',
+    topics: ['case-studies', 'kv-cache', 'request-scheduling', 'production-deployment', 'advanced-systems'],
+    concepts: ['kv-cache', 'prefix-caching', 'prefill-decode-disaggregation', 'agent-infrastructure', 'throughput-engineering'],
+    tools: ['vllm'],
+    architecture_layer: ['production-systems', 'frontier-and-ecosystem'],
+    learning_stage: 'advanced',
+    optimization_axes: ['latency', 'throughput', 'memory', 'cost', 'operability'],
+    related: ['chapters-chapter07-request-scheduling', 'chapters-chapter10-production-deployment', 'chapters-chapter11-advanced-topics', 'docs-refs'],
+    references: [
+      'https://vllm.ai/blog/mooncake-store'
     ]
   }
 };

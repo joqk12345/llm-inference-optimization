@@ -27,6 +27,7 @@ related:
   - "chapters-chapter11-advanced-topics"
   - "appendix-b-troubleshooting"
   - "appendix-c-benchmarks-roi"
+  - "docs-cases-vllm-mooncake-store-agentic-serving"
 references: []
 status: "published"
 display_order: 11
@@ -311,6 +312,19 @@ def get_worker_id(session_id: str, num_workers: int) -> int:
 - 确保同一session的请求路由到同一节点
 - KV Cache 可以复用，TTFT 往往会明显降低（幅度取决于 cache hit 与历史长度，需以压测为准）
 ```
+
+**分布式 KV 池的替代思路**：
+
+Session stickiness 简单直接,但它会把负载均衡和缓存命中绑在一起。当 Agent 任务持续很多轮、上下文增长到数万甚至十几万 token 时,单个实例本地的 CPU DRAM / SSD cache 容量也可能不够。vLLM x Mooncake Store 给出的另一种路线是把 KV Cache 做成集群级资源池:多个 vLLM 实例共享 Mooncake Store,通过 KV block hash 查询可复用前缀,再通过 RDMA 拉取对应 blocks。
+
+这不是普通无状态负载均衡,而是引入了一个分布式状态系统。生产评估时至少要同时看:
+
+- 本地 cache hit、远端 cache hit、miss 三类比例。
+- KV 元数据查询耗时、RDMA 传输耗时、worker 加载耗时。
+- master/client 故障时能否降级为重新 prefill。
+- 分布式 KV 池带来的收益是否超过网络、后台 I/O 和运维复杂度。
+
+详细案例见 [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](../docs/cases/vllm-mooncake-store-agentic-serving.md)。
 
 ### 10.2.4 高可用架构
 

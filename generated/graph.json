@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-05-02T00:30:34.806Z",
-  "nodeCount": 108,
-  "edgeCount": 407,
+  "generatedAt": "2026-05-07T14:25:51.601Z",
+  "nodeCount": 109,
+  "edgeCount": 437,
   "nodes": [
     {
       "id": "readme",
@@ -314,7 +314,8 @@
         "related": [
           "chapters-chapter05-llm-inference-basics",
           "chapters-chapter06-kv-cache-optimization",
-          "chapters-chapter10-production-deployment"
+          "chapters-chapter10-production-deployment",
+          "docs-cases-vllm-mooncake-store-agentic-serving"
         ],
         "references": [],
         "status": "published",
@@ -449,7 +450,8 @@
           "chapters-chapter07-request-scheduling",
           "chapters-chapter11-advanced-topics",
           "appendix-b-troubleshooting",
-          "appendix-c-benchmarks-roi"
+          "appendix-c-benchmarks-roi",
+          "docs-cases-vllm-mooncake-store-agentic-serving"
         ],
         "references": [],
         "status": "published",
@@ -495,7 +497,8 @@
         "related": [
           "chapters-chapter10-production-deployment",
           "chapters-chapter08-quantization",
-          "chapters-chapter09-speculative-sampling"
+          "chapters-chapter09-speculative-sampling",
+          "docs-cases-vllm-mooncake-store-agentic-serving"
         ],
         "references": [],
         "status": "published",
@@ -1247,6 +1250,60 @@
         ],
         "status": "published",
         "display_order": 215,
+        "source_scope": "secondary"
+      }
+    },
+    {
+      "id": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "label": "vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池",
+      "type": "case-study",
+      "file": "docs/cases/vllm-mooncake-store-agentic-serving.md",
+      "metadata": {
+        "id": "docs-cases-vllm-mooncake-store-agentic-serving",
+        "title": "vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池",
+        "slug": "docs-cases-vllm-mooncake-store-agentic-serving",
+        "date": "2026-05-07",
+        "type": "case-study",
+        "topics": [
+          "case-studies",
+          "kv-cache",
+          "request-scheduling",
+          "production-deployment",
+          "advanced-systems"
+        ],
+        "concepts": [
+          "kv-cache",
+          "prefix-caching",
+          "prefill-decode-disaggregation",
+          "agent-infrastructure",
+          "throughput-engineering"
+        ],
+        "tools": [
+          "vllm"
+        ],
+        "architecture_layer": [
+          "production-systems",
+          "frontier-and-ecosystem"
+        ],
+        "learning_stage": "advanced",
+        "optimization_axes": [
+          "latency",
+          "throughput",
+          "memory",
+          "cost",
+          "operability"
+        ],
+        "related": [
+          "chapters-chapter07-request-scheduling",
+          "chapters-chapter10-production-deployment",
+          "chapters-chapter11-advanced-topics",
+          "docs-refs"
+        ],
+        "references": [
+          "https://vllm.ai/blog/mooncake-store"
+        ],
+        "status": "published",
+        "display_order": 216,
         "source_scope": "secondary"
       }
     },
@@ -2197,12 +2254,22 @@
     },
     {
       "source": "chapters-chapter07-request-scheduling",
+      "target": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
       "target": "url:https://lmsys.org/blog/2025-12-17-minisgl/",
       "type": "references"
     },
     {
       "source": "chapters-chapter07-request-scheduling",
       "target": "url:https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "docs-cases-vllm-mooncake-store-agentic-serving",
       "type": "references"
     },
     {
@@ -2422,6 +2489,16 @@
     },
     {
       "source": "chapters-chapter10-production-deployment",
+      "target": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
       "target": "url:https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus",
       "type": "references"
     },
@@ -2507,7 +2584,17 @@
     },
     {
       "source": "chapters-chapter11-advanced-topics",
+      "target": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "type": "related"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
       "target": "url:https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter11-advanced-topics",
+      "target": "docs-cases-vllm-mooncake-store-agentic-serving",
       "type": "references"
     },
     {
@@ -3687,6 +3774,126 @@
     },
     {
       "source": "docs-cases-turboquant-kv-cache-compression",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "topic:case-studies",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "topic:kv-cache",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "topic:request-scheduling",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "topic:production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "topic:advanced-systems",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "concept:kv-cache",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "concept:prefix-caching",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "concept:prefill-decode-disaggregation",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "concept:agent-infrastructure",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "concept:throughput-engineering",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "tool:vllm",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "optimization-axis:latency",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "optimization-axis:throughput",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "optimization-axis:memory",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "optimization-axis:cost",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "optimization-axis:operability",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "chapters-chapter11-advanced-topics",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "docs-refs",
+      "type": "related"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "https://vllm.ai/blog/mooncake-store",
+      "type": "references"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "chapters-chapter07-request-scheduling",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "target": "chapters-chapter10-production-deployment",
+      "type": "extends"
+    },
+    {
+      "source": "docs-cases-vllm-mooncake-store-agentic-serving",
       "target": "chapters-chapter11-advanced-topics",
       "type": "extends"
     },
