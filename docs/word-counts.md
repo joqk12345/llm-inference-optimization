@@ -12,10 +12,10 @@
 | `chapters/chapter03-gpu-basics.md` | 25749 | 639 | 13342 | 11027 | 5288 | 1460 |
 | `chapters/chapter04-environment-setup.md` | 35353 | 1441 | 26978 | 21203 | 2943 | 3030 |
 | `chapters/chapter05-llm-inference-basics.md` | 41344 | 1490 | 25701 | 20402 | 7253 | 4089 |
-| `chapters/chapter06-kv-cache-optimization.md` | 50057 | 1738 | 34114 | 26893 | 7225 | 5185 |
-| `chapters/chapter07-request-scheduling.md` | 51991 | 1675 | 33487 | 24321 | 7424 | 3805 |
-| `chapters/chapter08-quantization.md` | 61298 | 2362 | 41277 | 32105 | 9059 | 5626 |
+| `chapters/chapter06-kv-cache-optimization.md` | 50816 | 1742 | 34589 | 27310 | 7356 | 5241 |
+| `chapters/chapter07-request-scheduling.md` | 52913 | 1687 | 34049 | 24812 | 7592 | 3869 |
+| `chapters/chapter08-quantization.md` | 63369 | 2395 | 42445 | 33117 | 9482 | 5757 |
 | `chapters/chapter09-speculative-sampling.md` | 37185 | 1098 | 19610 | 15708 | 7289 | 2283 |
-| `chapters/chapter10-production-deployment.md` | 79063 | 2938 | 58077 | 43759 | 8132 | 5971 |
-| `chapters/chapter11-advanced-topics.md` | 63724 | 2106 | 41651 | 34082 | 10082 | 4286 |
-| **TOTAL** | 502269 | 16586 | 320408 | 252357 | 77638 | 38551 |
+| `chapters/chapter10-production-deployment.md` | 80155 | 2952 | 58711 | 44314 | 8345 | 6043 |
+| `chapters/chapter11-advanced-topics.md` | 66313 | 2136 | 43140 | 35378 | 10595 | 4464 |
+| **TOTAL** | 509702 | 16679 | 324736 | 256128 | 79086 | 39052 |

@@ -47,30 +47,30 @@
     },
     {
       "file": "chapters/chapter06-kv-cache-optimization.md",
-      "bytes": 50057,
-      "lines": 1738,
-      "chars": 34114,
-      "non_ws": 26893,
-      "cjk": 7225,
-      "words": 5185
+      "bytes": 50816,
+      "lines": 1742,
+      "chars": 34589,
+      "non_ws": 27310,
+      "cjk": 7356,
+      "words": 5241
     },
     {
       "file": "chapters/chapter07-request-scheduling.md",
-      "bytes": 51991,
-      "lines": 1675,
-      "chars": 33487,
-      "non_ws": 24321,
-      "cjk": 7424,
-      "words": 3805
+      "bytes": 52913,
+      "lines": 1687,
+      "chars": 34049,
+      "non_ws": 24812,
+      "cjk": 7592,
+      "words": 3869
     },
     {
       "file": "chapters/chapter08-quantization.md",
-      "bytes": 61298,
-      "lines": 2362,
-      "chars": 41277,
-      "non_ws": 32105,
-      "cjk": 9059,
-      "words": 5626
+      "bytes": 63369,
+      "lines": 2395,
+      "chars": 42445,
+      "non_ws": 33117,
+      "cjk": 9482,
+      "words": 5757
     },
     {
       "file": "chapters/chapter09-speculative-sampling.md",
@@ -83,30 +83,30 @@
     },
     {
       "file": "chapters/chapter10-production-deployment.md",
-      "bytes": 79063,
-      "lines": 2938,
-      "chars": 58077,
-      "non_ws": 43759,
-      "cjk": 8132,
-      "words": 5971
+      "bytes": 80155,
+      "lines": 2952,
+      "chars": 58711,
+      "non_ws": 44314,
+      "cjk": 8345,
+      "words": 6043
     },
     {
       "file": "chapters/chapter11-advanced-topics.md",
-      "bytes": 63724,
-      "lines": 2106,
-      "chars": 41651,
-      "non_ws": 34082,
-      "cjk": 10082,
-      "words": 4286
+      "bytes": 66313,
+      "lines": 2136,
+      "chars": 43140,
+      "non_ws": 35378,
+      "cjk": 10595,
+      "words": 4464
     }
   ],
   "total": {
     "file": "TOTAL",
-    "bytes": 502269,
-    "lines": 16586,
-    "chars": 320408,
-    "non_ws": 252357,
-    "cjk": 77638,
-    "words": 38551
+    "bytes": 509702,
+    "lines": 16679,
+    "chars": 324736,
+    "non_ws": 256128,
+    "cjk": 79086,
+    "words": 39052
   }
 }
