@@ -28,6 +28,8 @@ related:
   - "chapters-chapter08-quantization"
   - "chapters-chapter09-speculative-sampling"
   - "docs-cases-vllm-mooncake-store-agentic-serving"
+  - "docs-cases-projectdiscovery-prompt-caching-agent-cost"
+  - "docs-cases-ds4-local-metal-inference"
 references: []
 status: "published"
 display_order: 12
@@ -378,6 +380,23 @@ services:
        return f"worker-{worker_id}"
    ```
 
+**ProjectDiscovery 的三断点实践**：
+
+ProjectDiscovery 在 Neo 中把这个原则落成了更具体的 prompt caching 架构:
+
+- **BP1: static system prompt**。只标记最后一个静态 system message,跳过 Working Memory、Relevant Skills、Runtime Context 等动态段落。
+- **BP3: static tool definitions**。静态工具先排序并缓存,动态工具和 per-user subagents 后置。
+- **BP2: conversation sliding window**。在最近的 tool result 处打断点,让每一步只重新处理新增消息。
+
+其中最大的收益来自 relocation trick:把每步变化的 working memory / runtime context 从 prefix 中移走,作为尾部 runtime reminder 注入。这样动态内容只影响最后一小段,不会破坏静态 system prompt 和工具定义的共享缓存链。
+
+```
+推荐顺序:
+  static system prompt -> static tools -> cached conversation -> dynamic runtime reminder
+```
+
+这和 Manus 的 “Design Around the KV-Cache” 是同一个原则的供应商 API 版本:如果缓存是 prefix-based,就不要把动态内容插进 prefix 中间。ProjectDiscovery 报告这一类结构调整把 cache hit rate 从 7% 拉到 84%,并带来 59% 的整体 LLM 成本节省。案例详见 [ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](../docs/cases/projectdiscovery-prompt-caching-agent-cost.md)。
+
 **原则2: Mask, Don't Remove** ⭐⭐⭐
 
 **问题**：工具数量爆炸
@@ -623,6 +642,18 @@ Mooncake Store 的思路是把 KV Cache 从“单个 vLLM 实例的内部状态�
 **长任务 Agent 的推理成本,很大一部分取决于历史状态能否跨轮、跨副本、跨节点复用。**
 
 如果只做 prompt engineering,而推理集群每次都重新 prefill 80K token 的历史,系统成本仍然会失控。更合理的架构是把稳定前缀设计、cache-aware routing、分布式 KV 池和故障降级放在一起设计。完整案例见 [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](../docs/cases/vllm-mooncake-store-agentic-serving.md)。
+
+### 11.1.10 ds4.c: 本地 Agent 的磁盘 KV Cache
+
+云端 Agent serving 关心跨副本共享 KV;本地 Agent 还有另一种更朴素但很实用的需求:重启、切换任务或 stateless client 重发完整 conversation 时,能不能从磁盘恢复已经计算过的长前缀。
+
+`antirez/ds4` 是一个很窄但有启发的样本。它不是通用 serving 框架,而是面向 DeepSeek V4 Flash 的 Metal-only 本地 runner。它的 server 支持 disk KV cache:当前 live session 保存在内存中,被其他 session 替换时可以把 checkpoint 写到磁盘;后续请求如果 token prefix 匹配,就从磁盘恢复,避免重新 prefill 大段历史。
+
+这给本地 Agent Infra 一个判断:
+
+**本地推理不是云端 serving 的缩小版。单用户、长上下文、低并发、隐私和 session resume 往往比 batch throughput 更重要。**
+
+ds4.c 同时还展示了模型专用 runner 的取舍:只服务 DeepSeek V4 Flash,只优化 Metal graph path,只量化 routed MoE experts 到 2-bit,并用官方 logits/test vectors 做校验。这种专用性不适合生产主线,但适合作为本地高端个人机器推理的前沿观察样本。完整案例见 [ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](../docs/cases/ds4-local-metal-inference.md)。
 
 ---
 

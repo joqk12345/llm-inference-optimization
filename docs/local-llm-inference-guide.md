@@ -242,6 +242,14 @@ curl http://localhost:11434/api/chat -d '{
 
 对于长对话，启用上下文缓存可以大幅减少重复计算。
 
+**本地 Agent 的磁盘 KV Cache**：
+
+本地 coding agent 经常是 stateless client:每次请求都会重新发送完整 conversation。对长上下文模型来说,第一次 prefill 很贵,后续如果能复用已计算的 KV checkpoint,体验会明显不同。
+
+`antirez/ds4` 是一个值得关注的样本。它面向 DeepSeek V4 Flash 写了专用 Metal runner,并在 server 中支持 disk KV cache:当前 live session 保留在内存中,被其他 session 替换时可以把 checkpoint 写到磁盘;后续请求如果 token prefix 匹配,就从磁盘恢复,避免从头 prefill。它不适合作为通用框架推荐,但很好地说明了本地推理和云端 serving 的目标不同:本地更看重长任务恢复、Agent 兼容性和高内存个人机器上的可用性。
+
+参考案例: [ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](cases/ds4-local-metal-inference.md)
+
 ### 4. 模型选择
 
 - **代码任务**：CodeLlama、DeepSeek-Coder
@@ -262,6 +270,10 @@ curl http://localhost:11434/api/chat -d '{
 - **vLLM**：高性能推理服务
 - **SGLang**：结构化输出优化
 - **TensorRT-LLM**：NVIDIA官方优化
+
+### 本地专用引擎
+- **llama.cpp**：通用 GGUF / CPU / Metal 推理生态
+- **ds4.c**：DeepSeek V4 Flash 专用 Metal runner,关注 2-bit MoE 专家量化、磁盘 KV Cache 和本地 Agent 接入
 
 ### 高级话题
 - **PD分离**：Prefill-Decode分离架构
@@ -290,4 +302,5 @@ curl http://localhost:11434/api/chat -d '{
 > - [llm-inference-optimization 项目](https://github.com/joqk12345/llm-inference-optimization)：LLM推理优化完整指南
 > - [Ollama 官网](https://ollama.com)
 > - [llama.cpp GitHub](https://github.com/ggerganov/llama.cpp)
+> - [ds4.c GitHub](https://github.com/antirez/ds4)
 > - [TheBloke 量化模型](https://huggingface.co/TheBloke)

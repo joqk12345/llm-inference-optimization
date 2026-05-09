@@ -15,7 +15,9 @@ const SECONDARY_FILES = [
   'docs/cases/lmsys-qat-mxfp4-analysis.md',
   'docs/cases/dflash-block-diffusion-analysis.md',
   'docs/cases/turboquant-kv-cache-compression.md',
-  'docs/cases/vllm-mooncake-store-agentic-serving.md'
+  'docs/cases/vllm-mooncake-store-agentic-serving.md',
+  'docs/cases/projectdiscovery-prompt-caching-agent-cost.md',
+  'docs/cases/ds4-local-metal-inference.md'
 ];
 
 const PRESET_METADATA = {
@@ -132,7 +134,7 @@ const PRESET_METADATA = {
     architecture_layer: ['production-systems'],
     learning_stage: 'production',
     optimization_axes: ['operability', 'cost', 'latency', 'throughput'],
-    related: ['chapters-chapter07-request-scheduling', 'chapters-chapter11-advanced-topics', 'appendix-b-troubleshooting', 'appendix-c-benchmarks-roi', 'docs-cases-vllm-mooncake-store-agentic-serving']
+    related: ['chapters-chapter07-request-scheduling', 'chapters-chapter11-advanced-topics', 'appendix-b-troubleshooting', 'appendix-c-benchmarks-roi', 'docs-cases-vllm-mooncake-store-agentic-serving', 'docs-cases-projectdiscovery-prompt-caching-agent-cost']
   },
   'chapters/chapter11-advanced-topics.md': {
     type: 'article',
@@ -142,7 +144,7 @@ const PRESET_METADATA = {
     architecture_layer: ['frontier-and-ecosystem'],
     learning_stage: 'advanced',
     optimization_axes: ['operability', 'quality', 'latency', 'throughput'],
-    related: ['chapters-chapter10-production-deployment', 'chapters-chapter08-quantization', 'chapters-chapter09-speculative-sampling', 'docs-cases-vllm-mooncake-store-agentic-serving']
+    related: ['chapters-chapter10-production-deployment', 'chapters-chapter08-quantization', 'chapters-chapter09-speculative-sampling', 'docs-cases-vllm-mooncake-store-agentic-serving', 'docs-cases-projectdiscovery-prompt-caching-agent-cost', 'docs-cases-ds4-local-metal-inference']
   },
   'appendix-a-tools-resources.md': {
     type: 'reference',
@@ -152,7 +154,7 @@ const PRESET_METADATA = {
     architecture_layer: ['frontier-and-ecosystem'],
     learning_stage: 'advanced',
     optimization_axes: ['operability', 'cost', 'memory'],
-    related: ['chapters-chapter04-environment-setup', 'chapters-chapter08-quantization', 'docs-refs']
+    related: ['chapters-chapter04-environment-setup', 'chapters-chapter08-quantization', 'docs-refs', 'docs-cases-ds4-local-metal-inference']
   },
   'appendix-b-troubleshooting.md': {
     type: 'reference',
@@ -349,6 +351,32 @@ const PRESET_METADATA = {
     related: ['chapters-chapter07-request-scheduling', 'chapters-chapter10-production-deployment', 'chapters-chapter11-advanced-topics', 'docs-refs'],
     references: [
       'https://vllm.ai/blog/mooncake-store'
+    ]
+  },
+  'docs/cases/projectdiscovery-prompt-caching-agent-cost.md': {
+    type: 'case-study',
+    topics: ['case-studies', 'production-deployment', 'advanced-systems', 'kv-cache'],
+    concepts: ['cost-optimization', 'kv-cache', 'prefix-caching', 'agent-infrastructure', 'observability'],
+    tools: [],
+    architecture_layer: ['production-systems'],
+    learning_stage: 'production',
+    optimization_axes: ['cost', 'latency', 'operability', 'quality'],
+    related: ['chapters-chapter10-production-deployment', 'chapters-chapter11-advanced-topics', 'docs-refs'],
+    references: [
+      'https://projectdiscovery.io/blog/how-we-cut-llm-cost-with-prompt-caching'
+    ]
+  },
+  'docs/cases/ds4-local-metal-inference.md': {
+    type: 'case-study',
+    topics: ['case-studies', 'advanced-systems', 'kv-cache', 'quantization'],
+    concepts: ['kv-cache', 'quantization', 'agent-infrastructure', 'memory-bandwidth'],
+    tools: [],
+    architecture_layer: ['frontier-and-ecosystem'],
+    learning_stage: 'advanced',
+    optimization_axes: ['memory', 'cost', 'latency', 'operability'],
+    related: ['chapters-chapter11-advanced-topics', 'appendix-a-tools-resources', 'docs-refs'],
+    references: [
+      'https://github.com/antirez/ds4'
     ]
   }
 };

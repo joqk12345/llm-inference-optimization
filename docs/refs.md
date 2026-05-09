@@ -56,6 +56,20 @@ display_order: 203
   - 引用章节：6.7.8, 10.6.5, 11.1.7
   - URL: https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
 
+- **How We Cut LLM Costs by 59% With Prompt Caching**
+  - 来源：ProjectDiscovery Blog
+  - 作者：ProjectDiscovery & Parth Malhotra
+  - 发布日期：2026年4月10日
+  - 核心内容：
+    - 多步 security agent 的 prompt caching 成本优化实践
+    - 三个 cache breakpoints: static system prompt、static tool definitions、conversation sliding window
+    - relocation trick: 将 Working Memory、Runtime Context、Relevant Skills 等动态内容移出 cacheable prefix
+    - 稳定模板变量、冻结 datetime、provider routing for cache locality、tool message part-level marking
+    - 报告 cache hit rate 从 7% 到 84%,整体 LLM 成本节省 59%
+  - 建议引用章节：10.6.5, 11.1
+  - URL: https://projectdiscovery.io/blog/how-we-cut-llm-cost-with-prompt-caching
+  - 横向案例：[ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/projectdiscovery-prompt-caching-agent-cost.md:1)
+
 #### MoE架构与推理
 
 > 横向对照阅读：如果你想把 `MiniMax-01`、`Kimi Linear` 和 `DeepSeek-V4` 放在同一条 attention 演进链里看，优先读
@@ -179,6 +193,19 @@ display_order: 203
     - Scheduler和ModelExecutor接口设计
   - 引用章节：5.7, 6.3.2, 6.3.3, 7.4, 10.6
   - URL: https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf
+
+#### 本地推理与专用引擎
+- **ds4.c**
+  - 作者：Salvatore Sanfilippo (antirez)
+  - 核心内容：
+    - DeepSeek V4 Flash 专用本地推理引擎
+    - Metal-only,面向 Apple Silicon 高内存机器
+    - routed MoE experts 2-bit 量化,敏感路径保持更高精度
+    - disk KV checkpoint / prefix resume
+    - OpenAI / Anthropic 兼容 server,可接本地 coding agent
+  - 建议引用章节：11.1, 11.2, 附录A
+  - URL: https://github.com/antirez/ds4
+  - 横向案例：[ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/ds4-local-metal-inference.md:1)
 
 #### 性能分析
 - **vLLM Profiling Documentation**
@@ -465,6 +492,10 @@ display_order: 203
 ### 第10章 - 生产环境部署
 - **10.2.3** Session-Aware 路由与分布式 KV 池
   - vLLM x Mooncake Store - 跨实例 cache hit 与 Agent 长任务路由
+
+- **10.6.5** 多步任务 / Agent 场景的成本优化策略
+  - Manus Blog - Context Engineering
+  - ProjectDiscovery - 三断点 prompt caching 与动态内容后移
 
 - **10.5.5** 性能分析工具与实战
   - vLLM Profiling Documentation

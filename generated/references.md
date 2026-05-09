@@ -53,6 +53,10 @@
 - [第10章：生产环境部署](/chapters/chapter10-production-deployment) -> https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
 - [第11章：高级话题](/chapters/chapter11-advanced-topics) -> https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
 
+### projectdiscovery.io
+
+- [第10章：生产环境部署](/chapters/chapter10-production-deployment) -> https://projectdiscovery.io/blog/how-we-cut-llm-cost-with-prompt-caching
+
 ### todo
 
 - [Frequently Asked Questions](/docs/faq) -> https://TODO
@@ -107,3 +111,7 @@
 - [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第7章：请求调度策略](/chapters/chapter07-request-scheduling)
 - [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
 - [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第11章：高级话题](/chapters/chapter11-advanced-topics)
+- [ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](/docs/cases/projectdiscovery-prompt-caching-agent-cost) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
+- [ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](/docs/cases/projectdiscovery-prompt-caching-agent-cost) => [第11章：高级话题](/chapters/chapter11-advanced-topics)
+- [ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](/docs/cases/ds4-local-metal-inference) => [第11章：高级话题](/chapters/chapter11-advanced-topics)
+- [ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](/docs/cases/ds4-local-metal-inference) => [附录A: 工具与资源](/appendix-a-tools-resources)

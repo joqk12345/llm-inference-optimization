@@ -28,6 +28,7 @@ related:
   - "appendix-b-troubleshooting"
   - "appendix-c-benchmarks-roi"
   - "docs-cases-vllm-mooncake-store-agentic-serving"
+  - "docs-cases-projectdiscovery-prompt-caching-agent-cost"
 references: []
 status: "published"
 display_order: 11
@@ -1568,7 +1569,9 @@ def log_request_cost(tokens: int, time_seconds: float):
 
 ### 10.6.5 多步任务 / Agent 场景的成本优化策略
 
-**参考链接（可选）**：[Manus - Context Engineering for AI Agents](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus)
+**参考链接（可选）**：
+- [Manus - Context Engineering for AI Agents](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus)
+- [ProjectDiscovery - How We Cut LLM Costs by 59% With Prompt Caching](https://projectdiscovery.io/blog/how-we-cut-llm-cost-with-prompt-caching)
 
 **核心观点（经验口径）**：围绕 KV-Cache 设计多步任务系统,通常是最具杠杆的成本优化路径之一（但不是银弹）
 
@@ -1661,7 +1664,40 @@ class SessionAwareRouter:
 - 吞吐可能提升（取决于并发提升是否被调度/显存/带宽瓶颈抵消）
 - 注意观察尾延迟：不当的路由/重试可能让 P95/P99 变差
 
-#### 10.6.5.3 成本优化Checklist
+#### 10.6.5.3 Prompt caching breakpoints: 静态前缀、工具定义和滑动窗口
+
+ProjectDiscovery 在 Neo 安全测试 Agent 中给了一个更细的 prompt caching 案例。它不是只说“固定 prefix”,而是把可缓存内容拆成三个 breakpoint:
+
+1. **BP1: 静态 system prompt**  
+   标记最后一个不含 Working Memory、Relevant Skills、Runtime Context 的静态 system message。对跨用户共享的 agent 指令使用更长 TTL,让同类 agent 的提示词在业务高峰期保持 warm。
+
+2. **BP3: 静态 tool definitions**  
+   静态工具排在前面并稳定排序,动态 per-user tools 或 subagents 放到后面。这样 `[system prompt -> static tools]` 可以跨用户共享缓存。
+
+3. **BP2: conversation sliding window**  
+   标记最近的 tool result,让每一步只为 breakpoint 之后新增的消息付出完整处理成本。长任务中可以插入中间 breakpoint,避免 content blocks 太多后退化为大范围 miss。
+
+它最重要的优化是 **relocation trick**:把 working memory、runtime context、skills context 这类每步变化的内容从 prefix 中移出,合并成尾部的 runtime reminder。否则动态内容夹在静态 system prompt 和静态 tools 中间,会让后面的缓存链全部失效。
+
+```
+低命中结构:
+  static system -> dynamic memory -> static tools -> conversation
+
+高命中结构:
+  static system -> static tools -> conversation -> dynamic runtime context
+```
+
+这类优化的生产检查项:
+
+- 静态 system prompt 与工具定义是否 byte-identical。
+- 动态变量是否保留 placeholder,真实值是否移到尾部 Runtime Context。
+- 时间是否按 task run 冻结,而不是每一步取当前秒级时间。
+- provider routing 是否破坏 cache locality。
+- 并行 tool responses 是否在 SDK wire format 上消耗了多个 breakpoint slots。
+
+ProjectDiscovery 报告 cache hit rate 从 7% 提升到 84%,整体 LLM 成本节省 59%。这些数字应作为案例参考,不是通用承诺;真正要复用的是 prompt 结构与指标拆分方法。详细案例见 [ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](../docs/cases/projectdiscovery-prompt-caching-agent-cost.md)。
+
+#### 10.6.5.4 成本优化Checklist
 
 **基线测量**：
 - [ ] 测量当前KV-cache hit rate
@@ -1673,6 +1709,9 @@ class SessionAwareRouter:
 - [ ] 移除prompt中的timestamp等动态内容
 - [ ] 检查JSON序列化是否使用`sort_keys=True`
 - [ ] 确保prompt结构是"固定prefix + 动态suffix"
+- [ ] 检查动态 system messages 是否夹在静态 system prompt 和 tool definitions 中间
+- [ ] 检查 tool definitions 是否稳定排序,动态工具是否后置
+- [ ] 检查 provider routing 是否导致相同 prompt 落到互不共享缓存的供应商路径
 - [ ] 启用Prefix Caching
 
 **中期优化**(1周内):

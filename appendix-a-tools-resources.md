@@ -23,6 +23,7 @@ related:
   - "chapters-chapter04-environment-setup"
   - "chapters-chapter08-quantization"
   - "docs-refs"
+  - "docs-cases-ds4-local-metal-inference"
 references: []
 status: "published"
 display_order: 13
@@ -208,6 +209,45 @@ GPU利用率: 95%+
 | **企业级部署** | TensorRT-LLM | 官方支持 |
 | **多模态** | vLLM | 生态完善 |
 | **MoE模型** | vLLM | Large EP支持 |
+| **本地 Mac 专用模型实验** | llama.cpp / ds4.c | Metal、本地 Agent、磁盘 KV Cache |
+
+---
+
+### A.1.6 本地专用推理引擎: ds4.c
+
+**简介**:
+- GitHub: https://github.com/antirez/ds4
+- 面向 DeepSeek V4 Flash 的专用本地推理引擎
+- 只支持 Metal 路径,主要面向 Apple Silicon 高内存机器
+- 提供 OpenAI / Anthropic 兼容 server,可接本地 coding agent
+
+**核心特性**:
+```yaml
+模型专用:
+  - 非通用 GGUF runner
+  - 针对 DeepSeek V4 Flash 的布局和测试向量做适配
+
+量化:
+  - routed MoE experts 使用 2-bit 量化
+  - shared experts / projections / routing 等敏感路径保持较高精度
+
+KV Cache:
+  - 支持 disk KV checkpoint
+  - 适合长 prompt / coding agent session resume
+```
+
+**适用场景**:
+- ✅ Apple Silicon 上探索 DeepSeek V4 Flash
+- ✅ 本地 coding agent / 长上下文任务
+- ✅ 研究模型专用 runner 如何做端到端优化
+- ❌ 不适合作为通用生产 serving 框架
+- ❌ 不适合多模型、多租户、高并发集群部署
+
+**阅读建议**:
+
+把 ds4.c 看成“本地推理系统设计样本”,而不是 vLLM / SGLang 的替代品。它最值得学习的是:本地推理可以把模型格式、量化、KV checkpoint、server API 和 Agent client 兼容性一起设计。
+
+相关案例: [ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](docs/cases/ds4-local-metal-inference.md)
 
 ---
 
