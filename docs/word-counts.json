@@ -47,12 +47,12 @@
     },
     {
       "file": "chapters/chapter06-kv-cache-optimization.md",
-      "bytes": 50816,
-      "lines": 1742,
-      "chars": 34589,
-      "non_ws": 27310,
-      "cjk": 7356,
-      "words": 5241
+      "bytes": 53978,
+      "lines": 1783,
+      "chars": 36385,
+      "non_ws": 28880,
+      "cjk": 7961,
+      "words": 5451
     },
     {
       "file": "chapters/chapter07-request-scheduling.md",
@@ -83,30 +83,30 @@
     },
     {
       "file": "chapters/chapter10-production-deployment.md",
-      "bytes": 80155,
-      "lines": 2952,
-      "chars": 58711,
-      "non_ws": 44314,
-      "cjk": 8345,
-      "words": 6043
+      "bytes": 82844,
+      "lines": 2991,
+      "chars": 60522,
+      "non_ws": 45881,
+      "cjk": 8760,
+      "words": 6255
     },
     {
       "file": "chapters/chapter11-advanced-topics.md",
-      "bytes": 66313,
-      "lines": 2136,
-      "chars": 43140,
-      "non_ws": 35378,
-      "cjk": 10595,
-      "words": 4464
+      "bytes": 69054,
+      "lines": 2167,
+      "chars": 44913,
+      "non_ws": 36938,
+      "cjk": 11050,
+      "words": 4659
     }
   ],
   "total": {
     "file": "TOTAL",
-    "bytes": 509702,
-    "lines": 16679,
-    "chars": 324736,
-    "non_ws": 256128,
-    "cjk": 79086,
-    "words": 39052
+    "bytes": 518294,
+    "lines": 16790,
+    "chars": 330116,
+    "non_ws": 260825,
+    "cjk": 80561,
+    "words": 39669
   }
 }
