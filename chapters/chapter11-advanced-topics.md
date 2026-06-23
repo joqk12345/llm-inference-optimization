@@ -34,7 +34,7 @@ references: []
 status: "published"
 display_order: 12
 ---
-# 第11章：高级话题
+# 第11章 高级话题
 
 > "唯一不变的是变化本身,而技术栈的深度让变化加速。" - 佚名
 
@@ -70,7 +70,7 @@ display_order: 12
 
 ---
 
-## 11.1 Agent基础设施 ⚠️ 生态仍不成熟
+## 11.1 Agent基础设施（生态成熟度说明）
 
 **背景**：当系统从“单轮生成”走向“多步任务”（检索、工具调用、执行、回写、重试），推理基础设施不再是唯一复杂点。你需要一个能运行工具、隔离权限、可观测、可恢复的 Agent 运行环境。
 
@@ -322,7 +322,7 @@ services:
 
 #### 六大核心原则
 
-**原则1: Design Around the KV-Cache** ⭐⭐⭐
+**原则1: Design Around the KV-Cache**
 
 **核心洞察**：
 - KV-cache hit rate是生产级agent最重要的单一指标
@@ -333,7 +333,7 @@ services:
 
 1. **稳定的Prompt Prefix**
    ```python
-   # ❌ Bad: 每次请求都不同
+   # Bad: 每次请求都不同
    system_prompt = f"""
    You are an AI assistant.
    Current time: {datetime.now()}
@@ -341,7 +341,7 @@ services:
    Session ID: {session_id}
    """
 
-   # ✅ Good: 稳定的前缀
+   # Good: 稳定的前缀
    system_prompt = """
    You are an AI assistant.
    Current time: {{current_time}}
@@ -352,16 +352,16 @@ services:
 
 2. **Append-only Context**
    ```python
-   # ❌ Bad: 修改历史
+   # Bad: 修改历史
    context[5]["content"] = updated_content  # 破坏cache!
 
-   # ✅ Good: 追加新内容
+   # Good: 追加新内容
    context.append({
        "role": "system",
        "content": f"Correction: {updated_content}"
    })
 
-   # ✅ Good: 确定性序列化
+   # Good: 确定性序列化
    import json
    tools_str = json.dumps(tools, sort_keys=True)  # 保持顺序
    ```
@@ -397,7 +397,7 @@ ProjectDiscovery 在 Neo 中把这个原则落成了更具体的 prompt caching 
 
 这和 Manus 的 “Design Around the KV-Cache” 是同一个原则的供应商 API 版本:如果缓存是 prefix-based,就不要把动态内容插进 prefix 中间。ProjectDiscovery 报告这一类结构调整把 cache hit rate 从 7% 拉到 84%,并带来 59% 的整体 LLM 成本节省。案例详见 [ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](../docs/cases/projectdiscovery-prompt-caching-agent-cost.md)。
 
-**原则2: Mask, Don't Remove** ⭐⭐⭐
+**原则2: Mask, Don't Remove**
 
 **问题**：工具数量爆炸
 - MCP协议让用户plug数百个工具
@@ -444,7 +444,7 @@ prefix = "<|im_start|>assistant\n<|tool|>{\"name\": \"browser_"
 # 只能选择browser_开头的工具
 ```
 
-**原则3: File System as Ultimate Context** ⭐⭐
+**原则3: File System as Ultimate Context**
 
 **长context的三大痛点**：
 1. **Observations巨大**: 网页、PDF可能包含大量tokens
@@ -473,7 +473,7 @@ context.append({
 # - 关键: 可恢复性(information not lost, just externalized)
 ```
 
-**原则4: Manipulate Attention Through Recitation** ⭐⭐
+**原则4: Manipulate Attention Through Recitation**
 
 **问题**：
 - 典型Agent任务: 多步tool calls
@@ -504,7 +504,7 @@ Current step: Comparing prices...
 # - 用自然语言bias任务目标
 ```
 
-**原则5: Keep the Wrong Stuff In** ⭐⭐
+**原则5: Keep the Wrong Stuff In**
 
 **常见错误**：
 - Agent出错 → 清理trace → 重试
@@ -540,7 +540,7 @@ context = [
 - 学术界忽视的指标
 - 人类从错误中学习,Agent也应如此
 
-**原则6: Don't Get Few-Shotted** ⭐
+**原则6: Don't Get Few-Shotted**
 
 **问题**：
 - LLM是优秀的mimic
@@ -574,10 +574,10 @@ templates = [
 #### 开源生态的机会
 
 **当前缺失**：
-- ❌ 没有标准化的context management
-- ❌ 每个agent都要re-invent这些模式
-- ❌ 缺乏best practices文档
-- ❌ 没有agent-oriented的profiling工具
+- 没有标准化的context management
+- 每个agent都要re-invent这些模式
+- 缺乏best practices文档
+- 没有agent-oriented的profiling工具
 
 **可以做的事情**：
 
@@ -626,7 +626,7 @@ templates = [
 
 ### 11.1.9 vLLM x Mooncake Store: Agent 多轮前缀变成集群级 KV 资产
 
-vLLM 在 2026 年发布的 Mooncake Store 集成给 Agent Infra 补上了一个很重要的系统视角：Agent 的上下文状态不只要在应用层可恢复,也要在推理层可复用。
+vLLM x Mooncake Store 这类集成给 Agent Infra 补上了一个很重要的系统视角：Agent 的上下文状态不只要在应用层可恢复，也要在推理层可复用。正式出版前，具体发布时间、接口名称和性能数据应以项目文档与发布说明为准。
 
 在 Codex / SWE-bench Pro 这类 coding agent trace 中,一次任务可能包含几十轮模型调用。到后期,上下文长度可以增长到数万 token 以上,但每一轮新增内容通常只是工具输出、用户增量或少量中间状态。也就是说,绝大多数输入是已经见过的 prefix。如果下一轮被调度到另一个 vLLM 实例,本地 KV Cache miss 会把这些 prefix 重新 prefill 一遍。
 
@@ -647,17 +647,17 @@ Mooncake Store 的思路是把 KV Cache 从“单个 vLLM 实例的内部状态�
 
 云端 Agent serving 关心跨副本共享 KV;本地 Agent 还有另一种更朴素但很实用的需求:重启、切换任务或 stateless client 重发完整 conversation 时,能不能从磁盘恢复已经计算过的长前缀。
 
-`antirez/ds4` 是一个很窄但有启发的样本。它不是通用 serving 框架,而是面向 DeepSeek V4 Flash 的 Metal-only 本地 runner。它的 server 支持 disk KV cache:当前 live session 保存在内存中,被其他 session 替换时可以把 checkpoint 写到磁盘;后续请求如果 token prefix 匹配,就从磁盘恢复,避免重新 prefill 大段历史。
+`antirez/ds4` 是一个很窄但有启发的样本。它不是通用 serving 框架，而是面向特定模型和本地 Metal 路径的 runner。它的 server 支持 disk KV cache：当前 live session 保存在内存中，被其他 session 替换时可以把 checkpoint 写到磁盘；后续请求如果 token prefix 匹配，就从磁盘恢复，避免重新 prefill 大段历史。
 
 这给本地 Agent Infra 一个判断:
 
 **本地推理不是云端 serving 的缩小版。单用户、长上下文、低并发、隐私和 session resume 往往比 batch throughput 更重要。**
 
-ds4.c 同时还展示了模型专用 runner 的取舍:只服务 DeepSeek V4 Flash,只优化 Metal graph path,只量化 routed MoE experts 到 2-bit,并用官方 logits/test vectors 做校验。这种专用性不适合生产主线,但适合作为本地高端个人机器推理的前沿观察样本。完整案例见 [ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](../docs/cases/ds4-local-metal-inference.md)。
+ds4.c 同时还展示了模型专用 runner 的取舍：只服务特定模型、只优化特定硬件路径，并通过 logits/test vectors 做校验。这种专用性不适合生产主线，但适合作为本地高端个人机器推理的前沿观察样本。完整案例见 [ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](../docs/cases/ds4-local-metal-inference.md)。
 
 ---
 
-## 11.2 异构硬件部署 ⭐
+## 11.2 异构硬件部署
 
 **背景**：异构部署的动机通常不是“追更强 GPU”，而是用不同硬件的优势匹配不同阶段的瓶颈（例如算力型 prefill/训练 vs 带宽型 decode/rollout），在成本与稳定性之间取得更好的平衡。
 
@@ -1954,9 +1954,9 @@ kv_cache_cluster = Cluster(
 
 ---
 
-## 🚫 常见误区
+## 常见误区
 
-### ❌ "MoE总是更便宜"
+### "MoE总是更便宜"
 
 **实际情况**：取决于部署策略。
 
@@ -1976,7 +1976,7 @@ kv_cache_cluster = Cluster(
 # - 结论: 只有在高并发时MoE才更便宜
 ```
 
-### ❌ "更多GPU总是更快"
+### "更多GPU总是更快"
 
 **实际情况**：通信开销可能抵消收益。
 
@@ -1990,7 +1990,7 @@ kv_cache_cluster = Cluster(
 # - 带宽瓶颈
 ```
 
-### ❌ "Agent系统就是LLM + Tools"
+### "Agent系统就是LLM + Tools"
 
 **实际情况**：Agent Infra是复杂的系统工程。
 
@@ -2006,7 +2006,7 @@ kv_cache_cluster = Cluster(
 开源生态缺失是最大的机会!
 ```
 
-### ❌ "Linear Attention是未来"
+### "Linear Attention是未来"
 
 **实际情况**：Sparse Attention更实用。
 
@@ -2024,7 +2024,7 @@ kv_cache_cluster = Cluster(
 
 ---
 
-## ✅ 章节检查清单
+## 章节检查清单
 
 阅读本章后,你应该能够:
 
@@ -2039,7 +2039,7 @@ kv_cache_cluster = Cluster(
 
 ---
 
-## 📚 动手练习
+## 动手练习
 
 **练习11.1**：搭建简单的Jupyter Agent
 
@@ -2093,58 +2093,11 @@ assert result == "6"
 
 ---
 
-## ✅ 练习参考答案
-
-**练习11.1: 搭建简单的Jupyter Agent**
-
-```python
-from jupyter_client import KernelManager
-import json
-
-class SimpleAgent:
-    def __init__(self):
-        # 启动Jupyter kernel
-        self.km = KernelManager()
-        self.km.start_kernel()
-        self.kc = self.km.client()
-        self.kc.start_channels()
-
-    def execute_code(self, code: str) -> str:
-        """执行Python代码"""
-        self.kc.execute(code)
-        msg = self.kc.get_shell_msg(timeout=10)  # 示例
-
-        if msg['content']['status'] == 'ok':
-            # 获取输出
-            msg = self.kc.get_iopub_msg(timeout=10)  # 示例
-            if msg['content']['ename']:
-                return f"Error: {msg['content']['evalue']}"
-            return str(msg['content'].get('text', ''))
-        return "Execution failed"
-
-    def read_file(self, path: str) -> str:
-        """读取文件"""
-        code = f'with open("{path}", "r") as f: print(f.read())'
-        return self.execute_code(code)
-
-    def write_file(self, path: str, content: str):
-        """写入文件"""
-        escaped_content = json.dumps(content)
-        code = f'with open("{path}", "w") as f: f.write({escaped_content})'
-        return self.execute_code(code)
-
-    def __del__(self):
-        self.km.shutdown_kernel()
-
-# 使用
-agent = SimpleAgent()
-result = agent.execute_code("print(sum([1,2,3]))")
-print(result)  # 6
-```
+> 练习参考答案建议作为配套资源或附录单独提供，正文保留任务与验收标准，便于课堂或自学使用。
 
 ---
 
-## 🎯 总结
+## 本章小结
 
 关键要点：
 - **Agent Infra是最大的机会**: 开源生态是负分,等待创新

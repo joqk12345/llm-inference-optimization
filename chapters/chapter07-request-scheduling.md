@@ -29,7 +29,7 @@ references: []
 status: "published"
 display_order: 8
 ---
-# 第7章：请求调度策略
+# 第7章 请求调度策略
 
 > **💰 成本影响**（常见量级，强依赖流量分布/上下文长度/实现细节）
 > - **吞吐**：连续批处理与更好的调度策略通常能显著提高有效 tokens/s
@@ -142,29 +142,29 @@ GPU 资源:
 
 **没有调度器的问题**：
 ```
-❌ 串行处理:
+串行处理:
   A → B → C
   User C 等待时间过长 ( unfairness)
 
-❌ 简单批处理:
+简单批处理:
   [A, B, C] 一起处理
   需要等待最慢的请求完成
   大量 padding 浪费
 
-❌ 先来先服务:
+先来先服务:
   长请求阻塞短请求
   P95 延迟高
 ```
 
 **调度器的价值**：
 ```
-✅ 动态调整:
+动态调整:
   根据请求长度和资源情况动态调度
 
-✅ 公平性:
+公平性:
   避免长请求饿死短请求
 
-✅ 高效性:
+高效性:
   最大化 GPU 利用率和吞吐量
 ```
 
@@ -201,10 +201,10 @@ GPU 资源:
 ### 7.1.3 调度器的目标
 
 **主要目标**：
-1. ✅ **最小化延迟**: P50、P95、P99 延迟尽可能低
-2. ✅ **最大化吞吐量**: 在给定硬件上服务更多用户
-3. ✅ **公平性**: 避免长请求饿死短请求
-4. ✅ **资源利用**: GPU 利用率尽可能高
+1. **最小化延迟**: P50、P95、P99 延迟尽可能低
+2. **最大化吞吐量**: 在给定硬件上服务更多用户
+3. **公平性**: 避免长请求饿死短请求
+4. **资源利用**: GPU 利用率尽可能高
 
 **次要目标**：
 - 简单性: 易于理解和调试
@@ -256,14 +256,14 @@ class FIFOScheduler:
 ```
 
 **优点**：
-- ✅ 实现简单
-- ✅ 公平 (先来先服务)
-- ✅ 无饥饿 (每个请求最终都会被处理)
+- 实现简单
+- 公平 (先来先服务)
+- 无饥饿 (每个请求最终都会被处理)
 
 **缺点**：
-- ❌ 吞吐量低 (一次只处理一个请求)
-- ❌ GPU 利用率偏低
-- ❌ 长请求阻塞后续所有请求
+- 吞吐量低 (一次只处理一个请求)
+- GPU 利用率偏低
+- 长请求阻塞后续所有请求
 
 **适用场景**：
 - 单用户环境
@@ -309,13 +309,13 @@ Padded C: [pad×30][20 tokens]
 ```
 
 **优点**：
-- ✅ 提高吞吐量 (相比 FIFO)
-- ✅ GPU 利用率提升
+- 提高吞吐量 (相比 FIFO)
+- GPU 利用率提升
 
 **缺点**：
-- ❌ 大量 padding 浪费
-- ❌ 短请求被长请求阻塞
-- ❌ 无法动态调整
+- 大量 padding 浪费
+- 短请求被长请求阻塞
+- 无法动态调整
 
 **适用场景**：
 - 请求长度相近的场景
@@ -618,9 +618,9 @@ class Scheduler:
 
 ---
 
-### 7.4.4 Overlap Scheduling (Mini-SGLang) ⚡️
+### 7.4.4 Overlap Scheduling (Mini-SGLang)
 
-> **💡 深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/) + [Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
+> **深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/) + [Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
 >
 > **核心问题**：CPU overhead 可能导致 GPU 闲置 → Overlap Scheduling 是一种应对方式
 >
@@ -759,8 +759,8 @@ P95 延迟通常可改善
 #### 7.4.4.5 vLLM 的实现状态
 
 **当前状态** (v0.6.x):
-- ✅ 支持 iteration-level scheduling
-- ⚠️ overlap 支持程度与版本/配置相关
+- 支持 iteration-level scheduling
+- overlap 支持程度与版本/配置相关
 
 **如何启用** (实验性):
 ```python
@@ -776,7 +776,7 @@ llm = LLM(
 
 ### 7.4.5 运行中的动态容量预留
 
-> **💡 参考思路（经验口径）**：一些推理引擎会提供动态容量预留来减少“按 max_new_tokens 预留”的浪费
+> **参考思路（经验口径）**：一些推理引擎会提供动态容量预留来减少“按 max_new_tokens 预留”的浪费
 >
 > **问题**：预留 max_new_tokens 的空间可能浪费内存
 >
@@ -963,12 +963,12 @@ class SJFScheduler:
 ```
 
 **优势**：
-- ✅ 降低平均延迟
-- ✅ 提高吞吐量
+- 降低平均延迟
+- 提高吞吐量
 
 **劣势**：
-- ❌ 可能饿死长请求
-- ❌ 需要准确估计请求长度
+- 可能饿死长请求
+- 需要准确估计请求长度
 
 **改进**：Shortest Remaining Time First (SRTF)
 - 动态重新评估
@@ -1008,12 +1008,12 @@ class RoundRobinScheduler:
 ```
 
 **优势**：
-- ✅ 绝对公平
-- ✅ 无饥饿
+- 绝对公平
+- 无饥饿
 
 **劣势**：
-- ❌ 上下文切换开销
-- ❌ 可能降低吞吐量
+- 上下文切换开销
+- 可能降低吞吐量
 
 ---
 
@@ -1048,12 +1048,12 @@ class AdaptiveScheduler:
 ```
 
 **优势**：
-- ✅ 适应不同工作负载
-- ✅ 自动优化
+- 适应不同工作负载
+- 自动优化
 
 **挑战**：
-- ⚠️ 策略切换开销
-- ⚠️ 参数调优复杂
+- 策略切换开销
+- 参数调优复杂
 
 ---
 
@@ -1163,7 +1163,7 @@ vLLM serve meta-llama/Llama-2-7b-hf \
 
 ---
 
-## 7.7 Prefill-Decode 分离 (PD 分离) ⚠️ 技术评估中
+## 7.7 Prefill-Decode 分离 (PD 分离)（技术评估）
 
 **背景**：PD 分离的价值经常来自“资源重配”而不是“无条件吞吐提升”。当你的负载混杂（短 prompt 与长上下文、短输出与长输出、峰值波动），把 prefill 与 decode 拆开能降低互相干扰，进而改善尾延迟并减少为保 SLA 支付的冗余成本。
 
@@ -1477,7 +1477,9 @@ def schedule_for_pd(requests):
 
 **Mooncake Store 补充案例**：
 
-2026 年 vLLM x Mooncake Store 的实践把 PD 分离再往前推了一步：KV 不只是在 prefill 和 decode worker 之间传输,还可以写入一个集群级分布式 KV Cache 池。调度器在请求到达时对 prompt token blocks 做 hash,查询 Mooncake master 是否已有匹配 KV blocks,再把命中信息纳入调度决策。这样,Agent 多轮任务即使被路由到不同 vLLM 实例,也有机会复用前几轮的长前缀 KV,而不是重新 prefill。
+vLLM x Mooncake Store 这类实践把 PD 分离再往前推了一步：KV 不只是在 prefill 和 decode worker 之间传输，还可以写入一个集群级分布式 KV Cache 池。调度器在请求到达时对 prompt token blocks 做 hash，查询是否已有匹配 KV blocks，再把命中信息纳入调度决策。这样，Agent 多轮任务即使被路由到不同 vLLM 实例，也有机会复用前几轮的长前缀 KV，而不是重新 prefill。
+
+> **版本说明**：分布式 KV 池和相关 connector 的接口仍可能随框架版本变化。正式落地时，应核验对应 vLLM、Mooncake Store 与网络/RDMA 环境版本。
 
 这说明 PD 分离的调度输入正在扩展:
 
@@ -1618,7 +1620,7 @@ python -m sglang.launch_server \
 
 ---
 
-## ✅ 章节检查清单
+## 章节检查清单
 
 完成本章后,你应该能够:
 
@@ -1635,7 +1637,7 @@ python -m sglang.launch_server \
 
 ---
 
-## 📚 动手练习
+## 动手练习
 
 **练习 7.1**：对比静态批处理和动态批处理
 
@@ -1660,7 +1662,7 @@ python -m sglang.launch_server \
 2. 选择合适的调度算法
 3. 配置 vLLM 参数
 
-**练习 7.3**：使用 vLLM 部署 PD 分离架构 ⭐
+**练习 7.3**：使用 vLLM 部署 PD 分离架构
 
 任务:
 1. 设计一个 PD 分离的部署方案
@@ -1670,7 +1672,7 @@ python -m sglang.launch_server \
 
 ---
 
-## 🎯 总结
+## 本章小结
 
 关键要点：
 - 调度器是推理系统的核心,决定性能上限

@@ -24,7 +24,7 @@ references: []
 status: "published"
 display_order: 4
 ---
-# 第3章：GPU基础
+# 第3章 GPU基础
 
 > **💰 商业动机**：推理成本的第一性约束来自硬件。相同模型与相同框架下，硬件选型与配置不当，推理成本和尾延迟常常会被放大到 3-5 倍。理解 GPU 的瓶颈（算力 vs 带宽 vs 显存）是后续所有优化（KV、调度、量化、投机采样、PD 分离）的基础。
 
@@ -242,11 +242,11 @@ nsys profile -o profile.qdrep python your_inference.py
 
 | 优化手段 | 对 Compute-bound | 对 Memory-bound | 适用场景 |
 |----------|-----------------|-----------------|----------|
-| 算子融合 | ✅ 显著 | ✅ 中等 | 通用 |
-| FP8/INT8 量化 | ✅ 提升吞吐 | ✅ 减少带宽 | 通用 |
-| KV Cache | ❌ 无直接影响 | ✅ 显著减少访存 | Decode 阶段 |
-| PagedAttention | ❌ 无直接影响 | ✅ 减少碎片化 | 长序列 |
-| 连续批处理 | ✅ 提高利用率 | ✅ 稳定带宽 | 高并发 |
+| 算子融合 | 显著 | 中等 | 通用 |
+| FP8/INT8 量化 | 提升吞吐 | 减少带宽 | 通用 |
+| KV Cache | 无直接影响 | 显著减少访存 | Decode 阶段 |
+| PagedAttention | 无直接影响 | 减少碎片化 | 长序列 |
+| 连续批处理 | 提高利用率 | 稳定带宽 | 高并发 |
 
 > **核心结论**：推理优化里大量”看起来像软件技巧”的东西（KV 组织、paged/chunked、连续批处理、前缀缓存）本质上都是在做同一件事：**减少无效访存与提升有效带宽利用率**，因为 LLM 推理的 Decode 阶段天然是 memory-bound。
 
@@ -560,7 +560,7 @@ print(f"mem_util={util.memory}")
 
 ---
 
-## ✅ 章节检查清单
+## 章节检查清单
 
 阅读本章后，你应该能够：
 
@@ -572,7 +572,7 @@ print(f"mem_util={util.memory}")
 
 ---
 
-## 📚 动手练习（配套代码）
+## 动手练习（配套代码）
 
 配套目录：`code/chapter03/`。
 
@@ -619,14 +619,14 @@ docker run --gpus all -it llm-book-chapter03 python memory_calculator.py \
 
 ---
 
-## 📎 参考资料
+## 参考资料
 
 - `docs/refs.md`：GPU 架构、Nsight 工具、推理框架与性能分析资料汇总。
 - `appendix-b-troubleshooting.md`：常见问题与排查路径（如 OOM、低利用率、抖动等）。
 
 ---
 
-## 🎯 总结
+## 本章小结
 
 这一章你应该带走的不是一堆参数，而是三句话：
 

@@ -1412,7 +1412,7 @@ Continuous Batching 不是“又一种 batch 技巧”,
 
 ---
 
-## ✅ 章节检查清单
+## 章节检查清单
 
 完成本章后,你应该能够:
 
@@ -1427,7 +1427,7 @@ Continuous Batching 不是“又一种 batch 技巧”,
 
 ---
 
-## 📚 动手练习
+## 动手练习
 
 练习 5.1: 计算 KV Cache 显存占用
 
@@ -1463,7 +1463,7 @@ Llama-2-7B 的配置:
 
 ---
 
-## 🎯 总结
+## 本章小结
 
 关键要点：
 - 训练vs推理: 训练是计算密集型,推理是内存带宽密集型
@@ -1485,6 +1485,6 @@ Llama-2-7B 的配置:
 
 ---
 
-## 📎 参考资料
+## 参考资料
 - [Paged Attention from First Principles: A View Inside vLLM](https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vLLM/) by Hamza Elshafie
 - [Efficient Memory Management for Large Language Model Serving with PagedAttention](https://arxiv.org/abs/2309.06180) - vLLM原始论文

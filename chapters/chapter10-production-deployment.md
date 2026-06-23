@@ -33,7 +33,7 @@ references: []
 status: "published"
 display_order: 11
 ---
-# 第10章：生产环境部署
+# 第10章 生产环境部署
 
 > "在开发环境能运行是运气,在生产环境稳定运行才是本事。" - 佚名
 
@@ -69,10 +69,10 @@ display_order: 11
 - 安全性与灾备方案
 
 本章结束后,你将能够:
-- ✅ 设计并部署高可用的LLM服务
-- ✅ 搭建完整的监控体系
-- ✅ 实施有效的成本优化策略
-- ✅ 处理生产环境的常见问题
+- 设计并部署高可用的LLM服务
+- 搭建完整的监控体系
+- 实施有效的成本优化策略
+- 处理生产环境的常见问题
 
 > **数值说明**：本章出现的阈值、价格、成本与性能数字均为示例或经验值,需结合你的硬件、负载与SLA目标进行校准。
 
@@ -1594,7 +1594,7 @@ def log_request_cost(tokens: int, time_seconds: float):
 **优化1: 移除动态内容**
 
 ```python
-# ❌ Before: 每次请求都不同
+# Before: 每次请求都不同
 system_prompt = f"""
 You are Manus AI assistant.
 Current time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -1604,7 +1604,7 @@ Session ID: {session_id}
 ...
 """
 
-# ✅ After: 固定前缀
+# After: 固定前缀
 system_prompt = """
 You are Manus AI assistant.
 Current time: {{current_time}}
@@ -1618,22 +1618,22 @@ request = system_prompt + fixed_tools + dynamic_content
 **优化2: 使用稳定的JSON序列化**
 
 ```python
-# ❌ Before: 无序序列化
+# Before: 无序序列化
 import json
 prompt_json = json.dumps(tools_definition)
 
-# ✅ After: 有序序列化
+# After: 有序序列化
 prompt_json = json.dumps(tools_definition, sort_keys=True)
 ```
 
 **优化3: 使用append而非modify**
 
 ```python
-# ❌ Before: 修改整个prompt
+# Before: 修改整个prompt
 for tool_call in tool_calls:
     prompt += f"\nTool result: {tool_call.result}"
 
-# ✅ After: append新内容
+# After: append新内容
 for tool_call in tool_calls:
     cache_manager.append(tool_call.result)
 ```
@@ -1738,7 +1738,7 @@ ProjectDiscovery 报告 cache hit rate 从 7% 提升到 84%,整体 LLM 成本节
 
 ### 10.6.6 轻量级参考实现: Mini-SGLang（选读）
 
-> **💡 深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/)
+> **深度来源**：[Mini-SGLang Blog](https://lmsys.org/blog/2025-12-17-minisgl/)
 >
 > **核心价值**：以相对较小代码规模实现完整推理引擎,适合学习和研究原型
 >
@@ -1880,20 +1880,20 @@ class TensorParallelRunner:
 |------|------|-------------|
 | 代码行数 | 数十万行 | 数千行 |
 | 学习曲线 | 陡峭 | 平缓 |
-| 核心功能 | ✅ | ✅ |
-| 生产就绪 | ✅ | ❌ (教育/研究) |
+| 核心功能 | 完整 | 教学核心路径 |
+| 生产就绪 | 高 | 教育/研究 |
 | 修改难度 | 高 | 低 |
 | 阅读时间 | 数周 | 数小时 |
 
 **适用场景**：
 
-✅ **Mini-SGLang适合**:
+**Mini-SGLang适合**:
 - 学习LLM推理原理
 - 快速验证研究想法
 - 开发新的CUDA内核
 - 理解Radix Cache实现
 
-❌ **vLLM/SGLang适合**:
+**vLLM/SGLang适合**:
 - 生产环境部署
 - 需要完整功能
 - 需要长期维护
@@ -2543,7 +2543,7 @@ async def chat_completions(request: Request):
 
 ---
 
-## 10.10 RL rollout 的生产约束 ⚠️ 开源生态缺失
+## 10.10 RL rollout 的生产约束（生态成熟度说明）
 
 **背景**：RL rollout 把推理变成“训练目的组织的大规模生成”。它会带来混合负载（推理+评估+数据处理），并对隔离、配额、观测与成本治理提出更高要求。
 
@@ -2641,9 +2641,9 @@ class ResourcePolicy:
 
 ---
 
-## 🚫 常见误区
+## 常见误区
 
-### ❌ "生产环境只需要更多GPU"
+### "生产环境只需要更多GPU"
 
 **实际情况**：架构和优化比硬件更重要。
 
@@ -2656,29 +2656,29 @@ class ResourcePolicy:
 - 结论: 优化往往比单纯增加GPU更有效
 ```
 
-### ❌ "K8s能自动处理所有故障"
+### "K8s能自动处理所有故障"
 
 **实际情况**：K8s只是工具,需要合理配置。
 
 ```yaml
-# ❌ 错误配置
+# 错误配置
 livenessProbe:
   initialDelaySeconds: 0  # 太短,模型还未加载
   periodSeconds: 1        # 太频繁,浪费资源
 
-# ✅ 正确配置
+# 正确配置
 livenessProbe:
   initialDelaySeconds: 60  # 给模型加载时间
   periodSeconds: 10        # 合理间隔
   failureThreshold: 3      # 允许偶尔失败
 ```
 
-### ❌ "监控越详细越好"
+### "监控越详细越好"
 
 **实际情况**：关注关键指标,避免信息过载。
 
 ```python
-# ❌ 监控所有指标
+# 监控所有指标
 metrics = [
     "cpu_usage",
     "memory_usage",
@@ -2690,7 +2690,7 @@ metrics = [
     # ... 100+ 指标
 ]
 
-# ✅ 监控关键指标
+# 监控关键指标
 metrics = [
     "ttft_p95",         # 首token延迟
     "tokens_per_second", # 吞吐量
@@ -2700,12 +2700,12 @@ metrics = [
 ]
 ```
 
-### ❌ "Spot实例不可靠,不适合生产"
+### "Spot实例不可靠,不适合生产"
 
 **实际情况**：合理的设计可以可靠使用Spot实例。
 
 ```python
-# ✅ 最佳实践
+# 最佳实践
 1. 使用混合实例(按需 + Spot)
    - 按需: 最小容量
    - Spot: 弹性扩容
@@ -2725,7 +2725,7 @@ metrics = [
 
 ---
 
-## ✅ 章节检查清单
+## 章节检查清单
 
 阅读本章后,你应该能够:
 
@@ -2742,7 +2742,7 @@ metrics = [
 
 ---
 
-## 📚 动手练习
+## 动手练习
 
 **练习10.1**：部署vLLM到Kubernetes
 
@@ -2797,7 +2797,7 @@ curl http://localhost:8000/v1/models
 
 ---
 
-**练习10.4**：设计 RL rollout 资源隔离方案 ⭐
+**练习10.4**：设计 RL rollout 资源隔离方案
 
 目标: 为在线 serving 和 rollout 设计一套不会相互拖垮的资源治理方案
 
@@ -2814,7 +2814,7 @@ curl http://localhost:8000/v1/models
 
 ---
 
-**练习10.5**：开发并部署vLLM自定义插件 ⭐⭐
+**练习10.5**：开发并部署vLLM自定义插件
 
 目标: 实现一个vLLM插件来定制行为
 
@@ -2831,150 +2831,11 @@ curl http://localhost:8000/v1/models
 
 ---
 
-## ✅ 练习参考答案
-
-**练习10.1: 部署vLLM到Kubernetes**
-
-```yaml
-# vLLM-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: vLLM-llama3-8b
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: vLLM
-  template:
-    metadata:
-      labels:
-        app: vLLM
-    spec:
-      containers:
-      - name: vLLM
-        image: vLLM/vLLM-openai:latest
-        resources:
-          limits:
-            nvidia.com/gpu: 1
-        env:
-        - name: MODEL_NAME
-          value: "meta-llama/Llama-3.1-8B"
-        ports:
-        - containerPort: 8000
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 60
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 8000
-          initialDelaySeconds: 30
-          periodSeconds: 5
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: vLLM-service
-spec:
-  selector:
-    app: vLLM
-  ports:
-  - port: 80
-    targetPort: 8000
-  type: LoadBalancer
-```
-
-**练习10.2: 搭建监控系统**
-
-```yaml
-# prometheus-config.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: prometheus-config
-data:
-  prometheus.yml: |
-    global:
-      scrape_interval: 15s
-    scrape_configs:
-    - job_name: 'vLLM'
-      static_configs:
-        - targets: ['vLLM-service:8000']
-      metrics_path: /metrics
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: prometheus
-spec:
-  containers:
-  - name: prometheus
-    image: prom/prometheus:latest
-    args:
-    - '--config.file=/etc/prometheus/prometheus.yml'
-    volumeMounts:
-    - name: config
-      mountPath: /etc/prometheus
-  volumes:
-  - name: config
-    configMap:
-      name: prometheus-config
-```
-
-**练习10.3: ROI监控**
-
-```python
-# cost_tracker.py
-import time
-import json
-from typing import List, Dict
-
-class CostTracker:
-    def __init__(self, gpu_cost_per_hour: float = 3.0):
-        self.requests: List[Dict] = []
-        self.gpu_cost_per_hour = gpu_cost_per_hour
-
-    def track_request(self,
-                     request_id: str,
-                     input_tokens: int,
-                     output_tokens: int,
-                     ttft_ms: float,
-                     gpu_utilization: float):
-        total_tokens = input_tokens + output_tokens
-        gpu_time_hours = (ttft_ms / 1000) / 3600
-        effective_gpus = gpu_utilization / 100
-        cost = gpu_time_hours * effective_gpus * self.gpu_cost_per_hour
-
-        self.requests.append({
-            "request_id": request_id,
-            "total_tokens": total_tokens,
-            "cost": cost,
-            "cost_per_1k_tokens": (cost / total_tokens) * 1000,
-            "timestamp": time.time()
-        })
-
-    def get_summary(self):
-        total_cost = sum(r["cost"] for r in self.requests)
-        total_tokens = sum(r["total_tokens"] for r in self.requests)
-        return {
-            "total_requests": len(self.requests),
-            "total_cost": total_cost,
-            "total_tokens": total_tokens,
-            "avg_cost_per_1k_tokens": (total_cost / total_tokens) * 1000 if total_tokens > 0 else 0
-        }
-
-    def save_to_file(self, filename: str):
-        with open(filename, "w") as f:
-            json.dump(self.requests, f, indent=2)
-```
+> 练习参考答案建议作为配套资源或附录单独提供，正文保留任务与验收标准，便于课堂或自学使用。
 
 ---
 
-## 🎯 总结
+## 本章小结
 
 关键要点：
 - **生产环境≠开发环境**: 需要高可用、监控、安全、灾备

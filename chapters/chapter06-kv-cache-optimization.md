@@ -30,7 +30,7 @@ references: []
 status: "published"
 display_order: 7
 ---
-# 第6章：KV Cache 优化
+# 第6章 KV Cache 优化
 
 > **💰 成本影响**（常见量级，强依赖模型/上下文/并发/框架实现）
 > - **显存效率**：KV 管理得当通常能显著提高有效显存利用率，从而承载更多并发或更长上下文
@@ -150,11 +150,11 @@ V: "我的语义是'苹果'"
 → 生成 "Paris"
 
 步骤 2: "The capital of France is Paris"
-→ 重新计算 Token 0-7 的 K、V ❌
+→ 重新计算 Token 0-7 的 K、V 
 → Token 0-6 的 K、V 重复计算了!
 
 步骤 3: "The capital of France is Paris and"
-→ 重新计算 Token 0-8 的 K、V ❌❌
+→ 重新计算 Token 0-8 的 K、V 
 → Token 0-7 的 K、V 又重复计算了!
 ```
 
@@ -207,10 +207,10 @@ V: "我的语义是'苹果'"
 
 **可视化浪费**：
 ```
-第 2 步: 重新计算 Token 1 的 K、V ❌ 浪费
-第 3 步: 重新计算 Token 1, 2 的 K、V ❌ 浪费
+第 2 步: 重新计算 Token 1 的 K、V 浪费
+第 3 步: 重新计算 Token 1, 2 的 K、V 浪费
 ...
-第 n 步: 重新计算 Token 1, 2, ..., n-1 的 K、V ❌ 浪费
+第 n 步: 重新计算 Token 1, 2, ..., n-1 的 K、V 浪费
 ```
 
 ---
@@ -248,12 +248,12 @@ Decode 阶段 - 第 2 步:
 ```
 
 **效果**：避免重复计算
-- ✅ 每个 token 的 K、V 只计算一次
-- ✅ 大幅减少计算量
+- 每个 token 的 K、V 只计算一次
+- 大幅减少计算量
 
 **代价**：显存占用 O(n)
-- ❌ 需要存储所有历史 token 的 K、V
-- ❌ 序列越长,显存占用越大
+- 需要存储所有历史 token 的 K、V
+- 序列越长,显存占用越大
 
 ---
 
@@ -401,9 +401,9 @@ class NaiveKVCache:
 
 ---
 
-### 6.3.2 PagedAttention 原理 ⚡️ (vLLM 的核心)
+### 6.3.2 PagedAttention 原理 (vLLM 的核心)
 
-> **💡 深度来源**：[Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
+> **深度来源**：[Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
 >
 > **核心洞察**：PagedAttention 借鉴操作系统的虚拟内存机制,将 KV Cache 分成固定大小的 blocks,以实现更高效的内存管理。
 >
@@ -759,20 +759,20 @@ Fragmentation 偏高 → 可能需要调整 block size
 #### 6.3.2.10 总结: PagedAttention 的核心价值
 
 **关键成就**：
-1. ✅ 内存利用率通常显著提升(依负载而定)
-2. ✅ 支持 Prefix Caching (相同或高度相似 prompt 可复用)
-3. ✅ 动态内存分配 (不需要预知序列长度)
-4. ✅ 支持更高的并发和更长的序列
+1. 内存利用率通常显著提升(依负载而定)
+2. 支持 Prefix Caching (相同或高度相似 prompt 可复用)
+3. 动态内存分配 (不需要预知序列长度)
+4. 支持更高的并发和更长的序列
 
 **适用场景**：
-- ✅ 多租户 SaaS (大量并发请求)
-- ✅ 长序列生成 (文档摘要、长对话)
-- ✅ 共享 prompt (系统提示词、RAG 场景)
+- 多租户 SaaS (大量并发请求)
+- 长序列生成 (文档摘要、长对话)
+- 共享 prompt (系统提示词、RAG 场景)
 
 **权衡**：
-- ⚠️ 轻微的内存开销 (block table)
-- ⚠️ 实现复杂度增加
-- ✅ 但收益远大于成本
+- 轻微的内存开销 (block table)
+- 实现复杂度增加
+- 但收益远大于成本
 
 ---
 
@@ -839,9 +839,9 @@ KV Cache 大小:
 ```
 
 **为什么 GQA 是常见折中**：
-- ✅ 质量损失小（MMLU 仅 -0.4 pt）
-- ✅ 同时降低 KV Cache 开销（~75%  reduction）
-- ✅ Llama-3 (8B/70B)、Mistral 等现代模型采用
+- 质量损失小（MMLU 仅 -0.4 pt）
+- 同时降低 KV Cache 开销（~75%  reduction）
+- Llama-3 (8B/70B)、Mistral 等现代模型采用
 
 ---
 
@@ -909,7 +909,7 @@ def dequantize_kv(kv_int8, scale):
 | TurboQuant 类向量量化 | 约 4-6×（研究结果） | 需任务级验证 | 最高 8× attention logits 计算加速（研究结果） | 前沿长上下文压缩 |
 
 > **数据来源**：vLLM 基准测试、AWQ 论文。测试条件：Llama-2-7B，A100-80GB。
-> **前沿补充**：Google Research 在 2026 年发布的 TurboQuant 把 KV Cache 量化推进到 3-4 bit 的向量压缩路线。它结合 PolarQuant 与 QJL residual correction,目标是在减少 scale/codebook 等元数据开销的同时保持 attention score 质量。相关案例见 [TurboQuant 案例研究 - 极限 KV Cache 压缩](../docs/cases/turboquant-kv-cache-compression.md)。
+> **前沿补充**：TurboQuant 可作为 KV Cache 低比特向量压缩路线的案例。正式出版前，应以论文、项目页或官方技术报告核验具体发布时间、实验设置和性能数字。这里引用它的目的，是说明当位宽下降到 3-4 bit 时，元数据开销、attention score 质量和在线解码开销会一起成为系统问题。相关案例见 [TurboQuant 案例研究 - 极限 KV Cache 压缩](../docs/cases/turboquant-kv-cache-compression.md)。
 
 **工程决策**：
 - 显存瓶颈优先：INT8 是最佳平衡点（2× 压缩，< 0.5% 质量损失）
@@ -1025,9 +1025,9 @@ def dequantize_kv(kv_int8, scale):
 ```
 
 **实际考虑**：
-- ⚠️ Prefill 阶段需要临时显存
-- ⚠️ Decode 阶段需要额外显存
-- ⚠️ 留一些 buffer 避免OOM
+- Prefill 阶段需要临时显存
+- Decode 阶段需要额外显存
+- 留一些 buffer 避免OOM
 
 ---
 
@@ -1035,22 +1035,22 @@ def dequantize_kv(kv_int8, scale):
 
 **有 KV Cache**：
 ```
-✅ 优点:
+优点:
   - 大幅减少计算
   - 降低延迟
 
-❌ 缺点:
+缺点:
   - 占用大量显存
   - 限制并发数和序列长度
 ```
 
 **无 KV Cache**：
 ```
-✅ 优点:
+优点:
   - 节省显存
   - 支持更长序列
 
-❌ 缺点:
+缺点:
   - 计算量大
   - 延迟高
 ```
@@ -1130,7 +1130,7 @@ Q: 你的主要瓶颈是什么？
 
 ## 6.6 混合模型的状态管理
 
-> **💡 核心洞察**：当 Attention 与 Mamba/线性注意力混合部署时，状态管理不再只是 KV Cache 的问题，而是两种不同状态机制的统一协调问题。
+> **核心洞察**：当 Attention 与 Mamba/线性注意力混合部署时，状态管理不再只是 KV Cache 的问题，而是两种不同状态机制的统一协调问题。
 
 前面几节我们讨论了纯 Attention 架构下的 KV Cache 管理。但当你使用混合模型（Hybrid Models）时，系统需要同时管理两类状态：
 
@@ -1352,10 +1352,10 @@ print(f"Mamba states: {stats.get('num_mamba_states', 'N/A')}")
 ### 6.8.3 vLLM 的 KV Cache 实现
 
 **关键特性**：
-1. ✅ PagedAttention (高内存利用率)
-2. ✅ Prefix Caching (跨请求复用)
-3. ✅ 自动 eviction (LRU/LFU)
-4. ✅ 动态 block 分配
+1. PagedAttention (高内存利用率)
+2. Prefix Caching (跨请求复用)
+3. 自动 eviction (LRU/LFU)
+4. 动态 block 分配
 
 **使用示例**：
 ```python
@@ -1376,11 +1376,11 @@ outputs = llm.generate(prompts)
 
 ---
 
-## 6.9 Prefix Caching ⭐⭐⭐
+## 6.9 Prefix Caching
 
-> **💡 核心洞察**：重复的 prompt (如系统提示词) 只需要计算一次,后续请求直接复用 KV Cache。
+> **核心洞察**：重复的 prompt (如系统提示词) 只需要计算一次,后续请求直接复用 KV Cache。
 >
-> **🎯 指标口径**：当系统 prompt 高复用、且 prefill 占比较高时,Prefix Caching 往往能显著提升有效吞吐并降低 TTFT;幅度取决于 prefix 命中率、上下文长度与调度策略,需以压测为准。
+> ** 指标口径**：当系统 prompt 高复用、且 prefill 占比较高时,Prefix Caching 往往能显著提升有效吞吐并降低 TTFT;幅度取决于 prefix 命中率、上下文长度与调度策略,需以压测为准。
 >
 > **📌 与第7章的边界**：Prefix Caching 决定“哪些 KV 资产可以复用”; 第7章的调度器再决定“哪些请求优先利用这些资产进入执行”。
 
@@ -1394,7 +1394,7 @@ Request 1: "System: You are helpful. User: What is AI?"
 Request 2: "System: You are helpful. User: Tell me a joke"
 Request 3: "System: You are helpful. User: How are you?"
 
-问题: "System: You are helpful." 计算了 3 次! ❌
+问题: "System: You are helpful." 计算了 3 次! 
 ```
 
 **典型场景**：
@@ -1435,7 +1435,7 @@ Prefix Caching: 全局 distributed cache (如 Redis)
 - 每次比较 prompt 文本
 - 问题: 慢!而且语义相同的 token 可能来自不同文本
 
-**方案 2: vLLM 的 Hash-based 方法** ⭐
+**方案 2: vLLM 的 Hash-based 方法**
 - 对每个 Block 的 KV Cache 计算 Hash
 - Hash 相同的 Block 被认为内容相同
 
@@ -1488,8 +1488,8 @@ def compute_block_hash(block_kv):
 
 **部分 Hit 场景**：
 ```
-系统提示词: hit ✅
-用户输入: miss ❌
+系统提示词: hit 
+用户输入: miss 
 
 → 复用系统提示词的 KV
 → 只计算用户输入部分
@@ -1650,13 +1650,13 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 **1. 识别可缓存的 Prefix**
 ```
-✅ 适合缓存:
+适合缓存:
   - 系统提示词
   - 固定的知识库内容
   - 多轮对话的历史
   - 共享的上下文
 
-❌ 不适合缓存:
+不适合缓存:
   - 完全随机的输入
   - 每次都不同的用户查询
 ```
@@ -1684,7 +1684,7 @@ def monitor_prefix_cache(llm):
 
     threshold = 0.5  # 根据业务容忍度调整
     if stats['hit_rate'] < threshold:
-        print("⚠️  Cache hit rate 偏低,考虑优化:")
+        print(" Cache hit rate 偏低,考虑优化:")
         print("  1. 增加系统提示词长度")
         print("  2. 检查是否有可共享的 prefix")
         print("  3. 调整 cache size")
@@ -1695,7 +1695,7 @@ def monitor_prefix_cache(llm):
 
 ---
 
-## ✅ 章节检查清单
+## 章节检查清单
 
 完成本章后,你应该能够:
 
@@ -1717,7 +1717,7 @@ def monitor_prefix_cache(llm):
 
 ---
 
-## 📚 动手练习
+## 动手练习
 
 **练习 6.1**：计算 KV Cache 显存占用
 
@@ -1763,7 +1763,7 @@ GPU 总显存: 2048 tokens
 
 ---
 
-## 🎯 总结
+## 本章小结
 
 关键要点：
 - 传统 KV Cache 容易遭受内存碎片化,有效显存利用率会明显下降(常见在 60-70% 量级,依工作负载而变)
