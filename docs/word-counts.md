@@ -7,15 +7,15 @@
 
 | file | bytes | lines | chars | non_ws | cjk | words |
 | --- | --- | --- | --- | --- | --- | --- |
-| `chapters/chapter01-introduction.md` | 15760 | 337 | 7004 | 6108 | 3802 | 757 |
-| `chapters/chapter02-technology-landscape.md` | 40745 | 762 | 19167 | 16749 | 9141 | 2059 |
-| `chapters/chapter03-gpu-basics.md` | 25749 | 639 | 13342 | 11027 | 5288 | 1460 |
-| `chapters/chapter04-environment-setup.md` | 35353 | 1441 | 26978 | 21203 | 2943 | 3030 |
-| `chapters/chapter05-llm-inference-basics.md` | 41344 | 1490 | 25701 | 20402 | 7253 | 4089 |
-| `chapters/chapter06-kv-cache-optimization.md` | 53978 | 1783 | 36385 | 28880 | 7961 | 5451 |
-| `chapters/chapter07-request-scheduling.md` | 52913 | 1687 | 34049 | 24812 | 7592 | 3869 |
-| `chapters/chapter08-quantization.md` | 63369 | 2395 | 42445 | 33117 | 9482 | 5757 |
-| `chapters/chapter09-speculative-sampling.md` | 37185 | 1098 | 19610 | 15708 | 7289 | 2283 |
-| `chapters/chapter10-production-deployment.md` | 82844 | 2991 | 60522 | 45881 | 8760 | 6255 |
-| `chapters/chapter11-advanced-topics.md` | 69054 | 2167 | 44913 | 36938 | 11050 | 4659 |
-| **TOTAL** | 518294 | 16790 | 330116 | 260825 | 80561 | 39669 |
+| `chapters/chapter01-introduction.md` | 15893 | 337 | 7040 | 6150 | 3883 | 751 |
+| `chapters/chapter02-technology-landscape.md` | 41174 | 759 | 19172 | 16800 | 9410 | 2012 |
+| `chapters/chapter03-gpu-basics.md` | 25694 | 639 | 13316 | 11014 | 5290 | 1447 |
+| `chapters/chapter04-environment-setup.md` | 35163 | 1441 | 26901 | 21149 | 2974 | 3006 |
+| `chapters/chapter05-llm-inference-basics.md` | 41331 | 1490 | 25695 | 20400 | 7255 | 4085 |
+| `chapters/chapter06-kv-cache-optimization.md` | 53853 | 1783 | 36266 | 28816 | 8014 | 5392 |
+| `chapters/chapter07-request-scheduling.md` | 52904 | 1689 | 34032 | 24832 | 7634 | 3831 |
+| `chapters/chapter08-quantization.md` | 62969 | 2395 | 42152 | 32945 | 9594 | 5639 |
+| `chapters/chapter09-speculative-sampling.md` | 36924 | 1098 | 19484 | 15642 | 7304 | 2219 |
+| `chapters/chapter10-production-deployment.md` | 79628 | 2852 | 57314 | 43699 | 8790 | 5947 |
+| `chapters/chapter11-advanced-topics.md` | 67725 | 2120 | 43521 | 35941 | 11099 | 4504 |
+| **TOTAL** | 513258 | 16603 | 324893 | 257388 | 81247 | 38833 |
