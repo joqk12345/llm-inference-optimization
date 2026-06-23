@@ -25,6 +25,7 @@ related:
   - "chapters-chapter07-request-scheduling"
   - "chapters-chapter08-quantization"
   - "docs-cases-turboquant-kv-cache-compression"
+  - "docs-cases-hybrid-attention-prefix-cache-state-machine"
 references: []
 status: "published"
 display_order: 7
@@ -1569,7 +1570,46 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ---
 
-### 6.9.7 实战案例
+### 6.9.7 Hybrid Attention 下的 Prefix Caching：命中不等于可复用
+
+前面的例子默认了一个重要前提：所有层的 cache 都是同一种普通 KV。只要 token 前缀相同、block hash 命中，就可以把这段 KV 直接接到新请求后面继续算。
+
+在普通 full attention 模型里，这个假设通常成立。但在 hybrid attention 模型里，它会变得危险。模型可能同时包含 full attention、sliding window attention、压缩 attention、稀疏路由和 on-disk prefix。此时 **prefix cache hit rate 不是正确性指标**：hash 命中只能说明“某段 token 内容曾经出现过”，不能说明“所有下游 attention 需要的状态都处在可恢复的位置”。
+
+可以把它理解成：
+
+- `PagedAttention` 解决的是“KV block 怎么分配、映射和共享”
+- `Prefix Caching` 解决的是“相同前缀怎么避免重复 prefill”
+- `Hybrid Attention` 进一步要求系统回答“命中的到底是哪一种状态，能不能按该状态的规则恢复”
+
+因此，hybrid attention 下的 cache 不再只是 KV block，而更像一组异构状态：
+
+| 状态 | 能否直接复用 | 关键风险 |
+|------|--------------|----------|
+| compressed KV | 只能按压缩边界复用 | 半个压缩块被误当成完整前缀 |
+| uncompressed tail | 通常不跨请求复用 | 尾部 token 还没形成稳定 cache identity |
+| SWA window | 需要窗口位置对齐 | 命中了 token 前缀，但窗口已经滑到另一段 |
+| indexer state | 必须 bit-exact | sparse routing 的 top-k 分叉后无法事后修复 |
+| on-disk prefix | 需要父链和块边界完整 | 读回数据不等于 GPU 上已有可读 block |
+
+这会把 prefix hit 从一个简单的 hash lookup，升级成多 cache group 的交集判定。每个 cache group 都要回答“我能接受的最长前缀是多少”，最终只能复用所有 group 都接受、并且对齐到完整块边界的那一段。
+
+工程上，这意味着 allocator 也不能再只是“找空 block”。它至少要维护四类规则：
+
+1. **准入规则**：哪些 token 有资格进入可共享 cache。例如 tail 没凑够完整块时，不应进入长期 prefix cache。
+2. **状态分流**：命中之后按 compressed KV、SWA、tail、indexer、on-disk prefix 分别恢复。
+3. **一致性检查**：从“查到命中”到“真正使用”之间必须 pin 住所有权，避免并发 eviction 或 offload 把 block 抢走。
+4. **kernel / 编译约束**：prefix hit 的长度还要满足 attention backend 的 page size、CUDA Graph 静态拓扑和硬件对齐要求。
+
+所以，以后看 hybrid attention serving 系统，不要只问 “cache hit rate 多高”。更关键的问题是：
+
+**它命中的到底是哪一种状态？这段状态是否完整、对齐、可恢复、且在使用前不会被并发修改？**
+
+更完整的案例分析见 [Hybrid Attention Prefix Cache 状态机案例研究](../docs/cases/hybrid-attention-prefix-cache-state-machine.md)。
+
+---
+
+### 6.9.8 实战案例
 
 **案例 1: Chatbot 服务 (示意)**
 ```
@@ -1606,7 +1646,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ---
 
-### 6.9.8 最佳实践
+### 6.9.9 最佳实践
 
 **1. 识别可缓存的 Prefix**
 ```
@@ -1666,6 +1706,7 @@ def monitor_prefix_cache(llm):
 - [ ] 计算 KV Cache 的显存占用
 - [ ] 对比 MHA、MQA、GQA 的 KV Cache 大小
 - [ ] 解释 Prefix Caching 的工作原理
+- [ ] 理解 hybrid attention 下 prefix hit 为什么不等于安全复用
 - [ ] 计算 Prefix Caching 的加速比
 - [ ] 配置 vLLM 启用 Prefix Caching
 - [ ] 监控 cache hit rate 并优化
