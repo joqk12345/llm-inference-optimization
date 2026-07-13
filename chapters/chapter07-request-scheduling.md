@@ -11,7 +11,7 @@ concepts:
   - "prefill-decode-disaggregation"
   - "throughput-engineering"
 tools:
-  - "vLLM"
+  - "vllm"
   - "sglang"
 architecture_layer:
   - "optimization-techniques"
@@ -25,7 +25,10 @@ related:
   - "chapters-chapter06-kv-cache-optimization"
   - "chapters-chapter10-production-deployment"
   - "docs-cases-vllm-mooncake-store-agentic-serving"
-references: []
+references:
+  - "https://www.usenix.org/conference/osdi22/presentation/yu"
+  - "https://www.usenix.org/conference/osdi24/presentation/agrawal"
+  - "https://arxiv.org/abs/2401.09670"
 status: "published"
 display_order: 8
 ---
@@ -626,6 +629,8 @@ class Scheduler:
 >
 > **性能影响**：可减少 GPU stalls,具体提升需基准测试
 
+迭代级调度允许请求在生成过程中逐轮进入、退出批次，是连续批处理的关键机制；Orca 给出了这一机制的早期系统化实现与评估。[CITE: orca-osdi-2022]
+
 ---
 
 #### 7.4.4.1 CPU 开销导致 GPU 闲置问题
@@ -638,8 +643,7 @@ class Scheduler:
   - Synchronization (等待 GPU 完成)
   - Batch scheduling (决定哪些请求一起处理)
 
-**问题**：
-- vLLM 的迭代级调度是 **串行** 的:
+**问题**：调度、输入准备、采样与 kernel launch 等 CPU 工作如果处在关键路径上，就可能在相邻 GPU iteration 之间形成空洞：
   ```
   Step 1: CPU 调度下一批请求
   Step 2: CPU 准备输入数据
@@ -648,7 +652,7 @@ class Scheduler:
   Step 5: CPU 等待 GPU 完成
   Step 6: 回到 Step 1
   ```
- - 结果: **GPU 利用率偏低**,可能出现 GPU stalls
+结果是否构成瓶颈取决于模型、batch、硬件和引擎版本，应以时间线分析为准，不能由“采用迭代级调度”直接推出。
 
 **Nsight Systems 分析** (无 overlap):
 ```
@@ -672,21 +676,21 @@ GPU:              |<--Compute1-->|    stalls    |
 
 **对比**：
 ```
-无 Overlap (vLLM 默认):
+无 Overlap（概念示意）:
 CPU: |--Schedule--|--Prepare--|
 GPU:                 |--Compute--|<-stall->|--Compute--|
 
-有 Overlap (Mini-SGLang):
+有 Overlap（概念示意）:
 CPU: |--Schedule1--|--Prepare2--|--Prepare3--|
 GPU:                 |--Compute1-->|--Compute2-->|
 ```
-GPU 持续运行,无闲置!
+理想情况下相邻 iteration 的空洞会缩短，但同步、数据依赖和队列反压仍可能造成闲置。
 
 ---
 
 #### 7.4.4.3 实现机制
 
-**架构设计**：
+**架构伪代码**（用于解释生产者—消费者关系，不对应某个引擎的公开 API）：
 ```python
 class OverlapScheduler:
     def __init__(self):
@@ -725,10 +729,12 @@ class OverlapScheduler:
             self._process_outputs(outputs)
 ```
 
-**关键优化**：
-1. **Pipeline 深度**: 通常 2-3 个 batches 的 pipeline
-2. **同步机制**: 使用条件变量避免 busy waiting
-3. **内存管理**: 预分配 buffers 避免运行时分配
+**实现时需要验证**：
+
+1. pipeline 深度是否增加排队延迟或显存占用；
+2. 同步机制是否真正缩短了 GPU 时间线空洞；
+3. 预分配 buffer 是否引入额外复制或峰值内存；
+4. 发生取消、抢占或 OOM 时，CPU 与 GPU 状态能否一致回收。
 
 ---
 
@@ -749,28 +755,14 @@ class OverlapScheduler:
 
 **延迟改善(示意)**：
 ```
-P95 延迟通常可改善
-- CPU 准备时间不再完全阻塞 GPU
-- 请求更快开始处理
+是否改善 P95 取决于 CPU 开销占比、排队和 pipeline 深度；应同时报告吞吐、TTFT、TPOT 与尾延迟
 ```
 
 ---
 
-#### 7.4.4.5 vLLM 的实现状态
+#### 7.4.4.5 版本边界
 
-**当前状态** (v0.6.x):
-- 支持 iteration-level scheduling
-- overlap 支持程度与版本/配置相关
-
-**如何启用** (实验性):
-```python
-from vLLM import LLM
-
-llm = LLM(
-    model="meta-llama/Llama-2-7b-hf",
-    enable_overlap_schedule=True,  # 实验性功能
-)
-```
+不同引擎对 overlap、异步输出处理和调度流水线的命名与实现会变化。这里不提供“通用开关”：落地时应锁定引擎版本，查该版本的官方参数列表，并用 Nsight Systems 或等价工具确认时间线确实发生变化。
 
 ---
 
@@ -1074,92 +1066,28 @@ class AdaptiveScheduler:
 
 ### 7.6.1 vLLM 调度参数调优
 
-**关键参数**：
+下面只展示实验骨架。参数是否存在、默认值与语义都应以锁定版本的 `vllm serve --help` 为准：
+
 ```bash
-vLLM serve meta-llama/Llama-2-7b-hf \
-  # Batch 相关
-  --max-num-batched-tokens 8192 \        # 每次 iteration 最大 tokens
-  --max-num-seqs 256 \                    # 最大并发请求数
-
-  # Memory 相关
-  --gpu-memory-utilization 0.9 \         # GPU 内存利用率
-  --block-size 16 \                       # PagedAttention block 大小
-
-  # 调度相关
-  --max-paddings 256 \                    # 最大 padding 数量
-  --schedule-policy "fcfs" \              # 调度策略 (fcfs/priority)
+vllm serve MODEL \
+  --max-num-batched-tokens <candidate> \
+  --max-num-seqs <candidate> \
+  --gpu-memory-utilization <candidate>
 ```
 
-**调优建议**：
-```
-场景 1: 低延迟优先
-  --max-num-batched-tokens 4096  # 减小 batch size
-  --max-num-seqs 64              # 减少并发
-
-场景 2: 高吞吐优先
-  --max-num-batched-tokens 16384 # 增大 batch size
-  --max-num-seqs 512             # 增加并发
-
-场景 3: 混合工作负载
-  --max-num-batched-tokens 8192  # 平衡
-  --schedule-policy "priority"   # 启用优先级
-```
+不要从书里的固定数字起步。先用能稳定启动且不 OOM 的保守值建立基线，再逐项扫描候选值；每个点至少记录 TTFT、TPOT、P95/P99、输出 tokens/s、等待队列、KV 使用率、错误率与成本。chunked prefill 一类机制可以缓解长 prefill 对 decode 的干扰，但收益和公平性仍取决于负载；Sarathi-Serve 提供了相应机制与实验依据。[CITE: sarathi-serve-osdi-2024]
 
 ---
 
 ### 7.6.2 不同场景的调度策略
 
-**场景 1: Chatbot 服务**
-```
-特征:
-  - 大量短请求
-  - 用户敏感延迟
+| 场景 | 先描述负载 | 首轮实验变量 | 不能预设的结论 |
+|------|------------|--------------|----------------|
+| Chatbot | prompt/output 分布、并发与交互 SLO | token budget、最大并发、公平性 | 小 batch 一定有更低尾延迟 |
+| RAG | 共享前缀比例、文档长度、租户隔离 | chunked prefill、prefix caching、admission | 缓存一定命中或一定省钱 |
+| 批处理 | 截止时间、长度分布、可否抢占 | batch/token budget、长度感知策略 | 静态批处理或 SJF 必然最优 |
 
-推荐配置:
-  - Continuous Batching
-  - 较小的 batch size (减少等待)
-  - FIFO 优先 (公平性)
-
-参数:
-  --max-num-batched-tokens 4096
-  --max-num-seqs 128
-  --schedule-policy "fcfs"
-```
-
-**场景 2: RAG 应用**
-```
-特征:
-  - 长 prompt (文档内容)
-  - 短输出 (答案)
-  - 高 Prefill 比例
-
-推荐配置:
-  - Prefix Caching (缓存文档)
-  - 较大的 batch size (Prefill 阶段)
-  - 优先级调度 (VIP 用户)
-
-参数:
-  --enable-prefix-caching
-  --max-num-batched-tokens 16384
-  --schedule-policy "priority"
-```
-
-**场景 3: 批量处理**
-```
-特征:
-  - 离线任务
-  - 不敏感延迟
-  - 追求吞吐量
-
-推荐配置:
-  - 大 batch size
-  - Static Batching (可以接受)
-  - SJF 调度 (最小化平均完成时间)
-
-参数:
-  --max-num-batched-tokens 32768
-  --max-num-seqs 512
-```
+参数变更前后必须回放同一份流量；若同时改变模型精度、上下文上限或硬件，结果不能归因于调度策略。
 
 ---
 
@@ -1192,6 +1120,8 @@ vLLM serve meta-llama/Llama-2-7b-hf \
 
 ### 7.7.1 什么是 PD 分离
 
+DistServe 将 prefill 与 decode 分离部署，并围绕阶段间干扰、资源配置和 goodput 做了系统评估；它支持“分离可能改善 SLO 下的有效吞吐”，但不支持对任意负载作无条件收益承诺。[CITE: distserve-osdi-2024]
+
 **Prefill 阶段**：并行处理 prompt,计算密集
 - 输入: 整个 prompt
 - 计算: 矩阵乘法为主
@@ -1202,22 +1132,11 @@ vLLM serve meta-llama/Llama-2-7b-hf \
 - 计算: 内存读取为主
 - 特点: 带宽密集,串行生成
 
-**两种阶段的计算模式差异**：
-```
-Prefill:
-  GPU 利用: 计算占比更高
-  瓶颈: 算力 (FLOPS)
-  最优 GPU: H100 (高算力)
-
-Decode:
-  GPU 利用: 带宽占比更高
-  瓶颈: 内存带宽
-  最优 GPU: A100 (高带宽,低成本)
-```
+**两种阶段的计算模式差异**：prefill 通常具有更高并行度，decode 通常对权重与 KV 的数据移动更敏感，但这只是选型假设。不存在跨模型、价格与拓扑都成立的“prefill 最优 GPU”或“decode 最优 GPU”；应比较满足同一 SLO 时的 goodput/成本，并计入 KV 传输与空闲容量。
 
 **为什么需要分离?**
-- 同一个硬件无法同时优化两种模式
-- 分离后可以针对性优化
+- 同一资源池里的 prefill 与 decode 可能互相干扰，难以独立扩缩容
+- 分离后可以分别选择调度、容量与硬件候选方案
 - 资源利用率可能提升 (依负载而定)
 
 ---
@@ -1265,12 +1184,12 @@ Decode:
 │                                                                      │
 │  ┌─────────────────┐           ┌─────────────────┐                 │
 │  │  Prefill 池      │           │  Decode 池       │                 │
-│  │  (H100 x N)      │           │  (A100 x M)      │                 │
+│  │  (候选硬件 x N)   │           │  (候选硬件 x M)   │                 │
 │  │                 │           │                  │                 │
 │  │  ┌───────────┐  │    KV     │  ┌───────────┐  │                 │
 │  │  │ Prefill   │──┼───传输───▶│─▶│ Decode    │  │                 │
 │  │  │ Worker 1  │  │           │  │ Worker 1  │  │                 │
-│  │  └───────────┘  │   ~100GB/s│  └───────────┘  │                 │
+│  │  └───────────┘  │  (实测链路)│  └───────────┘  │                 │
 │  │  ┌───────────┐  │  (RDMA)   │  ┌───────────┐  │                 │
 │  │  │ Prefill   │──┤           │  │ Decode    │  │                 │
 │  │  │ Worker 2  │  │           │  │ Worker 2  │  │                 │
@@ -1291,72 +1210,30 @@ Decode:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**数据流详解**：
+**数据流与计量点**（概念示意，不代表固定时延）：
 
 ```
 时间线：
 
-Request A (prompt=1000 tokens)
+Request A
 │
-├─ 0ms: 到达调度器
-│
-├─ 10ms: 进入 Prefill 队列
-│
-├─ 50ms: Prefill Worker 处理
+├─ 到达调度器：记录请求到达与路由决策
+├─ 进入 Prefill 队列：记录排队时间
+├─ Prefill Worker 处理
 │  ├─ 计算 prompt 的 KV Cache
-│  └─ 150ms: 完成，输出首 token
-│
-├─ 200ms: KV Cache 通过 RDMA 传输到 Decode 池
-│  └─ 传输时间 ≈ KV大小 / 带宽
-│      (1000 tokens × 0.5MB / 100GB/s ≈ 5ms)
-│
-├─ 205ms: 进入 Decode 队列
-│
-├─ 210ms: Decode Worker 处理
+│  └─ 记录 prefill 执行时间与首 token 边界
+├─ KV Cache 传输到 Decode 池
+│  └─ 记录有效字节数、序列化、网络与重试时间
+├─ 进入 Decode 队列：记录排队时间
+├─ Decode Worker 处理
 │  ├─ 使用已缓存的 KV Cache
-│  └─ 逐 token 生成
-│
-└─ 2000ms: 生成完成 (100 tokens, ~18ms/token)
+│  └─ 记录逐 token 延迟
+└─ 生成完成：汇总端到端延迟、goodput 与单位成本
 ```
 
-**异构部署配置示例**：
+**部署边界**：
 
-```yaml
-# Kubernetes 下的 PD 分离配置
-# 注意：这需要支持跨节点 GPU 调度的编排系统
-
-# Prefill 池：H100，专注算力
-deployment:
-  name: vLLM-prefill
-  replicas: 4
-  gpu: nvidia-h100-80gb
-  resources:
-    limits:
-      nvidia.com/gpu: 1
-      memory: "80Gi"
-  env:
-    VLLM_WORKER_TYPE: "prefill"
-    VLLM_GPU_MEMORY_UTILIZATION: "0.95"
-
-# Decode 池：A100，专注成本
-deployment:
-  name: vLLM-decode
-  replicas: 8
-  gpu: nvidia-a100-80gb
-  resources:
-    limits:
-      nvidia.com/gpu: 1
-      memory: "80Gi"
-  env:
-    VLLM_WORKER_TYPE: "decode"
-    VLLM_GPU_MEMORY_UTILIZATION: "0.90"
-
-# 调度器：负责路由和 KV 传输
-deployment:
-  name: vLLM-scheduler
-  replicas: 2
-  # 需要支持 RDMA 的网络
-```
+不要把普通 Kubernetes Deployment 加几个环境变量当作可运行的 PD 分离配置。一个可复现方案至少要明确：引擎及 connector 版本、prefill/decode worker 启动方式、KV 格式与传输协议、拓扑与带宽、路由状态机、失败回退、独立扩缩容信号，以及端到端追踪字段。硬件型号和副本数由容量实验产生，而不是架构图预先指定。
 
 **资源隔离**：
 ```
@@ -1581,42 +1458,17 @@ python -m sglang.launch_server \
 
 ### 7.7.7 实战案例
 
-**案例 1: 单机 GPU 的 PD 分离 (示意)**
-```
-硬件: 单机 4 × A100 40GB
+这里不把假设性的硬件数量写成“案例结果”。真正的案例至少应交付以下证据包：
 
-部署:
-  GPU 0-1: Prefill Worker (2 个)
-  GPU 2-3: Decode Worker (2 个)
+| 项目 | 必须记录 |
+|------|----------|
+| 工作负载 | prompt/output 长度分布、到达过程、共享前缀与 SLO |
+| 单体基线 | 引擎版本、硬件拓扑、TTFT/TPOT/goodput/成本 |
+| 分离方案 | P/D 副本、connector、KV 字节数、链路与路由策略 |
+| 对照结果 | 相同流量下的分位数、goodput、失败率、成本与置信区间 |
+| 失败边界 | 哪类长度、并发或网络条件下收益消失 |
 
-性能:
-  吞吐量: 可能提升 (依负载而定)
-  P95 延迟: 可能改善
-```
-
-**案例 2: 跨机器的 PD 分离部署 (示意)**
-```
-硬件:
-  机器 A: 4 × H100 (Prefill)
-  机器 B: 8 × A100 (Decode)
-
-网络: InfiniBand (100 Gbps)
-
-性能:
-  吞吐量: 可能提升
-  成本: 可能降低 (取决于硬件价格与利用率)
-```
-
-**案例 3: 异构 GPU (H100 + H200) 的实践 (示意)**
-```
-硬件:
-  H100: Prefill (算力优化)
-  H200: Decode (带宽优化,大内存)
-
-性能:
-  吞吐量: 可能提升
-  支持更长序列 (取决于显存容量)
-```
+若缺少其中任一项，应称为“架构假设”或“容量实验”，不应称为生产案例。
 
 ---
 

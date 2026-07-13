@@ -105,7 +105,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the latest structural and editorial updat
 ### Appendices
 - **Appendix A: Tools and Resources** - A curated list of helpful tools
 - **Appendix B: Troubleshooting** - Common issues and solutions
-- **Appendix C: Performance Benchmarks** - Real-world numbers
+- **Appendix C: Benchmark and ROI Worksheets** - Draft teaching examples pending reproducible evidence
 
 ---
 

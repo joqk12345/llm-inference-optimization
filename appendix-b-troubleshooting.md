@@ -24,7 +24,8 @@ related:
   - "chapters-chapter04-environment-setup"
   - "chapters-chapter07-request-scheduling"
   - "chapters-chapter10-production-deployment"
-references: []
+references:
+  - "https://docs.vllm.ai/en/stable/usage/metrics/"
 status: "published"
 display_order: 14
 ---
@@ -162,15 +163,15 @@ print(f"已用: {info.used / 1024**3:.2f} GB")
 print(f"总计: {info.total / 1024**3:.2f} GB")
 ```
 
-**解决方案矩阵**:
+**候选动作矩阵**（参数存在性和允许值按目标版本核验）：
 
 | 场景 | 解决方案 | 命令示例 |
 |------|---------|----------|
-| **模型太大** | 量化 | `--quantization awq` |
-| **序列太长** | 减少max_model_len | `--max-model-len 4096` |
-| **并发太高** | 减少max_num_seqs | `--max-num-seqs 64` |
-| **KV Cache大** | KV Cache量化 | `--kv-cache-dtype fp8` |
-| **激活值大** | 减少batch size | `--max-num-batched-tokens 4096` |
+| **模型太大** | 评估兼容的量化制品或并行方案 | 质量、吞吐、加载与显存 |
+| **上下文预算过高** | 按真实长度分布调整上限 | 拒绝率、并发、TTFT |
+| **并发过高** | 扫描最大并发与 admission | 排队、抢占、尾延迟 |
+| **KV Cache大** | 评估 KV 精度或上下文策略 | 质量、TPOT、容量 |
+| **临时 buffer 峰值大** | 分解 kernel 与 batch 峰值 | OOM、吞吐、尾延迟 |
 
 ---
 
@@ -179,18 +180,12 @@ print(f"总计: {info.total / 1024**3:.2f} GB")
 **问题1: TTFT过长**
 
 ```
-症状: 首个token返回时间 > 5秒
+症状: TTFT 分位数超过该服务定义的 SLO 或健康基线
 ```
 
 **诊断**:
 
-```python
-# 使用vLLM的profiling
-VLLM_USE_TRACING=1 vllm serve meta-llama/Llama-3-8B
-
-# 查看trace
-# 找到prefill阶段,查看时间分布
-```
+先比较等待时间、prefill 执行时间、prefix cache 查询与网络时间。Tracing 的启用方式按目标版本官方文档核验；不要预设环境变量或输出路径。
 
 **解决方案**:
 
@@ -199,18 +194,15 @@ VLLM_USE_TRACING=1 vllm serve meta-llama/Llama-3-8B
 vllm serve meta-llama/Llama-3-8B \
   --enable-prefix-caching
 
-# 2. 使用Chunked Prefill
-vllm serve meta-llama/Llama-3-8B \
-  --max-model-len 32768
+# 2. 若目标版本支持，评估 chunked prefill
+# 先运行 vllm serve --help 核对参数；max-model-len 不是该功能的开关。
 
 # 3. 减少prompt长度
 # - 压缩系统提示词
 # - 移除冗余内容
 
-# 4. 使用投机采样
-vllm serve meta-llama/Llama-3-8B \
-  --speculative-model \
-  TheBloke/Llama-3-8B-Instruct-AWQ
+# 4. 若 decode 占主导，再用独立实验评估投机采样
+# draft/target 模型组合、采纳率与质量必须一起验证。
 ```
 
 ---
@@ -218,39 +210,27 @@ vllm serve meta-llama/Llama-3-8B \
 **问题2: 吞吐量低**
 
 ```
-症状: tokens/s < 1000 (Llama-3-8B, A100)
+症状: 在相同模型、硬件、精度和流量回放下，tokens/s 明显低于已验证基线
 ```
 
 **诊断**:
 
 ```bash
-# 运行benchmark
-python vllm/benchmark_serving.py \
-  --model meta-llama/Llama-3-8B \
-  --dataset-name sharegpt \
-  --num-prompts 1000
+# 使用目标版本随附的 benchmark 工具；路径和参数先查该版本文档
+vllm bench --help
 
 # 查看GPU利用率
 nvidia-smi dmon -s u
 
-# 如果GPU利用率低 → 内存或CPU瓶颈
-# 如果GPU利用率高但吞吐低 → 计算瓶颈
+# nvidia-smi 只能作为线索；瓶颈结论需要 profiler、队列和服务指标共同支持。
 ```
 
 **解决方案**:
 
 ```bash
-# 1. 增加batch size
-vllm serve meta-llama/Llama-3-8B \
-  --max-num-seqs 256
-
-# 2. 调整GPU内存利用率
-vllm serve meta-llama/Llama-3-8B \
-  --gpu-memory-utilization 0.95
-
-# 3. 启用continuous batching
-vllm serve meta-llama/Llama-3-8B \
-  --enable-chunked-context
+# 1. 对 max-num-seqs、max-num-batched-tokens 做单变量扫描
+# 2. 调整显存预算时保留 OOM 和临时 buffer 余量
+# 3. 对 chunked prefill / prefix caching 分别做 A/B，不使用未核验参数
 
 # 4. 检查CPU瓶颈
 # - 升级CPU
@@ -263,7 +243,7 @@ vllm serve meta-llama/Llama-3-8B \
 **问题3: GPU利用率低**
 
 ```
-症状: GPU利用率 < 50%,但吞吐量低
+症状: GPU 活动率低于该工作负载的健康基线，同时吞吐或 SLO 恶化
 ```
 
 **诊断**:
@@ -282,9 +262,7 @@ nsys profile -o report \
 **解决方案**:
 
 ```bash
-# 1. 增加并发请求
-vllm serve meta-llama/Llama-3-8B \
-  --max-num-seqs 512
+# 1. 先确认是否有足够请求以及等待队列；再逐步增加并发候选值
 
 # 2. 检查是否CPU瓶颈
 # - 查看CPU使用率
@@ -387,50 +365,23 @@ python -m vllm.model_conversion.convert \
 
 ### B.1.5 推理速度慢
 
-**症状**: 生成速度 < 10 tokens/s
+**症状**：在固定模型、输入/输出长度、并发和采样参数后，生成速度低于同环境基线。
 
 **诊断流程**:
 
 ```
-1. 检查GPU类型
-   - RTX 4090: ~1 TB/s带宽
-   - A100: ~2 TB/s带宽
-   - H100: ~3.35 TB/s带宽
-
-2. 检查模型大小
-   - 8B模型 → 应该>100 tok/s
-   - 70B模型 → 需要TP=4
-
-3. 检查配置
-   - max_num_seqs是否太小?
-   - gpu_memory_utilization是否太低?
-
-4. 检查瓶颈
-   - GPU利用率高 → 计算瓶颈
-   - GPU利用率低 → 内存/CPU瓶颈
+1. 固定并记录模型制品、dtype/量化、上下文、输出长度、并发与采样参数
+2. 查看等待请求、TTFT、TPOT、KV 使用率、抢占和错误
+3. 用 Nsight Systems 定位 CPU、GPU、通信和同步空洞
+4. 再用 Nsight Compute 判断主要 kernel 的计算、内存与 stall 指标
 ```
 
 **解决方案**:
 
 ```bash
-# 1. 启用优化
-vllm serve meta-llama/Llama-3-8B \
-  --enable-chunked-context \
-  --enable-prefix-caching \
-  --gpu-memory-utilization 0.95
-
-# 2. 调整配置
-vllm serve meta-llama/Llama-3-8B \
-  --max-num-seqs 256 \
-  --max-num-batched-tokens 8192
-
-# 3. 使用更快的GPU
-# - RTX 4090 → A100: 2x
-# - A100 → H100: 1.5x
-
-# 4. 使用量化
-vllm serve TheBloke/Llama-3-8B-Instruct-AWQ \
-  --quantization awq
+# 一次只改变一个候选变量，例如并发、token budget、prefix caching 或量化。
+# 每次变更都回归 TTFT、TPOT、吞吐、错误率、显存、质量与单位成本。
+# 不按 GPU 型号名称预设固定加速比。
 ```
 
 ---
@@ -445,8 +396,7 @@ vllm serve TheBloke/Llama-3-8B-Instruct-AWQ \
 # vLLM日志级别
 export VLLM_LOGGING_LEVEL=DEBUG
 
-# 启用trace
-export VLLM_USE_TRACING=1
+# tracing 的启用方式按目标版本官方文档核验，不预设环境变量。
 
 # 启动服务
 vllm serve meta-llama/Llama-3-8B
@@ -565,14 +515,16 @@ nsys-ui vllm_report.qdrep
 nsys stats vllm_report.qdrep --report csv > stats.csv
 ```
 
-**关键指标解读**:
+**关键指标解读**：这些指标没有跨模型通用的“理想值”，应与同工作负载的健康基线和业务 SLO 对比。
 
-| 指标 | 理想值 | 说明 |
-|------|--------|------|
-| **GPU利用率** | >80% | 太低表示内存或CPU瓶颈 |
-| **内存带宽利用率** | >50%峰值 | 太低表示计算瓶颈 |
-| **Occupancy** | >50% | Warp并行度 |
-| **L2 Cache命中率** | >80% | 数据局部性 |
+| 指标 | 能说明什么 | 不能单独说明什么 |
+|------|------------|------------------|
+| **GPU activity** | 采样窗口内 GPU 是否有工作 | 高就是高效、低就是 CPU 瓶颈 |
+| **内存吞吐** | kernel 的数据移动压力 | 未达峰值就一定是计算瓶颈 |
+| **Occupancy** | 可驻留 warp 比例 | occupancy 越高性能一定越好 |
+| **L2 hit rate** | 该访问模式的缓存复用 | 命中率越高端到端延迟一定越低 |
+
+vLLM 服务指标名称与弃用边界以稳定版生产指标文档为准。[CITE: vllm-production-metrics-stable]
 
 ---
 
@@ -583,11 +535,9 @@ nsys stats vllm_report.qdrep --report csv > stats.csv
 ```
 问题: 推理慢
 │
-├─ Step 1: 检查GPU利用率
-│  ├─ >80% → 计算瓶颈
-│  │   ├─ 升级GPU
-│  │   └─ 使用量化
-│  └─ <80% → 内存/CPU瓶颈
+├─ Step 1: 检查服务指标与GPU时间线
+│  ├─ 有持续等待队列 → 做容量与调度分析
+│  └─ 无等待但GPU有空洞 → 检查流量、CPU、同步、通信
 │      │
 │      ├─ Step 2: 检查显存使用
 │      │  ├─ 接近上限 → 内存受限
@@ -603,30 +553,7 @@ nsys stats vllm_report.qdrep --report csv > stats.csv
    └─ Nsight Compute
 ```
 
-**实战案例**:
-
-```bash
-# 问题: Llama-3-8B吞吐量只有500 tok/s
-
-# Step 1: 检查GPU利用率
-nvidia-smi
-# GPU-Util: 45% → 不是计算瓶颈
-
-# Step 2: 检查显存使用
-nvidia-smi
-# Memory-Usage: 18000MiB / 24000MiB → 接近上限
-
-# Step 3: 减少batch size
-vllm serve meta-llama/Llama-3-8B \
-  --max-num-seqs 64  # 从256降到64
-
-# Step 4: 验证效果
-python benchmark_serving.py \
-  --model meta-llama/Llama-3-8B \
-  --num-prompts 1000
-
-# 结果: 吞吐量提升到1200 tok/s ✅
-```
+**排障记录模板**：记录问题时间窗、版本和制品、负载分布、服务指标、GPU/CPU 时间线、唯一变量、变更前后结果及回滚条件。没有这些信息的“500 → 1200 tok/s”不能视为可复用案例。
 
 ---
 
@@ -880,4 +807,4 @@ diagnose_bottleneck()
 
 ---
 
-**有问题?查看 [附录C: 性能基准测试与ROI案例](appendix-c-benchmarks-roi.md)**
+**需要设计压测时，可参考 [附录C: 基准测试与ROI教学算例（待验证）](appendix-c-benchmarks-roi.md) 中的字段模板；不要把其中数字当作性能基线。**

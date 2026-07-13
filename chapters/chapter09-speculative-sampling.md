@@ -10,7 +10,7 @@ concepts:
   - "speculative-decoding"
   - "latency-budget"
 tools:
-  - "vLLM"
+  - "vllm"
   - "sglang"
 architecture_layer:
   - "optimization-techniques"
@@ -24,7 +24,10 @@ related:
   - "chapters-chapter08-quantization"
   - "chapters-chapter11-advanced-topics"
   - "docs-cases-dflash-block-diffusion-analysis"
-references: []
+references:
+  - "https://arxiv.org/abs/2211.17192"
+  - "https://arxiv.org/abs/2402.02057"
+  - "https://arxiv.org/abs/2401.15077"
 status: "published"
 display_order: 10
 ---
@@ -361,6 +364,7 @@ def verify_draft(main_model, prompt, draft_tokens):
 ### 9.3.1 Speculative Decoding
 
 **原始投机采样方法**：
+[CITE: speculative-decoding-icml-2023]
 ```
 核心特点:
   - 使用小模型或量化模型作为草稿
@@ -403,33 +407,9 @@ def verify_draft(main_model, prompt, draft_tokens):
 
 ### 9.3.3 Lookahead Decoding
 
-**前瞻解码**：
-```
-核心特点:
-  - 使用多个小草稿模型
-  - 每个草稿模型"预测"不同长度的 tokens
-  - 选择最长的正确序列
+Lookahead Decoding 不是“同时运行多个小草稿模型”。原始工作提出一种不需要辅助模型或外部 datastore 的精确并行解码方法，通过并行生成和验证 n-gram 候选来用额外的并行计算换取更少的串行 decode 步骤。[CITE: lookahead-decoding-2024]
 
-示例:
-  草稿模型 1: 预测 4 tokens
-  草稿模型 2: 预测 8 tokens
-  草稿模型 3: 预测 12 tokens
-
-  验证结果:
-    草稿 1: 4/4 正确 
-    草稿 2: 6/8 正确 
-    草稿 3: 10/12 正确 
-
-  接受: 草稿 1 的 4 tokens
-  最远验证: 草稿 3 的前 10 个 tokens
-```
-
-**优势**：
-```
-多个草稿模型提高接受率
-自适应 speculation 长度
-计算复杂度高
-```
+它与经典 speculative decoding 的主要区别不是“草稿长度更多”，而是候选产生机制不同。是否有净收益仍取决于并行硬件、候选命中、序列形态与实现开销。
 
 ---
 
@@ -455,11 +435,7 @@ def verify_draft(main_model, prompt, draft_tokens):
 - 只看平均 TPS 容易误判；有些实现吞吐上升但尾延迟变差
 - 验证开销的实现差异很大（kernel、batch、mask 处理都会影响）
 
-**Eagle 系列演进（示例口径）**：
-
-- **Eagle（早期）**：基础投机采样草稿训练，往往是固定 spec_len、单层草稿为主
-- **Eagle 2（改进）**：更重视接受率与回退控制，可能引入更强的训练/蒸馏策略
-- **Eagle 3（更工程化）**：更强调在推理框架里稳定集成与可观测性（但仍以你的压测结果为准）
+**当前证据边界**：初代 EAGLE 论文提出的是特征层自回归 drafter，并通过提前一位的 token 预测处理特征不确定性。[CITE: eagle-2024] 在 EAGLE-2、EAGLE-3 的原始论文或官方技术报告分别进入证据账本之前，本章不再用“更强训练”“更工程化”等模糊标签描述版本演进。
 
 ---
 

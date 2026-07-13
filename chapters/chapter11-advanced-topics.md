@@ -12,7 +12,7 @@ concepts:
   - "moe-inference"
   - "multimodal-inference"
 tools:
-  - "vLLM"
+  - "vllm"
   - "triton"
   - "torch-compile"
 architecture_layer:
@@ -919,19 +919,14 @@ expert_call_counts = {
 # Token需要路由到不同的GPU
 # All-to-All通信开销大
 
-communication_cost = O(num_tokens * num_gpus * num_experts)
+communication_volume ≈ routed_tokens × hidden_state_bytes × dispatch_and_combine
 ```
 
-**挑战3: KV Cache管理**
+实际通信量与 top-k、token 数、hidden size、并行布局和实现有关，并不是简单乘上 GPU 数与专家总数。更关键的指标是 All-to-All 在关键路径中的时间占比、链路带宽利用率、负载偏斜与尾延迟。
 
-```python
-# 不同专家的KV Cache不同
-# 如何共享和复用?
+**挑战3: Attention 状态与 MoE 执行的共同容量压力**
 
-# Token A: 使用Expert 1, 3
-# Token B: 使用Expert 2, 4
-# KV Cache无法直接复用!
-```
+常规 Transformer MoE 通常把专家放在 FFN 子层；KV Cache 属于 Attention 子层，不会因为 token 被路由到不同 FFN 专家就变成“专家专属 KV”。MoE 的总参数驻留、通信缓冲和 Attention KV 会共同争用显存，但应分别建模。若模型引入专家化 Attention 或其他特殊状态，再按该架构单独讨论，不能把它泛化为所有 MoE 的性质。
 
 ### 11.3.3 专家路由优化
 
@@ -963,27 +958,7 @@ class LoadBalancedGate:
         return top_k_experts
 ```
 
-**专家亲和性**(Expert Affinity):
-
-```python
-# 将相关的token路由到相同的专家
-# 提升KV Cache复用率
-
-def expert_affinity_routing(tokens: List[Token]):
-    """基于token相似度的路由"""
-
-    # 计算token embedding
-    embeddings = [get_embedding(t) for t in tokens]
-
-    # 聚类相似的token
-    clusters = cluster_embeddings(embeddings)
-
-    # 同一cluster的token使用相同的专家
-    for cluster_id, token_ids in clusters.items():
-        expert_id = assign_expert(cluster_id)
-        for token_id in token_ids:
-            route_token(token_id, expert_id)
-```
+**路由优化的边界**：服务系统可以优化 token dispatch、专家放置、复制热点专家以及通信—计算重叠，但不能在不重新训练或验证模型的情况下，按语义聚类任意改写模型 gate 的路由结果。路由策略属于模型语义的一部分；系统优化必须保持输出等价，或明确承担质量变化并做任务级回归。
 
 ### 11.3.4 Checkpoint管理
 

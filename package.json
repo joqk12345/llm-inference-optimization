@@ -11,7 +11,8 @@
     "knowledge:generate": "node scripts/generate-summary.js && node scripts/generate-path.js && node scripts/generate-architecture.js && node scripts/generate-references.js && npm run knowledge:vite-nav",
     "knowledge:vite-nav": "node scripts/generate-vitepress-nav.js",
     "knowledge:lint": "node scripts/lint-structure.js",
-    "knowledge:build": "npm run knowledge:ingest && npm run knowledge:sync-summary && npm run knowledge:graph && npm run knowledge:generate && npm run knowledge:lint"
+    "knowledge:lint-citations": "node scripts/lint-citations.js",
+    "knowledge:build": "npm run knowledge:ingest && npm run knowledge:sync-summary && npm run knowledge:graph && npm run knowledge:generate && npm run knowledge:lint && npm run knowledge:lint-citations"
   },
   "devDependencies": {
     "vitepress": "^1.6.3"

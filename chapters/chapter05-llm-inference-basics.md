@@ -11,7 +11,7 @@ concepts:
   - "paged-attention"
   - "continuous-batching"
 tools:
-  - "vLLM"
+  - "vllm"
 architecture_layer:
   - "inference-mechanics"
 learning_stage: "foundations"
@@ -22,7 +22,10 @@ optimization_axes:
 related:
   - "chapters-chapter06-kv-cache-optimization"
   - "chapters-chapter07-request-scheduling"
-references: []
+references:
+  - "https://arxiv.org/abs/2309.06180"
+  - "https://aclanthology.org/2023.emnlp-main.298/"
+  - "https://docs.vllm.ai/en/stable/usage/metrics/"
 status: "published"
 display_order: 6
 ---
@@ -119,33 +122,29 @@ display_order: 6
 推理工作负载 (Decode):
 - Forward pass: O(n·d) 计算 (每步只计算1个token)
 - 内存访问: 频繁加载KV Cache和模型权重
-- GPU: 内存带宽瓶颈
+- GPU: 常见为内存带宽或访存延迟瓶颈，但需要按实际 kernel 验证
 ```
 
 ### 5.1.3 为什么优化推理更关键
 
-商业现实:
+商业现实不是一组可以跨公司复用的固定数字，而是一条持续发生的成本流。下面给出计算框架：
 
 ```
-训练成本: 一次性投入
-- GPT-3训练: 约$4.6M
-- LLaMA-2训练: 约$2-3M
+月推理成本
+= 实例单价 × 实例数量 × 运行小时
++ 网络、存储、CPU 与运维成本
 
-推理成本: 持续运营
-- 每天处理1M请求
-- 每请求平均1000 tokens
-- 每token成本: $0.0001
-- 每月成本: $3M
+单位输出成本
+= 月推理总成本 / 实际交付的输出 token 数
 ```
 
-优化推理的收益:
+如果一次优化把同一 SLO 和质量约束下的单卡有效吞吐从 `Q_before` 提高到 `Q_after`，理论容量需求比例为：
 
 ```
-优化前: 每GPU处理10 req/s
-优化后: 每GPU处理30 req/s (3x提升)
-→ GPU需求减少 67%
-→ 成本降低 67%
+容量需求比例 = Q_before / Q_after
 ```
+
+这只是容量上界。真实成本还取决于流量峰谷、最小副本、高可用冗余、计费粒度和尾延迟；吞吐提高 3 倍并不自动等于账单下降 67%。
 
 ---
 
@@ -321,52 +320,54 @@ Decode 阶段:
 - 调度开销: 队列等待、调度器决策、KV Cache 管理
 ```
 
-**典型分布（Llama-2-7B, A100-80GB, 512 input / 128 output）**：
+**延迟分解记录模板**：
 
-| 阶段 | 耗时 | 占比 | 瓶颈类型 | 优化方向 |
-|------|------|------|----------|----------|
-| TTFT | 120ms | 50% | Compute-bound | 更快的 kernel、FP8、Chunked Prefill |
-| TPOT (×128) | 80ms | 33% | Memory-bound | KV Cache、量化、PagedAttention |
-| 网络开销 | 20ms | 8% | Network | gRPC 优化、连接复用 |
-| 调度开销 | 20ms | 8% | CPU | 连续批处理、减少锁竞争 |
+| 阶段 | 测量值 | 证据 | 候选优化 |
+|------|--------|------|----------|
+| 排队 + TTFT | P50/P95/P99 | 服务 histogram + trace | admission、prefill、缓存、路由 |
+| TPOT / ITL | P50/P95/P99 | 服务 histogram + token timeline | KV、kernel、batch、量化 |
+| 网络与序列化 | 客户端和服务端时间戳 | 分布式追踪 | 连接复用、协议与 payload |
+| 调度与 CPU | iteration 时间线 | profiler / trace | 调度流水线、采样与 launch |
 
 **不同场景下的瓶颈迁移**：
 
-| 场景特征 | TTFT 占比 | TPOT 占比 | 瓶颈判断 |
-|----------|-----------|-----------|----------|
-| 短 prompt (< 256 tokens) | 30% | 50% | TPOT 主导 |
-| 长 prompt (> 2K tokens) | 70% | 20% | TTFT 主导 |
-| 长输出 (> 512 tokens) | 15% | 75% | TPOT 主导 |
-| 高并发 (> 32 concurrent) | 变化大 | 变化大 | 调度开销上升 |
-| 显存接近上限 | 可能增加 | 可能增加 | 碎片化导致抖动 |
+| 场景特征 | 优先检查 | 不能直接推出 |
+|----------|----------|--------------|
+| prompt 相对较长 | prefill 执行、队列和 prefix 命中 | TTFT 一定由算力主导 |
+| 输出相对较长 | TPOT 随 batch、上下文增长的曲线 | decode 一定只受带宽限制 |
+| 高并发 | 排队、抢占、KV 使用率和尾延迟 | GPU 利用率高就代表系统健康 |
+| 显存接近容量边界 | OOM、抢占、重算和临时 buffer | 问题一定来自碎片化 |
 
 **实战诊断方法**：
 
 ```bash
 # 1. 监控 TTFT vs TPOT 分布
-# vLLM 默认暴露以下指标：
-# - vLLM:prompt_tokens_total
-# - vLLM:generation_tokens_total
-# - vLLM:request_latency_seconds (包含 TTFT + generation)
+# 当前稳定文档中的代表性指标：
+# - vllm:time_to_first_token_seconds
+# - vllm:request_time_per_output_token_seconds
+# - vllm:num_requests_waiting
+# - vllm:kv_cache_usage_perc
+# 指标名会随弃用策略演进，升级前检查目标版本 /metrics。
 
 # 2. 判断瓶颈类型
-# 如果 TTFT 占比 > 60% → 优先优化 prefill
-# 如果 TPOT 占比 > 60% → 优先优化 decode/内存
+# 把主要延迟贡献与业务 SLO 对齐，再选择优化对象。
 
 # 3. 使用 nsight systems 做深度分析
 nsys profile -o inference_trace ./run_inference.py
 # 查看 GPU 时间线，确认是计算还是内存等待
 ```
 
-**优化收益预估表**：
+上述指标口径以 vLLM 稳定版生产指标文档为边界。[CITE: vllm-production-metrics-stable]
 
-| 优化手段 | 预期 TTFT 改善 | 预期 TPOT 改善 | 适用场景 |
-|----------|---------------|---------------|----------|
-| FP8 量化 | +20% | +30% | 显存紧张、带宽瓶颈 |
-| PagedAttention | +5% | +15% | 长序列、多请求 |
-| Chunked Prefill | +30% | -5% | 长 prompt 场景 |
-| 连续批处理 | +10% | +20% | 高并发场景 |
-| PD 分离 | +40% | +25% | 混合负载、对延迟敏感 |
+**优化实验矩阵**：
+
+| 优化手段 | 机制假设 | 同时观察 | 主要风险 |
+|----------|----------|----------|----------|
+| 权重/KV 量化 | 减少容量或数据移动 | 质量、TTFT、TPOT、显存 | 反量化开销与质量回归 |
+| PagedAttention | 降低外部碎片与分配浪费 | 并发、KV 使用率、尾延迟 | block 元数据与调度开销 |
+| Chunked Prefill | 控制长 prefill 对 decode 的干扰 | TTFT、TPOT、公平性 | prefill 完成更晚 |
+| 连续批处理 | 提高 iteration 中的有效工作量 | 吞吐、排队、尾延迟 | 高负载下排队扩大 |
+| PD 分离 | 隔离阶段并独立扩缩容 | goodput、KV 传输、成本 | 网络和运维复杂度 |
 
 > **关键洞察**：优化必须"对症下药"。如果瓶颈在 TTFT，却花时间优化 TPOT，往往事倍功半。
 
@@ -528,10 +529,10 @@ attn_weights @ V:
 # Attention Mask
 # shape: [seq_len, seq_len]
 mask = torch.tensor([
-    [True,  True,  True,  True],  # Token 0 可以 attend to 0,1,2,3
-    [False, True,  True,  True],  # Token 1 可以 attend to 1,2,3
-    [False, False, True,  True],  # Token 2 可以 attend to 2,3
-    [False, False, False, True],  # Token 3 只能 attend to 3
+    [True,  False, False, False],  # Token 0 只能 attend to 0
+    [True,  True,  False, False],  # Token 1 可以 attend to 0,1
+    [True,  True,  True,  False],  # Token 2 可以 attend to 0,1,2
+    [True,  True,  True,  True],   # Token 3 可以 attend to 0,1,2,3
 ])
 ```
 
@@ -748,42 +749,25 @@ Decode 阶段 - 第 2 步:
 
 ---
 
-### 5.4.4 计算复杂度降低: 从 O(n²) 到 O(n)
+### 5.4.4 计算量如何变化：区分 prompt 与生成长度
 
-无 KV Cache:
-```
-每个 token: O(n²)
-总复杂度: O(n³)
-```
+不能只用一个 `n` 同时表示输入长度和生成长度。设 prompt 长度为 `P`，随后生成 `T` 个 token，并暂时忽略层数、head 数和隐藏维度等共同因子。
 
-有 KV Cache:
-```
-第 1 个 token (Prefill): O(n²)
-第 2 个 token (Decode): O(n)  (只计算新 token)
-第 3 个 token (Decode): O(n)
-...
-第 n 个 token (Decode): O(n)
+**不使用 KV Cache** 时，第 `t` 个生成步骤需要把长度约为 `P+t` 的整段序列重新送入模型，既重复计算旧 token 的投影，也重复执行旧位置之间的 Attention：
 
-总复杂度: O(n²) + (n-1) × O(n) = O(n²)
-平均复杂度: O(n)
+```text
+总计算量 ≈ Σ(t=1..T) O((P+t)²)
 ```
 
-加速效果: 序列越长,加速越明显
+**使用 KV Cache** 时，prompt 只做一次 prefill；每个 decode 步骤只为新 token 计算 Q/K/V，并让新 query 读取已有的 K/V：
 
+```text
+Prefill ≈ O(P²)
+Decode  ≈ Σ(t=1..T) O(P+t)
+总计算量 ≈ O(P² + TP + T²)
 ```
-序列长度 n = 10:
-- 无 KV Cache: 10³ = 1000 次运算
-- 有 KV Cache: 10² + 9×10 = 190 次运算
-- 加速比: 1000/190 = 5.26x
 
-序列长度 n = 100:
-- 无 KV Cache: 100³ = 1,000,000 次运算
-- 有 KV Cache: 100² + 99×100 = 19,900 次运算
-- 加速比: 1,000,000/19,900 = 50.25x
-
-序列长度 n = 1000:
-- 加速比: ~500x!
-```
+因此，KV Cache 消除的是跨 decode 步骤对历史 token 的重复计算；它不会把 Attention 本身变成常数复杂度，也不会自动给出某个固定加速倍数。实际收益还取决于模型结构、`P/T` 比例、batch、显存带宽、kernel 实现与调度开销，应通过端到端基准测试确认。
 
 ---
 
@@ -843,18 +827,18 @@ Multi-Query Attention (MQA):
 MQA:
 - 所有heads共享一组K、V
 - 32 heads → 1组K、V
-- 内存减少: 32x!
+- 仅按 KV 元素数量计算，约为对应 MHA 的 1/32
 - 代价: 模型质量可能下降
 ```
 
-Grouped-Query Attention (GQA) - LLaMA-2使用:
+Grouped-Query Attention (GQA) - 现代模型中的常见折中:
 
 ```
 折中方案:
 - 32 heads分成8组
 - 每组(4个heads)共享一组K、V
-- 内存减少: 4x
-- 质量: 接近MHA
+- 仅按 KV 元素数量计算，约为对应 MHA 的 1/4
+- 质量: 需要在模型训练与下游任务中验证
 ```
 
 Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
@@ -872,7 +856,7 @@ Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
 | 变体 | K、V数量 | 内存占用 | 模型质量 | 使用场景 |
 |------|---------|---------|---------|---------|
 | MHA | H组 | 基准 | 最佳 | 推理不受限 |
-| GQA | H/G组 | 减少G倍 | 接近MHA | 平衡性能与质量 |
+| GQA | 可配置 KV heads | 按 KV head 比例减少 | 任务相关 | 平衡容量与质量 |
 | MQA | 1组 | 减少H倍 | 可能下降 | 内存极度受限 |
 | MLA | 1组latent | 最小 | 有竞争力 | 超大模型 |
 
@@ -885,6 +869,8 @@ Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
 - 典型收益：在不改写整体 attention 机制的前提下，直接降低 KV Cache 占用
 
 这类方法最像“给每个 token 减肥”。token 数量没有变，但每个 token 背后的 K/V 存储成本下降了。
+
+这里的比例只描述理论 KV 元素数量，不包含元数据、block 舍入和 kernel 效率；GQA 的质量结论也必须限定在具体训练与评测设置中。[CITE: gqa-emnlp-2023]
 
 **第二类：线性化路线**
 
@@ -920,22 +906,16 @@ Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
 
 ### 5.5.1 内存碎片化: 隐形的性能杀手
 
-场景: 在A100 40GB上运行LLaMA-2-13B
+下面用一个符号化例子区分“预留浪费”和“外部碎片”，不把它包装成某张 GPU 的实测结果。
 
 ```
-内存分配:
-- 模型权重: ~26 GB (固定)
-- KV Cache可用: ~12 GB
-
-单个请求的KV Cache (FP16):
-- 每token: 0.78 MB
-- 2048 token窗口: 1.56 GB
-- 理论并发: 12 / 1.56 = 7个请求
+假设:
+- 每个请求按最大长度预留 L_max 个 slots
+- 三个请求实际分别使用 100、200、300 个 slots
+- 为便于演示，令 L_max = 2048
 ```
 
-问题: 实际只能运行2-3个请求!
-
-原因: 内存碎片化浪费了60-80%的KV Cache内存
+这个例子只说明预分配可能造成内部浪费，不代表真实系统固定浪费某个百分比。PagedAttention 论文报告了其测试条件下的结果，迁移到其他模型与流量时必须重新测量。[CITE: pagedattention-sosp-2023]
 
 ### 5.5.2 内部碎片化 (Internal Fragmentation)
 
@@ -963,7 +943,7 @@ Request C: 预分配2048 slots, 实际使用300
 
 已分配内存: 3 × 2048 = 6144 slots
 实际使用: 100 + 200 + 300 = 600 slots
-浪费: (6144 - 600) / 6144 = 90%!
+本例预留但未使用的比例: (6144 - 600) / 6144 ≈ 90%
 ```
 
 ### 5.5.3 外部碎片化 (External Fragmentation)
@@ -1468,13 +1448,12 @@ Llama-2-7B 的配置:
 关键要点：
 - 训练vs推理: 训练是计算密集型,推理是内存带宽密集型
 - LLM 推理分为 Prefill (计算密集) 和 Decode (带宽密集) 两个阶段
-- Attention 是唯一让 token 交互的操作,复杂度为 O(n²)
-- KV Cache 通过缓存历史 token 的 K、V,将复杂度降到 O(n)
-- 内存碎片化: 传统KV Cache管理的60-80%内存浪费问题
+- 在标准 Transformer block 中，self-attention 负责跨 token 聚合；完整序列 Attention 的计算复杂度随序列长度二次增长
+- KV Cache 缓存历史 token 的 K、V，使单个 decode 步骤只为新 token 计算投影，并读取随上下文线性增长的历史状态
+- 传统连续 KV 分配会产生预留浪费、内部/外部碎片与复制开销，具体比例依工作负载而变
 - PagedAttention 借鉴操作系统虚拟内存技术,将 KV Cache 分块管理
-- PagedAttention 通过按需分配 blocks 解决内部碎片
-- PagedAttention 通过固定大小的 blocks 重用缓解外部碎片
-- PagedAttention 支持相同前缀请求共享物理 blocks
+- PagedAttention 通过按需分配固定大小 blocks 限制预留浪费并缓解碎片
+- 论文中的 vLLM 设计支持在序列内部及请求之间灵活共享 KV blocks [CITE: pagedattention-sosp-2023]
 - Chunked Prefill 允许处理超长 prompt,避免显存溢出
 - Continuous Batching 通过去除 padding 和动态调度,大幅提升 GPU 利用率
 - vLLM 的三层架构 (接口层、引擎/策略层、运行时层) 提供了清晰的抽象

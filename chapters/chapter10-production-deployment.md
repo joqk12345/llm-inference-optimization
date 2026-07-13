@@ -29,7 +29,8 @@ related:
   - "appendix-c-benchmarks-roi"
   - "docs-cases-vllm-mooncake-store-agentic-serving"
   - "docs-cases-projectdiscovery-prompt-caching-agent-cost"
-references: []
+references:
+  - "https://docs.vllm.ai/en/stable/usage/metrics/"
 status: "published"
 display_order: 11
 ---
@@ -190,7 +191,7 @@ DeepSeek-V4 在昇腾/CANN 体系里的 Day-0 适配就是这个判断的现实�
 
 ```bash
 # 单机部署示例
-vLLM serve meta-llama/Llama-3.1-8B \
+vllm serve meta-llama/Llama-3.1-8B \
   --tensor-parallel-size 1 \
   --gpu-memory-utilization 0.9 \
   --max-model-len 8192 \
@@ -233,7 +234,7 @@ ray start --head --port=6379
 ray start --address=<head-node-ip>:6379
 
 # 启动vLLM服务(自动分布式)
-vLLM serve meta-llama/Llama-3.1-70B \
+vllm serve meta-llama/Llama-3.1-70B \
   --tensor-parallel-size 4 \
   --pipeline-parallel-size 2 \
   --distributed-executor-backend ray
@@ -613,11 +614,12 @@ df -h                      # 磁盘使用
 
 **vLLM内置Prometheus支持**：
 
+当前稳定版文档中，OpenAI-compatible server 直接在服务端口的 `/metrics` 暴露指标；指标名受弃用策略约束，生产配置必须锁定版本并在升级时做 dashboard 回归。[CITE: vllm-production-metrics-stable]
+
 ```bash
-# 启动vLLM时启用metrics
-vLLM serve meta-llama/Llama-3.1-8B \
-  --metrics-port 8000 \
-  --enable-prometheus
+# 启动服务；在同一服务端口采集 /metrics
+vllm serve MODEL
+curl http://localhost:8000/metrics
 ```
 
 **Prometheus配置**：
@@ -628,65 +630,30 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'vLLM'
+  - job_name: 'vllm'
     static_configs:
-      - targets: ['vLLM-service:8000']
+      - targets: ['vllm-service:8000']
     metrics_path: /metrics
-```
-
-**Grafana仪表盘JSON片段**：
-
-```json
-{
-  "dashboard": {
-    "title": "vLLM Performance Dashboard",
-    "panels": [
-      {
-        "title": "TTFT (P95)",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(vLLM:ttft_seconds_bucket[5m]))"
-          }
-        ]
-      },
-      {
-        "title": "GPU Utilization",
-        "targets": [
-          {
-            "expr": "nvidia_gpu_utilization"
-          }
-        ]
-      },
-      {
-        "title": "Tokens per Second",
-        "targets": [
-          {
-            "expr": "rate(vLLM:tokens_total[5m])"
-          }
-        ]
-      }
-    ]
-  }
-}
 ```
 
 **关键PromQL查询**：
 
 ```promql
 # TTFT P95
-histogram_quantile(0.95, rate(vLLM_ttft_seconds_bucket[5m]))
+histogram_quantile(0.95, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket[5m])))
 
-# 吞吐量
-rate(vLLM_tokens_total[5m])
+# 输出 token 吞吐量
+sum(rate(vllm:generation_tokens[5m]))
 
-# GPU利用率
-nvidia_gpu_utilization
+# 等待与运行中的请求数
+sum(vllm:num_requests_waiting)
+sum(vllm:num_requests_running)
 
-# 请求错误率
-rate(vLLM_requests_failed_total[5m]) / rate(vLLM_requests_total[5m])
+# KV Cache 使用比例
+max(vllm:kv_cache_usage_perc)
 
-# KV Cache命中率
-vLLM_kv_cache_hit_rate
+# 请求结果按 finished_reason 分组；标签名称应先在目标版本 /metrics 中核验
+sum by (finished_reason) (increase(vllm:request_success[5m]))
 ```
 
 ### 10.4.3 日志收集与分析
@@ -888,104 +855,42 @@ GPU利用率偏低?
 
 ### 10.5.3 常见性能问题
 
-**问题1: TTFT过长**
+| 症状 | 先验证 | 候选动作 | 回归指标 |
+|------|--------|----------|----------|
+| TTFT 过长 | prefill、排队、缓存查询分别耗时；prompt 分布 | 验证 prefix caching 或 chunked prefill；精简稳定前缀 | TTFT 分位数、TPOT、缓存命中 token、质量 |
+| 吞吐偏低 | GPU 时间线、等待队列、batch/token budget、CPU 开销 | 逐项扫描并发与 token budget；处理 CPU 或通信瓶颈 | 输出 tokens/s、尾延迟、失败率、成本 |
+| OOM | 权重、KV、临时 buffer 与碎片峰值 | 降低上下文/并发；评估权重或 KV 量化 | 峰值显存、拒绝率、质量、TPOT |
 
-```yaml
-症状: 首个token返回时间偏高
-
-原因:
-  - KV Cache未命中
-  - Prompt太长
-  - 内存带宽不足
-
-解决方案:
-  # 1. 启用Prefix Caching
-  vLLM serve ... --enable-prefix-caching
-
-  # 2. 使用Chunked Prefill
-  vLLM serve ... --max-model-len 32768
-
-  # 3. 优化prompt
-  - 移除冗余内容
-  - 压缩系统提示词
-```
-
-**问题2: 吞吐量低**
-
-```yaml
-症状: tokens/s 明显低于预期
-
-原因:
-  - Batch size太小
-  - GPU利用率低
-  - 频繁的OOM
-
-解决方案:
-  # 1. 增加batch size
-  vLLM serve ... --max-num-seqs 256
-
-  # 2. 调整GPU内存利用率
-  vLLM serve ... --gpu-memory-utilization 0.95
-
-  # 3. 启用continuous batching
-  vLLM serve ... --enable-chunked-context
-```
-
-**问题3: OOM频繁**
-
-```yaml
-症状: CUDA out of memory错误
-
-原因:
-  - max_model_len太大
-  - KV Cache占用过多
-  - 批次大小过大
-
-解决方案:
-  # 1. 减少max_model_len
-  vLLM serve ... --max-model-len 4096
-
-  # 2. KV Cache量化
-  vLLM serve ... --kv-cache-dtype fp8
-
-  # 3. 减少并发请求数
-  vLLM serve ... --max-num-batched-tokens 8192
-```
+这里不把 `--max-model-len` 当成 chunked prefill 开关，也不提供未经版本核验的参数名。先用目标版本的 `vllm serve --help` 确认能力，再一次只改变一个变量。
 
 ### 10.5.4 调优参数参考(示例)
 
-| 参数 | 默认值 | 推荐范围 | 说明 |
-|------|--------|---------|------|
-| **gpu-memory-utilization** | 0.9 | 0.85-0.95 | 过高可能导致OOM |
-| **max-num-seqs** | 256 | 64-512 | 并发请求数 |
-| **max-model-len** | 模型max | 2048-8192 | 根据实际需求 |
-| **dtype** | auto | half/bf16 | FP16/BF16 |
-| **kv-cache-dtype** | auto | fp8/int8 | KV缓存量化 |
+| 参数 | 决定依据 | 主要观察指标 | 风险 |
+|------|----------|--------------|------|
+| **gpu-memory-utilization** | 权重、KV、峰值临时缓冲与碎片余量 | OOM、KV 使用率、可承载并发 | 设得过高会失去安全余量 |
+| **max-num-seqs** | 并发分布与每请求 KV 增长 | 吞吐、排队、P95/P99 | 过大可能引发抢占和尾延迟抖动 |
+| **max-model-len** | 真实上下文分布与产品上限 | 显存、TTFT、拒绝率 | 盲目取模型上限会压缩并发空间 |
+| **dtype** | 模型制品、硬件支持与质量回归 | 质量、吞吐、显存 | 不同硬件的 kernel 支持不同 |
+| **kv-cache-dtype** | 长上下文容量与任务质量要求 | KV 容量、TPOT、任务质量 | 量化元数据和反量化可能抵消收益 |
 
-### 10.5.4.1 vLLM 生产配置完整示例
+### 10.5.4.1 vLLM 配置骨架（版本敏感）
 
-> **使用场景**：高并发在线服务，对延迟和稳定性有较高要求
+> **定位**：下面只展示配置应覆盖哪些维度，不是可直接复制的“生产推荐值”。发布前应固定镜像 digest，并根据模型制品、GPU 架构、vLLM 版本和真实流量重新核对参数。
 
 #### 启动命令
 
 ```bash
-# 基础配置
-vLLM serve meta-llama/Llama-3.1-8B-Instruct \
+# 示例骨架：只保留与模型格式无关的基础参数
+vllm serve meta-llama/Llama-3.1-8B-Instruct \
   --tensor-parallel-size 1 \
   --gpu-memory-utilization 0.90 \
   --max-num-seqs 256 \
   --max-num-batched-tokens 8192 \
   --max-model-len 8192 \
-  --dtype half \
-  --enforce-eager \
-  --enable-prefix-caching \
-  --quantization fp8 \
-  --kv-cache-dtype fp8
+  --dtype auto
 
-# 生产环境推荐配置
-# --enforce-eager: 禁用 CUDA graph，减少首次调用延迟波动
-# --enable-prefix-caching: 启用前缀缓存，重复 prompt 场景收益大
-# --quantization fp8: 启用 FP8 量化，平衡性能与质量
+# Prefix caching、CUDA graph/eager、权重与 KV 精度都应分别做 A/B。
+# 不要假设任意 FP16/BF16 模型都能仅靠一个参数安全切换到 FP8。
 ```
 
 #### 完整 docker-compose.yml 示例
@@ -995,16 +900,16 @@ version: '3.8'
 
 services:
   vLLM:
-    image: vLLM/vLLM:latest
-    container_name: vLLM-production
+    # 示例占位符；生产环境应替换为已验证的版本或镜像 digest。
+    image: vllm/vllm-openai:<pin-version>
+    container_name: vllm-production
     ports:
       - "8000:8000"
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - VLLM_WORKER_MULTIPROC_MODULE=vLLM.worker.multiprocessing.main
     volumes:
       - ./models:/models
-      - vLLM-data:/root/.cache/vLLM
+      - vllm-data:/root/.cache/huggingface
     deploy:
       resources:
         reservations:
@@ -1013,7 +918,7 @@ services:
               count: 1
               capabilities: [gpu]
     command: >
-      vLLM serve /models/meta-llama/Llama-3.1-8B-Instruct
+      vllm serve /models/meta-llama/Llama-3.1-8B-Instruct
       --host 0.0.0.0
       --port 8000
       --tensor-parallel-size 1
@@ -1021,13 +926,7 @@ services:
       --max-num-seqs 256
       --max-num-batched-tokens 8192
       --max-model-len 8192
-      --dtype half
-      --enforce-eager
-      --enable-prefix-caching
-      --quantization fp8
-      --kv-cache-dtype fp8
-      --api-key token-xxx
-      --trust-remote-code
+      --dtype auto
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
       interval: 30s
@@ -1037,7 +936,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  vLLM-data:
+  vllm-data:
 ```
 
 #### Prometheus 监控配置
@@ -1045,65 +944,47 @@ volumes:
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: 'vLLM'
+  - job_name: 'vllm'
     static_configs:
-      - targets: ['vLLM:8000']
+      - targets: ['vllm:8000']
     metrics_path: '/metrics'
 ```
 
 **关键监控指标**：
 
-| 指标名 | 类型 | 说明 | 告警阈值 |
-|--------|------|------|----------|
-| `vLLM:prompt_tokens_total` | Counter | 总输入 token 数 | - |
-| `vLLM:generation_tokens_total` | Counter | 总输出 token 数 | - |
-| `vLLM:request_latency_seconds` | Histogram | 请求延迟 | P99 > 5s |
-| `vLLM:block_manager_used_blocks` | Gauge | 使用中的 KV block | > 90% 容量 |
-| `vLLM:block_manager_free_blocks` | Gauge | 空闲 KV block | < 10% 容量 |
-| `vLLM:gpu_memory_used_bytes` | Gauge | GPU 显存使用 | > 95% |
-| `vLLM:prefix_cache_hit_rate` | Gauge | 前缀缓存命中率 | < 30% (若适用) |
+| 指标名 | 类型 | 说明 | 如何形成告警 |
+|--------|------|------|--------------|
+| `vllm:prompt_tokens` | Counter | 输入 token 数 | 用 `rate()` 形成输入吞吐基线 |
+| `vllm:generation_tokens` | Counter | 输出 token 数 | 用 `rate()` 形成输出吞吐基线 |
+| `vllm:time_to_first_token_seconds` | Histogram | TTFT | 从业务 SLO 推导分位数阈值 |
+| `vllm:request_time_per_output_token_seconds` | Histogram | 每输出 token 时间 | 从流式体验 SLO 推导阈值 |
+| `vllm:num_requests_waiting` | Gauge | 等待中的请求数 | 按持续时间与容量基线告警 |
+| `vllm:kv_cache_usage_perc` | Gauge | KV Cache 使用比例 | 与等待、抢占和 OOM 信号联合判断 |
+| `vllm:prefix_cache_hits` / `vllm:prefix_cache_queries` | Counter | 前缀缓存命中/查询 token 数 | 仅在启用且期望复用时评估 |
 
-#### 告警规则示例 (Prometheus AlertManager)
+#### 告警规则模板 (Prometheus AlertManager)
+
+先用 recording rule 把具体引擎指标转换成团队稳定的服务级指标，再把阈值绑定到该服务的 SLO。下面的名称是占位符，不是可直接复制的默认阈值：
 
 ```yaml
 groups:
-  - name: vLLM-alerts
+  - name: llm-service-alerts
     rules:
-      # GPU 显存告警
-      - alert: VLLMGpuMemoryHigh
-        expr: vLLM:gpu_memory_used_bytes / vLLM:gpu_memory_total_bytes > 0.95
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "GPU 显存使用率超过 95%"
-
-      # KV Cache 碎片化告警
-      - alert: VLLMKVCacheFragmentation
-        expr: vLLM:block_manager_free_blocks / vLLM:block_manager_total_blocks < 0.1
-        for: 5m
+      - alert: LLMWaitingQueueSustained
+        expr: llm_service:waiting_requests > <queue_threshold_from_capacity_test>
+        for: <slo_window>
         labels:
           severity: warning
         annotations:
-          summary: "KV Cache 碎片化严重，可能影响并发"
+          summary: "等待队列持续超过容量基线"
 
-      # 前缀缓存命中率低
-      - alert: VLLMPrefixCacheLow
-        expr: vLLM:prefix_cache_hit_rate < 0.3
-        for: 10m
-        labels:
-          severity: info
-        annotations:
-          summary: "前缀缓存命中率低于 30%，可能未启用或场景不适用"
-
-      # 请求延迟过高
-      - alert: VLLMRequestLatencyHigh
-        expr: histogram_quantile(0.99, rate(vLLM:request_latency_seconds_bucket[5m])) > 5
-        for: 5m
+      - alert: LLMTTFTSLOBreach
+        expr: llm_service:ttft_p99_seconds > <ttft_slo_seconds>
+        for: <slo_window>
         labels:
           severity: critical
         annotations:
-          summary: "P99 延迟超过 5 秒"
+          summary: "TTFT 超过业务 SLO"
 ```
 
 #### 生产环境检查清单
@@ -1111,9 +992,9 @@ groups:
 | 检查项 | 验证方法 | 通过标准 |
 |--------|----------|----------|
 | 服务启动正常 | `curl http://localhost:8000/v1/models` | 返回模型信息 |
-| GPU 利用率 | `nvidia-smi` | 稳定在 60-90% |
+| GPU 状态 | DCGM exporter / profiler | 无硬件错误；利用率与已验证容量基线一致 |
 | 无 OOM | 检查日志 | 无 CUDA OOM 错误 |
-| 延迟稳定 | 连续压测 | P99/P50 < 3 |
+| 延迟稳定 | 回放代表性流量 | TTFT、TPOT 与端到端分位数满足业务 SLO |
 | 缓存命中 | 查看 metrics | 符合预期（场景相关）|
 | 日志正常 | 检查 stdout/stderr | 无 ERROR 级别日志 |
 
@@ -1224,15 +1105,9 @@ ncu-ui output_report.ncu-rep
 # - Warp Efficiency: 分支分歧程度
 ```
 
-### 10.5.5.4 vLLM内置性能分析
+### 10.5.5.4 引擎级追踪
 
-```bash
-# vLLM 0.6.0+内置profiling
-VLLM_USE_TRACING=1 vLLM serve meta-llama/Llama-3.1-8B
-
-# 查看trace
-# 生成的chrome trace文件: /tmp/vLLM_trace.json
-```
+引擎内置 tracing 的环境变量、启动参数和输出格式会随版本变化。锁定目标版本后，应按该版本官方文档启用，并先验证 trace 是否包含 request ID、排队、prefill、decode、KV 传输与错误边界；不能只看到一段 GPU 时间就把它当作端到端追踪。
 
 ### 10.5.5.5 性能优化checklist
 
@@ -1920,16 +1795,18 @@ class CostTracker:
                      request_id: str,
                      input_tokens: int,
                      output_tokens: int,
-                     ttft_ms: float,
-                     gpu_utilization: float):
-        """追踪单个请求的成本"""
+                     service_time_ms: float,
+                     allocated_gpu_share: float):
+        """按完整服务时间估算单请求分摊成本。
 
-        # 计算实际GPU时间
-        gpu_time_hours = (ttft_ms / 1000) / 3600
+        allocated_gpu_share 由并发分摊或调度器计量得到，取值范围为 [0, 1]。
+        这仍是估算；生产计费应优先从实例运行时长和总交付 token 反推。
+        """
 
-        # 计算成本(考虑GPU利用率)
-        effective_gpus = gpu_utilization / 100
-        cost = gpu_time_hours * effective_gpus * self.gpu_cost_per_hour
+        gpu_time_hours = (service_time_ms / 1000) / 3600
+
+        # GPU 利用率不是计费折扣，不能直接乘到成本上。
+        cost = gpu_time_hours * allocated_gpu_share * self.gpu_cost_per_hour
 
         # 记录
         self.requests.append({
@@ -1959,12 +1836,12 @@ tracker.track_request(
     request_id="req-001",
     input_tokens=150,
     output_tokens=50,
-    ttft_ms=1200,
-    gpu_utilization=75
+    service_time_ms=5200,
+    allocated_gpu_share=0.25
 )
 
 print(tracker.get_summary())
-# {'total_cost': 0.00075, 'avg_cost_per_1k_tokens': 0.00375}
+# 输出取决于服务时间、并发分摊方式与 GPU 单价
 ```
 
 ### 10.7.2 优化措施的ROI计算
@@ -2026,7 +1903,7 @@ def plot_roi_dashboard():
 
     investment = [2000, 1000, 500, 1500]
     monthly_savings = [5110, 3640, 4380, 2190]
-    payback_months = [i / s * 30 for i, s in zip(investment, monthly_savings)]
+    payback_months = [i / s for i, s in zip(investment, monthly_savings)]
 
     # 绘图
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
@@ -2039,8 +1916,8 @@ def plot_roi_dashboard():
 
     # 回本周期
     ax2.bar(optimizations, payback_months)
-    ax2.set_title('回本周期(天)')
-    ax2.set_ylabel('天数')
+    ax2.set_title('回本周期（月）')
+    ax2.set_ylabel('月数')
 
     plt.tight_layout()
     plt.savefig('roi_dashboard.png')
