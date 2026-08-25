@@ -206,7 +206,7 @@ kind: AgentEnvironment
 metadata:
   name: agent-env-1
 spec:
-  image: agent-runtime:latest
+  image: your-registry/agent-runtime@sha256:<validated-digest>
   resources:
     cpu: "4"       # 示例
     memory: "16Gi" # 示例
@@ -843,7 +843,7 @@ DeepSeek-V4 在昇腾/CANN 体系中的 Day 0 支持，是一个很适合放进�
 
 更完整的横向案例见：
 
-- [DeepSeek-V4 昇腾 CANN 推理优化案例研究](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/deepseek-v4-ascend-cann-inference.md:1)
+- [DeepSeek-V4 昇腾 CANN 推理优化案例研究](../docs/cases/deepseek-v4-ascend-cann-inference.md)
 
 ---
 
@@ -1111,7 +1111,7 @@ DeepSeek-V4 给出的工程信号很明确：低比特精度未必是全模型�
 
 更完整的推理引擎适配对照见：
 
-- [DeepSeek-V4 推理引擎适配案例研究 - vLLM 与 SGLang](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/deepseek-v4-inference-engines.md:1)
+- [DeepSeek-V4 推理引擎适配案例研究 - vLLM 与 SGLang](../docs/cases/deepseek-v4-inference-engines.md)
 
 ---
 
@@ -2088,7 +2088,7 @@ assert result == "6"
 
 如果你想把这一章里提到的前沿 attention 路线放在一张图里看，建议直接阅读这个横向案例：
 
-- [注意力架构演进案例研究 - MiniMax-01、Kimi Linear 与 DeepSeek-V4](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/attention-architecture-evolution.md:1)
+- [注意力架构演进案例研究 - MiniMax-01、Kimi Linear 与 DeepSeek-V4](../docs/cases/attention-architecture-evolution.md)
 
 它会把三条路线放到同一套问题框架下比较：它们各自在改写什么、分别适合回答哪类工程问题、以及为什么它们共同说明 attention 已经重新变成推理系统的一等变量。
 

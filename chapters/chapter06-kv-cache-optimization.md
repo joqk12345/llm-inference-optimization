@@ -1266,9 +1266,9 @@ vllm serve MODEL --gpu-memory-utilization <candidate>
 
 ---
 
-## 6.8 实战对比
+## 6.7 实战对比
 
-### 6.8.1 无 KV Cache vs 有 KV Cache
+### 6.7.1 无 KV Cache vs 有 KV Cache
 
 **性能测试(示意)**：
 ```
@@ -1289,7 +1289,7 @@ vllm serve MODEL --gpu-memory-utilization <candidate>
 
 ---
 
-### 6.8.2 性能收益如何验证
+### 6.7.2 性能收益如何验证
 
 KV Cache 避免在每个 decode step 重新计算历史 token 的 K/V，这是机制收益；端到端加速比还受到模型权重读取、attention kernel、batch、采样和调度开销影响，不能从序列长度直接生成一个固定倍数。
 
@@ -1297,7 +1297,7 @@ KV Cache 避免在每个 decode step 重新计算历史 token 的 K/V，这是�
 
 ---
 
-### 6.8.3 vLLM 的 KV Cache 实现
+### 6.7.3 vLLM 的 KV Cache 实现
 
 **关键特性**：
 1. PagedAttention (高内存利用率)
@@ -1324,7 +1324,7 @@ outputs = llm.generate(prompts)
 
 ---
 
-## 6.9 Prefix Caching
+## 6.8 Prefix Caching
 
 > **核心洞察**：重复的 prompt (如系统提示词) 只需要计算一次,后续请求直接复用 KV Cache。
 >
@@ -1332,7 +1332,7 @@ outputs = llm.generate(prompts)
 >
 > **📌 与第7章的边界**：Prefix Caching 决定“哪些 KV 资产可以复用”; 第7章的调度器再决定“哪些请求优先利用这些资产进入执行”。
 
-### 6.9.1 什么是 Prefix Caching
+### 6.8.1 什么是 Prefix Caching
 
 **定义**：跨请求复用相同 prompt 的 KV Cache
 
@@ -1356,7 +1356,7 @@ Request 3: "System: You are helpful. User: How are you?"
 
 ---
 
-### 6.9.2 Prefix Caching 的核心思想
+### 6.8.2 Prefix Caching 的核心思想
 
 **传统 KV Cache**：单次请求内复用
 - Token 0 的 KV 被 token 1, 2, 3...复用
@@ -1375,7 +1375,7 @@ Prefix Caching: 全局 distributed cache (如 Redis)
 
 ---
 
-### 6.9.3 vLLM 的实现: Hash-based KV Cache
+### 6.8.3 vLLM 的实现: Hash-based KV Cache
 
 **挑战**：如何检测两个请求的 prefix 是否相同?
 
@@ -1413,7 +1413,7 @@ def compute_block_hash(block_kv):
 
 ---
 
-### 6.9.4 Prefix Caching 的工作流程
+### 6.8.4 Prefix Caching 的工作流程
 
 **首次请求 (Cold Path)**：
 ```
@@ -1446,7 +1446,7 @@ def compute_block_hash(block_kv):
 
 ---
 
-### 6.9.5 性能提升分析
+### 6.8.5 性能提升分析
 
 **理论加速比**：
 ```
@@ -1489,7 +1489,7 @@ def compute_block_hash(block_kv):
 
 ---
 
-### 6.9.6 vLLM 配置
+### 6.8.6 vLLM 配置
 
 **启用 Prefix Caching**（版本敏感，执行前检查目标版本帮助）：
 ```bash
@@ -1520,7 +1520,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ---
 
-### 6.9.7 Hybrid Attention 下的 Prefix Caching：命中不等于可复用
+### 6.8.7 Hybrid Attention 下的 Prefix Caching：命中不等于可复用
 
 前面的例子默认了一个重要前提：所有层的 cache 都是同一种普通 KV。只要 token 前缀相同、block hash 命中，就可以把这段 KV 直接接到新请求后面继续算。
 
@@ -1559,7 +1559,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ---
 
-### 6.9.8 实战案例
+### 6.8.8 实战案例
 
 **案例 1: Chatbot 服务 (示意)**
 ```
@@ -1596,7 +1596,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ---
 
-### 6.9.9 最佳实践
+### 6.8.9 最佳实践
 
 **1. 识别可缓存的 Prefix**
 ```

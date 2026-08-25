@@ -411,7 +411,7 @@ spec:
     spec:
       containers:
       - name: vLLM
-        image: vLLM/vLLM-openai:latest
+        image: your-registry/vllm-openai@sha256:<validated-digest>
         resources:
           limits:
             nvidia.com/gpu: 1  # 每个Pod 1个GPU
@@ -510,7 +510,7 @@ metadata:
 spec:
   containers:
   - name: vLLM
-    image: vLLM/vLLM-openai:latest
+    image: your-registry/vllm-openai@sha256:<validated-digest>
     resources:
       limits:
         nvidia.com/gpu: 1  # 请求1个GPU
@@ -752,7 +752,7 @@ def generate_request(prompt: str):
 docker run -d --name jaeger \
   -p 16686:16686 \
   -p 14250:14250 \
-  jaegertracing/all-in-one:latest
+  jaegertracing/all-in-one@sha256:<validated-digest>
 
 # 访问UI
 open http://localhost:16686

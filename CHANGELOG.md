@@ -2,6 +2,26 @@
 
 All notable editorial and structural changes to this manuscript are documented in this file.
 
+## 2026-04-26
+
+### Added
+
+- Added [`docs/book-longevity-review.md`](docs/book-longevity-review.md), a chapter-by-chapter review and migration plan for keeping the book useful as models, hardware, and runtimes change.
+- Added [ADR-0001](docs/adr/0001-stable-core-and-versioned-adapters.md), documenting the decision to separate a stable conceptual core from versioned runtime, hardware, model, and deployment adapters.
+
+### Changed
+
+- Fixed the Chapter 6 numbering gap by renumbering the practical comparison and prefix-caching sections to 6.7 and 6.8.
+- Replaced production `latest` image examples with digest placeholders that make validation and rollback explicit.
+- Repaired repository-local absolute links and updated generated knowledge-graph metadata.
+
+### Verification
+
+- `npm run knowledge:lint`
+- `npm run knowledge:lint-citations`
+- `npm run docs:build`
+- `git diff --check`
+
 ## 2026-04-17
 
 ### Changed

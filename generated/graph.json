@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-07-13T15:56:20.656Z",
+  "generatedAt": "2026-08-25T15:51:10.688Z",
   "nodeCount": 112,
-  "edgeCount": 505,
+  "edgeCount": 509,
   "nodes": [
     {
       "id": "readme",
@@ -3275,6 +3275,26 @@
       "source": "docs-refs",
       "target": "chapters-chapter10-production-deployment",
       "type": "related"
+    },
+    {
+      "source": "docs-refs",
+      "target": "docs-cases-projectdiscovery-prompt-caching-agent-cost",
+      "type": "references"
+    },
+    {
+      "source": "docs-refs",
+      "target": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "type": "references"
+    },
+    {
+      "source": "docs-refs",
+      "target": "docs-cases-ds4-local-metal-inference",
+      "type": "references"
+    },
+    {
+      "source": "docs-refs",
+      "target": "docs-cases-turboquant-kv-cache-compression",
+      "type": "references"
     },
     {
       "source": "docs-refs",
