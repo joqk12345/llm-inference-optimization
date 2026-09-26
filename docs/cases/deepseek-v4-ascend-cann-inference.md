@@ -166,7 +166,7 @@ DeepSeek-V4 不是一个简单 dense Transformer。它包含：
 
 ## 它和前面 attention 演进案例的关系
 
-前面的 [注意力架构演进案例研究](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/attention-architecture-evolution.md:1) 主要回答：
+前面的 [注意力架构演进案例研究](attention-architecture-evolution.md) 主要回答：
 
 - attention 为什么要被重写
 - `MiniMax-01 / Kimi Linear / DeepSeek-V4` 分别代表什么路线

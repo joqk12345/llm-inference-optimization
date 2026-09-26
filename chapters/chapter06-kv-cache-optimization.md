@@ -11,7 +11,7 @@ concepts:
   - "paged-attention"
   - "prefix-caching"
 tools:
-  - "vLLM"
+  - "vllm"
 architecture_layer:
   - "optimization-techniques"
 learning_stage: "core-techniques"
@@ -25,8 +25,11 @@ related:
   - "chapters-chapter07-request-scheduling"
   - "chapters-chapter08-quantization"
   - "docs-cases-turboquant-kv-cache-compression"
-  - "docs-cases-hybrid-attention-prefix-cache-state-machine"
-references: []
+references:
+  - "https://arxiv.org/abs/2309.06180"
+  - "https://arxiv.org/abs/2305.13245"
+  - "https://arxiv.org/abs/2402.02750"
+  - "https://docs.vllm.ai/en/stable/usage/metrics/"
 status: "published"
 display_order: 7
 ---
@@ -164,16 +167,15 @@ V: "我的语义是'苹果'"
 - 缓存旧 K、V,只计算新 K、V → 大幅减少计算
 
 **缓存的好处**：
-```
-无 KV Cache:
-- 每个步骤: O(n²)
-- 总复杂度: O(n³)
 
-有 KV Cache:
-- 第一个步骤: O(n²)
-- 后续步骤: O(n)
-- 总复杂度: O(n²)
+设 prompt 长度为 `P`、生成长度为 `T`。不使用 KV Cache 时，每个 decode 步骤都要重算长度约为 `P+t` 的整段序列；使用缓存后，prompt 只做一次 prefill，每步只计算新 token 并读取历史 K/V。忽略共同的模型维度因子后：
+
+```text
+无 KV Cache：Σ(t=1..T) O((P+t)²)
+有 KV Cache：O(P²) + Σ(t=1..T) O(P+t)
 ```
+
+这说明缓存消除了跨步骤的历史重复计算，但实际加速仍取决于 `P/T`、batch、带宽、kernel 与调度，不能从渐近复杂度直接推导固定倍数。
 
 ---
 
@@ -406,6 +408,7 @@ class NaiveKVCache:
 > **深度来源**：[Berkeley EECS-2025-192](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
 >
 > **核心洞察**：PagedAttention 借鉴操作系统的虚拟内存机制,将 KV Cache 分成固定大小的 blocks,以实现更高效的内存管理。
+> [CITE: pagedattention-sosp-2023]
 >
 > **为什么重要**：
 > - vLLM 的关键创新之一
@@ -492,14 +495,11 @@ PagedAttention:
 
 #### 6.3.2.3 Block Allocation 策略
 
-**预分配策略**：
+**概念伪代码**（不对应 vLLM 内部 API 或固定比例）：
 ```python
-# vLLM 的启动时分配
-def allocate_at_startup():
-    # 计算可用 GPU 内存
-    gpu_memory = get_gpu_memory()
-    # 预分配 90% 给 KV Cache (保留 10% 给模型 weights)
-    num_blocks = (gpu_memory * 0.9) / BLOCK_SIZE
+def allocate_at_startup(available_kv_bytes, block_bytes):
+    # available_kv_bytes 应在加载权重、运行 profiling 并保留安全余量后确定
+    num_blocks = available_kv_bytes // block_bytes
     # 创建 block pool
     block_pool = BlockPool(num_blocks)
     return block_pool
@@ -710,26 +710,14 @@ PagedAttention:
 
 #### 6.3.2.8 实战配置
 
-**启动 vLLM 时启用 PagedAttention** (默认启用):
+**vLLM 配置骨架**（PagedAttention 是其核心内存管理机制；参数按目标版本核验）：
 ```bash
-vLLM serve meta-llama/Llama-2-7b-hf \
-  --block-size 16 \              # Block 大小 (默认: 16)
-  --gpu-memory-utilization 0.9 \  # GPU 内存利用率
-  --max-num-batched-tokens 8192  # 最大 batch tokens
+vllm serve MODEL \
+  --gpu-memory-utilization <candidate> \
+  --max-num-batched-tokens <candidate>
 ```
 
-**监控 block 使用情况**：
-```python
-from vLLM import LLM
-
-llm = LLM(model="meta-llama/Llama-2-7b-hf")
-
-# 获取 block allocator 统计
-stats = llm.llm_engine.cache_engine.get_stats()
-print(f"Free blocks: {stats['num_free_blocks']}")
-print(f"Used blocks: {stats['num_used_blocks']}")
-print(f"GPU utilization: {stats['gpu_utilization']:.2%}")
-```
+不要依赖 `llm_engine.cache_engine` 一类内部对象路径做生产监控，它们不属于稳定公共接口。优先使用服务 `/metrics` 中目标版本公开的 KV 使用率、等待请求、抢占和延迟指标，并在升级时做 dashboard 回归。[CITE: vllm-production-metrics-stable]
 
 ---
 
@@ -808,17 +796,17 @@ KV Cache 大小:
 | 维度 | MHA | MQA | GQA (8 groups) |
 |------|-----|-----|----------------|
 | **KV Cache 大小** | 1× (baseline) | ~1/32× | ~1/4× |
-| **模型质量 (MMLU)** | baseline | -2.1 ± 0.3 pt | -0.4 ± 0.2 pt |
-| **推理速度 (A100)** | baseline | ~2.1× | ~1.6× |
-| **显存占用 (4K seq)** | 2 GB | 62 MB | 512 MB |
-| **适用场景** | 质量优先 | 成本/延迟优先 | 平衡场景 |
+| **KV head 数** | 与 query head 数相同 | 1 | 介于二者之间 |
+| **带宽压力** | 最高 | 最低 | 居中 |
+| **质量风险** | 作为基线 | 需按模型与任务验证 | 需按模型与任务验证 |
+| **适用场景** | 保留完整多头表示 | 极度压缩 KV | 容量、带宽与质量折中 |
 
-> **数据来源**：Llama-2 技术报告、GQA 论文 (Levshun et al., 2023)。测试条件：A100-80GB，batch_size=1，FP16。
+> **机制来源**：GQA 论文（Ainslie et al., 2023）讨论了用少于 query head 数的 KV heads 在质量与推理效率之间折中。具体质量、延迟与吞吐变化不能从 head 比例直接推出，必须携带模型、硬件、精度、序列长度、batch 和实现版本进行测量。[CITE: gqa-emnlp-2023]
 
 **工程决策建议**：
-- 追求质量（内容生成、知识问答）：选择 GQA 或 MHA
-- 成本敏感（高并发、边缘部署）：选择 MQA，需接受 ~2% 质量损失
-- 生产环境推荐 GQA：在质量损失可接受范围内获得显著性能收益
+- 架构已经确定时，服务侧通常不能把 MHA、MQA、GQA 当成可随意切换的开关。
+- 选择或训练模型时，应同时比较任务质量、KV 容量、decode 带宽与目标硬件上的端到端性能。
+- 不要用固定的 MMLU 损失或固定加速倍数替代业务回归测试。
 
 ---
 
@@ -839,8 +827,8 @@ KV Cache 大小:
 ```
 
 **为什么 GQA 是常见折中**：
-- 质量损失小（MMLU 仅 -0.4 pt）
-- 同时降低 KV Cache 开销（~75%  reduction）
+- KV head 数少于 query head 数，因此能降低 KV Cache 容量与读取流量
+- 相比 MQA 保留更多 KV heads，为模型设计提供更细的容量—质量折中
 - Llama-3 (8B/70B)、Mistral 等现代模型采用
 
 ---
@@ -903,17 +891,17 @@ def dequantize_kv(kv_int8, scale):
 | 精度 | KV Cache 压缩率 | 质量影响 (MMLU) | 推理速度提升 | 适用场景 |
 |------|----------------|-----------------|-------------|----------|
 | FP16 | 1× (baseline) | baseline | 1× | 质量优先 |
-| FP8 | 2× | -0.2 ± 0.1 pt | ~1.2× | 推荐首选 |
-| INT8 | 2× | -0.5 ± 0.2 pt | ~1.3× | 显存紧张 |
-| INT4 | 4× | -1.5 ± 0.5 pt | ~1.5× | 激进压缩 |
+| FP8 | 约 2×（未计元数据） | 需任务级验证 | 取决于硬件与 kernel | 硬件支持充分时优先评估 |
+| INT8 | 约 2×（未计元数据） | 需任务级验证 | 取决于反量化与访存收益 | 显存紧张 |
+| INT4 | 约 4×（未计元数据） | 风险通常更高 | 取决于 kernel 与元数据开销 | 激进压缩 |
 | TurboQuant 类向量量化 | 约 4-6×（研究结果） | 需任务级验证 | 最高 8× attention logits 计算加速（研究结果） | 前沿长上下文压缩 |
 
-> **数据来源**：vLLM 基准测试、AWQ 论文。测试条件：Llama-2-7B，A100-80GB。
+> **证据说明**：上表的压缩率是按元素位宽计算的理论下界，不包含 scale、zero point、对齐和运行时缓冲。质量与速度必须按具体 KV 量化方法、模型、任务和硬件分别验证；权重量化论文不能直接作为 KV Cache 质量结论的证据。[CITE: kivi-icml-2024]
 > **前沿补充**：TurboQuant 可作为 KV Cache 低比特向量压缩路线的案例。正式出版前，应以论文、项目页或官方技术报告核验具体发布时间、实验设置和性能数字。这里引用它的目的，是说明当位宽下降到 3-4 bit 时，元数据开销、attention score 质量和在线解码开销会一起成为系统问题。相关案例见 [TurboQuant 案例研究 - 极限 KV Cache 压缩](../docs/cases/turboquant-kv-cache-compression.md)。
 
 **工程决策**：
-- 显存瓶颈优先：INT8 是最佳平衡点（2× 压缩，< 0.5% 质量损失）
-- 质量敏感场景：使用 FP8（vLLM 0.5.0+ 原生支持）
+- 显存瓶颈优先：先比较 FP8/INT8 的实际容量收益、kernel 支持和业务质量回归
+- 质量敏感场景：从较高精度方案开始灰度，并保留回滚路径
 - 复杂推理任务（数学、代码）：谨慎使用量化，建议 FP16 或 FP8
 - 超长上下文场景：可以关注 TurboQuant/KIVI 这类 KV 专用量化，但必须等待框架支持并用业务长上下文回归集复测
 
@@ -1071,9 +1059,9 @@ Q: 你的主要瓶颈是什么？
 ├─ 显存不足 (OOM 频繁)
 │  ├─ 并发请求数受限制
 │  └─ 优先解决方案：
-│      1. GQA (减少 KV Cache 占用 75%)
-│      2. 量化 (INT8 减半，INT4 降至 1/4)
-│      3. Prefix Caching (系统提示词复用)
+│      1. 先按 num_kv_heads、精度和活动 token 总数核算 KV 容量
+│      2. 若模型结构允许，评估更少 KV heads 的模型
+│      3. 评估 KV 量化、并发上限和上下文上限
 │
 ├─ TTFT 过高 (首字慢)
 │  ├─ 长 prompt 场景
@@ -1086,8 +1074,8 @@ Q: 你的主要瓶颈是什么？
 │  ├─ Decode 阶段瓶颈
 │  └─ 优先解决方案：
 │      1. 量化 (减少内存带宽)
-│      2. 增大 block size (减少查找开销)
-│      3. 连续批处理 (提高 GPU 利用率)
+│      2. profiler 验证 KV 读取、权重读取或 kernel 开销
+│      3. 调整连续批处理与 token budget
 │
 └─ P95/P99 抖动
     ├─ 尾延迟不稳定
@@ -1097,34 +1085,31 @@ Q: 你的主要瓶颈是什么？
         3. 优先级队列 + 抢占策略
 ```
 
-### 6.5.5 显存瓶颈量化判断表
+### 6.5.5 KV Cache 容量核算
 
-> **工程判断**：根据模型规模和序列长度，快速判断是否需要优化
+不能只用“模型规模 + 单条序列长度”给出 KV 占比。权重精度、`num_kv_heads`、并发序列的实际长度、并行切分、block 舍入和运行时预留都会改变结果。
 
-| 模型 | 序列长度 | KV Cache 占比 | 瓶颈判断 | 推荐动作 |
-|------|----------|--------------|----------|----------|
-| Llama-2-7B | 2K | ~15% | 非瓶颈 | 默认配置即可 |
-| Llama-2-7B | 8K | ~45% | 临界点 | 监控，观察是否需量化 |
-| Llama-2-7B | 16K | ~80% | 严重瓶颈 | 必须量化 + GQA |
-| Llama-2-70B | 2K | ~50% | 临界点 | 需 TP=2 或量化 |
-| Llama-2-70B | 4K | ~75% | 严重瓶颈 | TP=4 + 量化 |
-| Llama-2-70B | 8K+ | >90% | 无法运行 | 需模型并行或更长上下文优化 |
+对同一批活动序列，未考虑 block 舍入时的理论值为：
 
-> **计算方法**：KV Cache 占用 ≈ 2 × num_layers × num_heads × head_dim × seq_len × bytes_per_param
-> 示例：Llama-2-7B (32L, 32H, 128d) @ 4K tokens ≈ 0.5 GB (FP16)
+```text
+KV bytes
+= 2 × num_layers × num_kv_heads × head_dim
+  × Σ(sequence_length_i) × bytes_per_element
+```
 
-### 6.5.6 Block Size 选型决策表
+其中 `2` 表示 K 和 V。MHA 中 `num_kv_heads = num_attention_heads`；GQA/MQA 中必须使用实际 KV head 数。[CITE: gqa-emnlp-2023]
 
-| 场景特征 | 推荐 Block Size | 理由 | 预期收益 |
-|---------|----------------|------|----------|
-| 短 prompt (< 512 tokens), 高并发 | 16 (默认) | 平衡管理开销与碎片化 | 内存利用率 ~90% |
-| 长 prompt (> 4K tokens), 低并发 | 32 | 减少 block table 查找开销 | ~5% 性能提升 |
-| 混合负载，无法预测 | 16 + 动态调整 | vLLM 0.6.0+ 支持 | 需压测验证 |
+容量评估应依次输出：理论 KV bytes、block 舍入后的分配量、每个并行 rank 的持有量、运行时可分配给 KV 的显存，以及在代表性长度分布下可承载的并发。只有这些条件齐全，才能判断是否需要量化、降低并发或调整并行方案。
+
+### 6.5.6 Block Size 选型实验
+
+block size 的可选值、默认值和是否可配置都取决于引擎版本与后端。更大的 block 可能减少元数据和查表开销，也可能增加尾块浪费；不存在跨负载通用的推荐值。
 
 **实际操作步骤**：
-1. 监控 `vLLM_block_manager_free_blocks` metric
-2. 若碎片化率（`1 - largest_free/total_free`）> 20%，考虑增大 block size
-3. 若 block table lookup 成为瓶颈（通过 Nsight Systems 验证），考虑减小 block size
+1. 从目标版本公开支持的候选值中选择实验点；
+2. 固定模型、长度分布、并发和精度，记录可承载请求数、KV 使用率、抢占、TTFT、TPOT 与吞吐；
+3. 用 profiler 检查 block table 或分配管理是否进入关键路径；
+4. 选择满足 SLO 且保留故障余量的配置，不以单一“利用率最高”为目标。
 
 ---
 
@@ -1161,30 +1146,22 @@ Q: 你的主要瓶颈是什么？
 特征：
 - 固定大小的隐状态，与序列长度无关
 - 每个时间步原地更新（in-place update）
-- 状态大小由模型结构决定（通常 ~2.57 MiB/序列）
-
-示例（基于 NVIDIA Nemotron-Nano-12B-v2）：
-- 每层 Mamba 状态：~2.57 MiB
-- 总状态大小与序列长度无关
+- 状态大小由模型层数、state dimension、卷积状态、dtype 与实现决定
 ```
 
 ### 6.6.2 长上下文下的状态大小对比
 
-关键洞察：**在长序列场景下，两类状态的大小关系会发生戏剧性变化**。
+关键洞察：Attention KV 通常随被缓存的 token 数线性增长，而 recurrent/SSM 状态的大小通常由模型结构决定。两者的交点必须用具体模型配置计算，不能套用固定比率。
 
-| 序列长度 | KV Cache 大小 | Mamba 状态大小 | KV/Mamba 比率 |
-|----------|--------------|----------------|---------------|
-| 1K tokens | ~0.5 GB | 2.57 MB | ~195× |
-| 4K tokens | ~2 GB | 2.57 MB | ~780× |
-| 16K tokens | ~8 GB | 2.57 MB | ~3,100× |
-| 128K tokens | ~64 GB | 2.57 MB | ~25,000× |
-
-> **数据来源**：估算基于 NVIDIA Nemotron-Nano-12B-v2 配置，实际数值因模型而异。
+| 状态 | 理论增长变量 | 还需计入 |
+|------|--------------|----------|
+| Attention KV | layers × KV heads × head dim × cached tokens × dtype | batch、block 舍入、并行切分 |
+| Mamba/SSM state | layers × state shape × dtype × active sequences | 卷积状态、对齐与运行时布局 |
 
 **核心结论**：
 
-- 短序列：两者状态大小相近，Mamba 状态可能略大
-- **长序列（> 4K）**：KV Cache 远大于 Mamba 状态，128K 时可达 **200 倍以上**
+- 短序列下固定状态成本可能不可忽略
+- 随缓存序列增长，Attention KV 的线性项会越来越重要
 - 这就是混合架构的吸引力所在：Mamba 用固定成本覆盖长距离依赖，Attention 只处理关键局部上下文
 
 ### 6.6.3 vLLM V0 的混合状态管理
@@ -1261,26 +1238,13 @@ Mamba 的页面大小远大于 Attention blocks，为了统一管理：
 
 ### 6.6.5 混合模型实战配置
 
-**在 vLLM 中启用混合模型**：
+**在 vLLM 中验证混合模型支持**：
 
 ```bash
-vLLM serve NVIDIA/Nemotron-Nano-12B-v2 \
-  --gpu-memory-utilization 0.9 \
-  --enforce-eager  # 某些混合模型需要 eager 模式
+vllm serve MODEL --gpu-memory-utilization <candidate>
 ```
 
-**监控混合状态使用**：
-
-```python
-from vLLM import LLM
-
-llm = LLM(model="NVIDIA/Nemotron-Nano-12B-v2")
-
-# 获取混合状态统计
-stats = llm.llm_engine.cache_engine.get_stats()
-print(f"KV Cache blocks: {stats['num_used_blocks']}")
-print(f"Mamba states: {stats.get('num_mamba_states', 'N/A')}")
-```
+不要默认添加 `--enforce-eager`，也不要依赖内部 cache engine 字段。先查目标版本的支持矩阵和公开指标，再比较 eager/graph 路径、峰值显存、并发和端到端延迟。
 
 ### 6.6.6 混合模型决策清单
 
@@ -1288,10 +1252,10 @@ print(f"Mamba states: {stats.get('num_mamba_states', 'N/A')}")
 
 | 条件 | 判断方法 | 建议 |
 |------|----------|------|
-| 序列长度经常 > 4K | 流量分析 | 认真评估混合模型 |
-| 显存瓶颈明显 | KV Cache 占比 > 70% | 混合模型可显著缓解 |
+| 序列长度分布有明显长尾 | 流量分析 | 计算两类状态并做容量实验 |
+| KV 限制并发或上下文 | 容量分解与 OOM/抢占记录 | 对比混合模型、KV 量化等候选方案 |
 | 使用支持混合的模型 | vLLM 支持列表 | 直接部署 |
-| 短序列为主 (< 1K) | 流量分析 | 纯 Attention 可能足够 |
+| 短序列为主 | 流量分析 | 仍需按质量、延迟和生态综合选择 |
 
 **评估步骤**：
 
@@ -1302,9 +1266,9 @@ print(f"Mamba states: {stats.get('num_mamba_states', 'N/A')}")
 
 ---
 
-## 6.8 实战对比
+## 6.7 实战对比
 
-### 6.8.1 无 KV Cache vs 有 KV Cache
+### 6.7.1 无 KV Cache vs 有 KV Cache
 
 **性能测试(示意)**：
 ```
@@ -1325,31 +1289,15 @@ print(f"Mamba states: {stats.get('num_mamba_states', 'N/A')}")
 
 ---
 
-### 6.8.2 性能提升量化分析
+### 6.7.2 性能收益如何验证
 
-**不同序列长度的加速比**：
-```
-序列长度 = 100:
-  无 KV Cache: ~100ms
-  有 KV Cache: ~100ms
-  加速比: 1x (太短,没优势)
+KV Cache 避免在每个 decode step 重新计算历史 token 的 K/V，这是机制收益；端到端加速比还受到模型权重读取、attention kernel、batch、采样和调度开销影响，不能从序列长度直接生成一个固定倍数。
 
-序列长度 = 1000:
-  无 KV Cache: ~10s
-  有 KV Cache: ~1.5s
-  加速比: 6.7x
-
-序列长度 = 10000:
-  无 KV Cache: ~1000s
-  有 KV Cache: ~8s
-  加速比: 125x!
-```
-
-**结论**：序列越长,KV Cache 的优势越明显
+可复现实验应固定生成结果和请求序列，分别运行“复用历史 K/V”和“每步重算历史状态”的实现，报告每一步延迟随上下文长度的曲线、总生成时间、峰值显存及 profiler 时间线。短序列也通常启用 KV Cache；“短序列没有优势”不是通用结论。
 
 ---
 
-### 6.8.3 vLLM 的 KV Cache 实现
+### 6.7.3 vLLM 的 KV Cache 实现
 
 **关键特性**：
 1. PagedAttention (高内存利用率)
@@ -1376,7 +1324,7 @@ outputs = llm.generate(prompts)
 
 ---
 
-## 6.9 Prefix Caching
+## 6.8 Prefix Caching
 
 > **核心洞察**：重复的 prompt (如系统提示词) 只需要计算一次,后续请求直接复用 KV Cache。
 >
@@ -1384,7 +1332,7 @@ outputs = llm.generate(prompts)
 >
 > **📌 与第7章的边界**：Prefix Caching 决定“哪些 KV 资产可以复用”; 第7章的调度器再决定“哪些请求优先利用这些资产进入执行”。
 
-### 6.9.1 什么是 Prefix Caching
+### 6.8.1 什么是 Prefix Caching
 
 **定义**：跨请求复用相同 prompt 的 KV Cache
 
@@ -1408,7 +1356,7 @@ Request 3: "System: You are helpful. User: How are you?"
 
 ---
 
-### 6.9.2 Prefix Caching 的核心思想
+### 6.8.2 Prefix Caching 的核心思想
 
 **传统 KV Cache**：单次请求内复用
 - Token 0 的 KV 被 token 1, 2, 3...复用
@@ -1427,7 +1375,7 @@ Prefix Caching: 全局 distributed cache (如 Redis)
 
 ---
 
-### 6.9.3 vLLM 的实现: Hash-based KV Cache
+### 6.8.3 vLLM 的实现: Hash-based KV Cache
 
 **挑战**：如何检测两个请求的 prefix 是否相同?
 
@@ -1465,7 +1413,7 @@ def compute_block_hash(block_kv):
 
 ---
 
-### 6.9.4 Prefix Caching 的工作流程
+### 6.8.4 Prefix Caching 的工作流程
 
 **首次请求 (Cold Path)**：
 ```
@@ -1498,7 +1446,7 @@ def compute_block_hash(block_kv):
 
 ---
 
-### 6.9.5 性能提升分析
+### 6.8.5 性能提升分析
 
 **理论加速比**：
 ```
@@ -1516,17 +1464,19 @@ def compute_block_hash(block_kv):
 加速比 ≈ (P + U) / U = 1 + P/U
 ```
 
-**实际案例**：
+**理论计算量示例**：
 ```
 场景 1: 系统提示词 200 tokens,用户输入 50 tokens
-  加速比 = (200 + 50) / 50 = **5 倍**
+  被跳过的前缀计算量与新增输入计算量之比 = 200 / 50
 
 场景 2: 系统提示词 1000 tokens (RAG 场景),用户输入 20 tokens
-  加速比 = (1000 + 20) / 20 = **51 倍** (极端 case)
+  被跳过的前缀计算量与新增输入计算量之比 = 1000 / 20
 
 场景 3: 无系统提示词
-  加速比 = 1x (无效果)
+  没有可复用前缀，因此不会跳过 prefill token
 ```
+
+`(P + U) / U` 只是按 token 数得到的 prefill 工作量比例，不是端到端延迟加速比。真实结果还受 cache 查询、block 对齐、队列、kernel 效率和 decode 时间影响。
 
 **内存开销**：
 - Hash table 存储: 与 block 数量线性相关
@@ -1539,18 +1489,18 @@ def compute_block_hash(block_kv):
 
 ---
 
-### 6.9.6 vLLM 配置
+### 6.8.6 vLLM 配置
 
-**启用 Prefix Caching** (v0.6.0+):
+**启用 Prefix Caching**（版本敏感，执行前检查目标版本帮助）：
 ```bash
-vLLM serve meta-llama/Llama-2-7b-hf \
+vllm serve meta-llama/Llama-2-7b-hf \
   --enable-prefix-caching \
   --max-num-seqs 128
 ```
 
 **监控 Cache Hit Rate**：
 ```python
-from vLLM import LLM
+from vllm import LLM
 
 llm = LLM(
     model="meta-llama/Llama-2-7b-hf",
@@ -1570,7 +1520,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ---
 
-### 6.9.7 Hybrid Attention 下的 Prefix Caching：命中不等于可复用
+### 6.8.7 Hybrid Attention 下的 Prefix Caching：命中不等于可复用
 
 前面的例子默认了一个重要前提：所有层的 cache 都是同一种普通 KV。只要 token 前缀相同、block hash 命中，就可以把这段 KV 直接接到新请求后面继续算。
 
@@ -1609,7 +1559,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ---
 
-### 6.9.8 实战案例
+### 6.8.8 实战案例
 
 **案例 1: Chatbot 服务 (示意)**
 ```
@@ -1646,7 +1596,7 @@ print(f"Tokens served from cache: {stats['cached_tokens']}")
 
 ---
 
-### 6.9.9 最佳实践
+### 6.8.9 最佳实践
 
 **1. 识别可缓存的 Prefix**
 ```
@@ -1766,12 +1716,12 @@ GPU 总显存: 2048 tokens
 ## 本章小结
 
 关键要点：
-- 传统 KV Cache 容易遭受内存碎片化,有效显存利用率会明显下降(常见在 60-70% 量级,依工作负载而变)
-- PagedAttention 借鉴 OS 虚拟内存,通过固定大小 block 管理缓解碎片化,有效利用率通常可提升到 90% 左右(同样依工作负载而变)
+- 传统连续分配可能产生外部碎片和过度预留；影响大小取决于请求长度分布与分配策略
+- PagedAttention 借鉴 OS 虚拟内存,通过固定大小 block 管理缓解碎片化；实际显存收益取决于请求长度分布、block size 与共享策略 [CITE: pagedattention-sosp-2023]
 - Block allocation 和 eviction 策略是 PagedAttention 的核心
-- Prefix Caching 通过跨请求复用,在高重复前缀场景可带来从 2x 到数十倍的加速
-- GQA 是质量与速度的最佳平衡
-- vLLM 自动启用 PagedAttention 和 Prefix Caching
+- Prefix Caching 通过跨请求复用跳过部分 prefill 工作；端到端收益取决于复用比例、查询开销、排队与 decode 占比
+- GQA 在 MHA 与 MQA 之间提供可设计的 KV head 数折中，但不是所有模型的固定最优选择 [CITE: gqa-emnlp-2023]
+- PagedAttention 是 vLLM 的核心内存管理机制；Prefix Caching 是否启用及其行为需要按版本和配置核对
 - KV 优化至少分三层: 管理层（分页/复用）、压缩层（GQA/MLA/量化）、结构层（线性 attention / 压缩 attention）
 - 混合模型（Attention + Mamba/线性注意力）通过固定大小隐状态解决长序列下的 KV Cache 爆炸问题
 - vLLM V1 通过统一分配器实现 KV Cache 和 Mamba 状态的协同管理

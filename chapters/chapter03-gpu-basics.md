@@ -20,13 +20,15 @@ optimization_axes:
 related:
   - "chapters-chapter04-environment-setup"
   - "chapters-chapter05-llm-inference-basics"
-references: []
+references:
+  - "https://crd.lbl.gov/assets/pubs_presos/parlab08-roofline-talk.pdf"
+  - "https://www.nvidia.com/en-us/data-center/h100/"
 status: "published"
 display_order: 4
 ---
 # 第3章 GPU基础
 
-> **💰 商业动机**：推理成本的第一性约束来自硬件。相同模型与相同框架下，硬件选型与配置不当，推理成本和尾延迟常常会被放大到 3-5 倍。理解 GPU 的瓶颈（算力 vs 带宽 vs 显存）是后续所有优化（KV、调度、量化、投机采样、PD 分离）的基础。
+> **💰 商业动机**：推理成本的第一性约束来自硬件。相同模型与框架在不同硬件、并行拓扑和配置下，单位成本与尾延迟可能明显不同。理解 GPU 的瓶颈（算力 vs 带宽 vs 显存）是后续所有优化（KV、调度、量化、投机采样、PD 分离）的基础。
 
 ## 简介
 
@@ -159,6 +161,8 @@ GPU 访问数据的速度是分层的：
 
 > **为什么重要**：Roofline Model 能帮助你快速判断”优化方向在哪里”——是提升算力还是提升带宽。
 
+[CITE: roofline-2009]
+
 **模型公式**：
 
 ```
@@ -172,28 +176,21 @@ GPU 访问数据的速度是分层的：
 ```
                        性能 (TFLOPS)
                          ↑
-    Compute-bound       |        ___________ (计算峰值: 1 PFLOPS)
+    Compute-bound       |        ___________ (计算峰值)
     区域                |       /
     (算术强度高)        |      /
                          |_____/____________________→ 算术强度 (FLOPs/Byte)
                          |    ╱
-    Memory-bound         |   ╱  ← 带宽限制 (带宽: 3.35 TB/s)
+    Memory-bound         |   ╱  ← 带宽限制
     区域                 |  ╱
     (算术强度低)         |_╱_________________________
                          0      100     200     300
                                 AI 算子算术强度示意
 ```
 
-**典型 AI 算子的算术强度**：
+**不要背算术强度表**：
 
-| 算子 | 算术强度 (FLOPs/Byte) | 瓶颈类型 | 优化方向 |
-|------|---------------------|----------|----------|
-| GEMM (矩阵乘) | 100-200+ | Compute | 算子融合、Tensor Core |
-| Attention (Batch大) | 50-100 | Compute | FlashAttention |
-| Attention (Decode) | 5-20 | **Memory** | KV Cache、量化 |
-| LayerNorm | 5-15 | Memory | 算子融合 |
-| Embedding lookup | 0.5-2 | Memory | 量化、缓存 |
-| Softmax | 1-5 | Memory | 算子融合 |
+同一类算子的算术强度会随张量形状、batch、序列长度、精度、融合方式、缓存命中与 kernel 实现改变。工程上应从实际执行的 kernel 计算 FLOPs/Bytes，或用 profiler 观察计算吞吐、内存吞吐与 stall 原因；不能仅凭“GEMM”或“Attention”这个名字判定瓶颈。
 
 **LLM 推理各阶段位置**：
 
@@ -212,30 +209,29 @@ GPU 访问数据的速度是分层的：
 
 **关键洞察**：
 - 当某个 kernel 的算术强度 < 带宽限制斜率时，性能由**带宽**决定
-- Decode 阶段的 Attention 算术强度很低（约 5-20），**必然受限于带宽**
-- 这就是为什么”提升带宽”（H100 → H200 → B200）能显著提升 Decode 性能
-- 这也是为什么 KV Cache 优化（减少重复访存）对 Decode 如此有效
+- 小 batch 的 Decode Attention 往往算术强度较低，常见表现是受显存带宽或访存延迟限制，但仍需按实际 kernel 验证
+- 若实测 decode kernel 受带宽约束，提高有效带宽或减少数据移动才可能转化为性能收益；硬件规格本身不等于端到端收益。[CITE: nvidia-h100-product-spec]
+- KV Cache 量化、布局与复用的价值，也应通过它们减少的字节数、额外计算和端到端指标共同验证
 
 **工程意义**：
 
 | 瓶颈类型 | 判断方法 | 优化策略 |
 |----------|----------|----------|
 | **Compute-bound** | GPU Util 100% + Tensor Core 饱和 | 算子融合、更强 GPU |
-| **Memory-bound** | GPU Util < 50% + 显存带宽饱和 | KV Cache、量化、减少访存 |
+| **Memory-bound** | profiler 显示内存吞吐接近平台上限，且 warp 主要等待内存 | KV Cache、量化、减少访存 |
 
 **实测诊断**：
 
 ```bash
 # 判断瓶颈类型
-# 1. 查看 GPU 利用率
+# 1. 查看 GPU 与内存子系统的活动率，作为第一轮线索
 nvidia-smi --query-gpu=utilization.gpu,utilization.memory --format=csv
 
-# 2. 高利用率 + 高显存 → Compute-bound
-# 3. 低利用率 + 高显存带宽 → Memory-bound
+# 注意：utilization.memory 不是实际带宽利用率，不能据此单独判定 memory-bound。
 
-# 4. 使用 nsight systems 做精确判断
+# 2. 使用 Nsight Systems 定位时间线，再用 Nsight Compute 检查 kernel 指标
 nsys profile -o profile.qdrep python your_inference.py
-# 查看 CUDA kernel 时间：计算密集型会有大量 matmul/attention
+# 关注 kernel 时间、memory throughput、compute throughput 与 stall 原因
 ```
 
 **优化收益预估**：

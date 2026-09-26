@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-05-09T13:59:51.979Z",
+  "generatedAt": "2026-08-25T15:51:10.688Z",
   "nodeCount": 112,
-  "edgeCount": 483,
+  "edgeCount": 509,
   "nodes": [
     {
       "id": "readme",
@@ -149,7 +149,10 @@
           "chapters-chapter04-environment-setup",
           "chapters-chapter05-llm-inference-basics"
         ],
-        "references": [],
+        "references": [
+          "https://crd.lbl.gov/assets/pubs_presos/parlab08-roofline-talk.pdf",
+          "https://www.nvidia.com/en-us/data-center/h100/"
+        ],
         "status": "published",
         "display_order": 4,
         "source_scope": "core"
@@ -188,7 +191,11 @@
           "chapters-chapter05-llm-inference-basics",
           "appendix-b-troubleshooting"
         ],
-        "references": [],
+        "references": [
+          "https://docs.vllm.ai/en/latest/getting_started/installation/gpu/",
+          "https://docs.vllm.ai/en/stable/deployment/docker/",
+          "https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html"
+        ],
         "status": "published",
         "display_order": 5,
         "source_scope": "core"
@@ -229,7 +236,11 @@
           "chapters-chapter06-kv-cache-optimization",
           "chapters-chapter07-request-scheduling"
         ],
-        "references": [],
+        "references": [
+          "https://arxiv.org/abs/2309.06180",
+          "https://aclanthology.org/2023.emnlp-main.298/",
+          "https://docs.vllm.ai/en/stable/usage/metrics/"
+        ],
         "status": "published",
         "display_order": 6,
         "source_scope": "core"
@@ -273,7 +284,12 @@
           "chapters-chapter08-quantization",
           "docs-cases-turboquant-kv-cache-compression"
         ],
-        "references": [],
+        "references": [
+          "https://arxiv.org/abs/2309.06180",
+          "https://arxiv.org/abs/2305.13245",
+          "https://arxiv.org/abs/2402.02750",
+          "https://docs.vllm.ai/en/stable/usage/metrics/"
+        ],
         "status": "published",
         "display_order": 7,
         "source_scope": "core"
@@ -317,7 +333,11 @@
           "chapters-chapter10-production-deployment",
           "docs-cases-vllm-mooncake-store-agentic-serving"
         ],
-        "references": [],
+        "references": [
+          "https://www.usenix.org/conference/osdi22/presentation/yu",
+          "https://www.usenix.org/conference/osdi24/presentation/agrawal",
+          "https://arxiv.org/abs/2401.09670"
+        ],
         "status": "published",
         "display_order": 8,
         "source_scope": "core"
@@ -363,7 +383,10 @@
           "chapters-chapter11-advanced-topics",
           "docs-cases-turboquant-kv-cache-compression"
         ],
-        "references": [],
+        "references": [
+          "https://arxiv.org/abs/2306.00978",
+          "https://arxiv.org/abs/2210.17323"
+        ],
         "status": "published",
         "display_order": 9,
         "source_scope": "core"
@@ -406,7 +429,11 @@
           "chapters-chapter11-advanced-topics",
           "docs-cases-dflash-block-diffusion-analysis"
         ],
-        "references": [],
+        "references": [
+          "https://arxiv.org/abs/2211.17192",
+          "https://arxiv.org/abs/2402.02057",
+          "https://arxiv.org/abs/2401.15077"
+        ],
         "status": "published",
         "display_order": 10,
         "source_scope": "core"
@@ -454,7 +481,9 @@
           "docs-cases-vllm-mooncake-store-agentic-serving",
           "docs-cases-projectdiscovery-prompt-caching-agent-cost"
         ],
-        "references": [],
+        "references": [
+          "https://docs.vllm.ai/en/stable/usage/metrics/"
+        ],
         "status": "published",
         "display_order": 11,
         "source_scope": "core"
@@ -588,7 +617,9 @@
           "chapters-chapter07-request-scheduling",
           "chapters-chapter10-production-deployment"
         ],
-        "references": [],
+        "references": [
+          "https://docs.vllm.ai/en/stable/usage/metrics/"
+        ],
         "status": "published",
         "display_order": 14,
         "source_scope": "core"
@@ -596,12 +627,12 @@
     },
     {
       "id": "appendix-c-benchmarks-roi",
-      "label": "附录C: 性能基准测试与ROI案例",
+      "label": "附录C: 基准测试与ROI教学算例（待验证）",
       "type": "reference",
       "file": "appendix-c-benchmarks-roi.md",
       "metadata": {
         "id": "appendix-c-benchmarks-roi",
-        "title": "附录C: 性能基准测试与ROI案例",
+        "title": "附录C: 基准测试与ROI教学算例（待验证）",
         "slug": "appendix-c-benchmarks-roi",
         "date": "2026-03-11",
         "type": "reference",
@@ -629,7 +660,7 @@
           "chapters-chapter10-production-deployment"
         ],
         "references": [],
-        "status": "published",
+        "status": "draft",
         "display_order": 15,
         "source_scope": "core"
       }
@@ -2116,6 +2147,16 @@
       "type": "related"
     },
     {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "https://crd.lbl.gov/assets/pubs_presos/parlab08-roofline-talk.pdf",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter03-gpu-basics",
+      "target": "https://www.nvidia.com/en-us/data-center/h100/",
+      "type": "references"
+    },
+    {
       "source": "chapters-chapter04-environment-setup",
       "target": "topic:environment-setup",
       "type": "related"
@@ -2159,6 +2200,21 @@
       "source": "chapters-chapter04-environment-setup",
       "target": "appendix-b-troubleshooting",
       "type": "related"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "https://docs.vllm.ai/en/latest/getting_started/installation/gpu/",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "https://docs.vllm.ai/en/stable/deployment/docker/",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter04-environment-setup",
+      "target": "https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html",
+      "type": "references"
     },
     {
       "source": "chapters-chapter05-llm-inference-basics",
@@ -2209,6 +2265,21 @@
       "source": "chapters-chapter05-llm-inference-basics",
       "target": "chapters-chapter07-request-scheduling",
       "type": "related"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "https://arxiv.org/abs/2309.06180",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "https://aclanthology.org/2023.emnlp-main.298/",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "https://docs.vllm.ai/en/stable/usage/metrics/",
+      "type": "references"
     },
     {
       "source": "chapters-chapter05-llm-inference-basics",
@@ -2292,6 +2363,26 @@
     },
     {
       "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "https://arxiv.org/abs/2309.06180",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "https://arxiv.org/abs/2305.13245",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "https://arxiv.org/abs/2402.02750",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
+      "target": "https://docs.vllm.ai/en/stable/usage/metrics/",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter06-kv-cache-optimization",
       "target": "url:https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
       "type": "references"
     },
@@ -2364,6 +2455,21 @@
       "source": "chapters-chapter07-request-scheduling",
       "target": "docs-cases-vllm-mooncake-store-agentic-serving",
       "type": "related"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "https://www.usenix.org/conference/osdi22/presentation/yu",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "https://www.usenix.org/conference/osdi24/presentation/agrawal",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter07-request-scheduling",
+      "target": "https://arxiv.org/abs/2401.09670",
+      "type": "references"
     },
     {
       "source": "chapters-chapter07-request-scheduling",
@@ -2457,6 +2563,16 @@
     },
     {
       "source": "chapters-chapter08-quantization",
+      "target": "https://arxiv.org/abs/2306.00978",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
+      "target": "https://arxiv.org/abs/2210.17323",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter08-quantization",
       "target": "docs-cases-turboquant-kv-cache-compression",
       "type": "references"
     },
@@ -2519,6 +2635,21 @@
       "source": "chapters-chapter09-speculative-sampling",
       "target": "docs-cases-dflash-block-diffusion-analysis",
       "type": "related"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "https://arxiv.org/abs/2211.17192",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "https://arxiv.org/abs/2402.02057",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter09-speculative-sampling",
+      "target": "https://arxiv.org/abs/2401.15077",
+      "type": "references"
     },
     {
       "source": "chapters-chapter10-production-deployment",
@@ -2604,6 +2735,11 @@
       "source": "chapters-chapter10-production-deployment",
       "target": "docs-cases-projectdiscovery-prompt-caching-agent-cost",
       "type": "related"
+    },
+    {
+      "source": "chapters-chapter10-production-deployment",
+      "target": "https://docs.vllm.ai/en/stable/usage/metrics/",
+      "type": "references"
     },
     {
       "source": "chapters-chapter10-production-deployment",
@@ -2892,6 +3028,11 @@
     },
     {
       "source": "appendix-b-troubleshooting",
+      "target": "https://docs.vllm.ai/en/stable/usage/metrics/",
+      "type": "references"
+    },
+    {
+      "source": "appendix-b-troubleshooting",
       "target": "appendix-c-benchmarks-roi",
       "type": "references"
     },
@@ -3134,6 +3275,26 @@
       "source": "docs-refs",
       "target": "chapters-chapter10-production-deployment",
       "type": "related"
+    },
+    {
+      "source": "docs-refs",
+      "target": "docs-cases-projectdiscovery-prompt-caching-agent-cost",
+      "type": "references"
+    },
+    {
+      "source": "docs-refs",
+      "target": "docs-cases-vllm-mooncake-store-agentic-serving",
+      "type": "references"
+    },
+    {
+      "source": "docs-refs",
+      "target": "docs-cases-ds4-local-metal-inference",
+      "type": "references"
+    },
+    {
+      "source": "docs-refs",
+      "target": "docs-cases-turboquant-kv-cache-compression",
+      "type": "references"
     },
     {
       "source": "docs-refs",

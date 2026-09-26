@@ -27,4 +27,4 @@
 ## 附录
 - [附录A: 工具与资源](/appendix-a-tools-resources)
 - [附录B: 故障排查指南](/appendix-b-troubleshooting)
-- [附录C: 性能基准测试与ROI案例](/appendix-c-benchmarks-roi)
+- [附录C: 基准测试与ROI教学算例（待验证）](/appendix-c-benchmarks-roi)

@@ -38,7 +38,17 @@ display_order: 1
 - Main reading path: [`SUMMARY.md`](SUMMARY.md)
 - Repo landing page: [`index.md`](index.md)
 - Back-cover style summary: [`docs/content-summary.md`](docs/content-summary.md)
+- Ten-year durability review and restructuring blueprint: [`docs/book-longevity-review.md`](docs/book-longevity-review.md)
+- Architecture decision record: [`ADR-0001`](docs/adr/0001-stable-core-and-versioned-adapters.md)
 - Editorial changelog: [`CHANGELOG.md`](CHANGELOG.md)
+
+### 🎬 Video Introduction
+
+Prefer a quick overview? The repository includes a 30-second, 16:9 introduction
+video in the same dark editorial style as the reference design:
+
+- [Download the MP4 introduction](media/intro_video/llm-inference-optimization-rewired-style-30s.mp4)
+- [Open the Canvas source](media/intro_video/canvas_rewired_style.html)
 
 ---
 
@@ -57,6 +67,8 @@ You'll learn:
 ---
 
 ## 📝 Current Editorial Status
+
+The long-term editorial strategy is to keep mechanisms and experimental methods stable while moving framework, hardware, model, and version-specific material into replaceable cards and playbooks. This is recorded in [`ADR-0001`](docs/adr/0001-stable-core-and-versioned-adapters.md); see [`docs/book-longevity-review.md`](docs/book-longevity-review.md) for the chapter-by-chapter audit and migration plan.
 
 - The manuscript is currently organized into **4 parts / 11 chapters**
 - Chapter boundaries have been tightened so the main path now reads more cleanly:
@@ -105,7 +117,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the latest structural and editorial updat
 ### Appendices
 - **Appendix A: Tools and Resources** - A curated list of helpful tools
 - **Appendix B: Troubleshooting** - Common issues and solutions
-- **Appendix C: Performance Benchmarks** - Real-world numbers
+- **Appendix C: Benchmark and ROI Worksheets** - Draft teaching examples pending reproducible evidence
 
 ---
 
