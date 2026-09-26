@@ -42,6 +42,14 @@ display_order: 1
 - Architecture decision record: [`ADR-0001`](docs/adr/0001-stable-core-and-versioned-adapters.md)
 - Editorial changelog: [`CHANGELOG.md`](CHANGELOG.md)
 
+### 🎬 Video Introduction
+
+Prefer a quick overview? The repository includes a 30-second, 16:9 introduction
+video in the same dark editorial style as the reference design:
+
+- [Download the MP4 introduction](media/intro_video/llm-inference-optimization-rewired-style-30s.mp4)
+- [Open the Canvas source](media/intro_video/canvas_rewired_style.html)
+
 ---
 
 ## 📖 What This Book Teaches

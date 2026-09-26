@@ -2,6 +2,14 @@
 
 All notable editorial and structural changes to this manuscript are documented in this file.
 
+## 2026-09-26
+
+### Added
+
+- Added a 30-second, 16:9 introduction video covering the book's core path from inference economics and GPU fundamentals through KV cache, scheduling, quantization, speculative sampling, production deployment, and vLLM 0.30.0 practice.
+- Added the playable MP4 at [`media/intro_video/llm-inference-optimization-rewired-style-30s.mp4`](media/intro_video/llm-inference-optimization-rewired-style-30s.mp4).
+- Added the editable Canvas source at [`media/intro_video/canvas_rewired_style.html`](media/intro_video/canvas_rewired_style.html).
+
 ## 2026-04-26
 
 ### Added
