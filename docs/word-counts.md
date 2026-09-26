@@ -16,6 +16,6 @@
 | `chapters/chapter07-request-scheduling.md` | 53392 | 1541 | 33144 | 24542 | 8204 | 3568 |
 | `chapters/chapter08-quantization.md` | 62188 | 2355 | 40940 | 32122 | 9786 | 5253 |
 | `chapters/chapter09-speculative-sampling.md` | 36996 | 1074 | 19540 | 15770 | 7309 | 2178 |
-| `chapters/chapter10-production-deployment.md` | 79797 | 2729 | 56241 | 43251 | 9331 | 5796 |
-| `chapters/chapter11-advanced-topics.md` | 68073 | 2095 | 43399 | 35908 | 11303 | 4476 |
-| **TOTAL** | 517528 | 15956 | 319822 | 255584 | 85462 | 37073 |
+| `chapters/chapter10-production-deployment.md` | 79872 | 2729 | 56316 | 43326 | 9331 | 5796 |
+| `chapters/chapter11-advanced-topics.md` | 67905 | 2095 | 43231 | 35740 | 11303 | 4476 |
+| **TOTAL** | 517435 | 15956 | 319729 | 255491 | 85462 | 37073 |
