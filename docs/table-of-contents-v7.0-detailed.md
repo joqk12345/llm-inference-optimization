@@ -2766,7 +2766,7 @@ vLLM插件系统提供了更好的解决方案。
 
   **6.3.4.8 SGLang的LRU Cache管理**
 
-  > **💡 深度来源**：[SGLang v0.2 Slides](/Users/mac/Downloads/sglang_v0_2.pdf)
+  > **💡 深度来源**：SGLang v0.2 Slides（内部资料；发布前替换为公开、可访问的版本化链接）
   >
   > **核心机制**：Radix Tree + LRU Eviction
   >
@@ -4072,7 +4072,7 @@ vLLM插件系统提供了更好的解决方案。
 
 - 7.4.7 Dynamic Memory Management (SGLang)
 
-  > **💡 深度来源**：[SGLang v0.2 Slides](/Users/mac/Downloads/sglang_v0_2.pdf)
+  > **💡 深度来源**：SGLang v0.2 Slides（内部资料；发布前替换为公开、可访问的版本化链接）
   >
   > **核心问题**：max_new_tokens预留空间浪费
   >

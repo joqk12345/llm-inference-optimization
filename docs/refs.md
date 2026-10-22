@@ -68,12 +68,12 @@ display_order: 203
     - 报告 cache hit rate 从 7% 到 84%,整体 LLM 成本节省 59%
   - 建议引用章节：10.6.5, 11.1
   - URL: https://projectdiscovery.io/blog/how-we-cut-llm-cost-with-prompt-caching
-  - 横向案例：[ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/projectdiscovery-prompt-caching-agent-cost.md:1)
+  - 横向案例：[ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](cases/projectdiscovery-prompt-caching-agent-cost.md)
 
 #### MoE架构与推理
 
 > 横向对照阅读：如果你想把 `MiniMax-01`、`Kimi Linear` 和 `DeepSeek-V4` 放在同一条 attention 演进链里看，优先读
-> [注意力架构演进案例研究 - MiniMax-01、Kimi Linear 与 DeepSeek-V4](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/attention-architecture-evolution.md:1)。
+> [注意力架构演进案例研究 - MiniMax-01、Kimi Linear 与 DeepSeek-V4](cases/attention-architecture-evolution.md)。
 
 - **DeepSeek-V4: Towards Highly Efficient Million-Token Context Intelligence**
   - 作者：DeepSeek-AI
@@ -121,7 +121,7 @@ display_order: 203
     - vLLM/SGLang、TileLang、torch.compile/NpuGraphEx 等生态接入
   - 建议引用章节：2.1.5, 10.3, 11.2, 11.8
   - 文件路径：/Users/mac/Downloads/DeepSeek-V4昇腾首发_基于CANN的高性能推理优化实践.pdf
-  - 横向案例：[DeepSeek-V4 昇腾 CANN 推理优化案例研究](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/deepseek-v4-ascend-cann-inference.md:1)
+  - 横向案例：[DeepSeek-V4 昇腾 CANN 推理优化案例研究](cases/deepseek-v4-ascend-cann-inference.md)
 
 - **DeepSeek V4 in vLLM: Efficient Long-context Attention**
   - 来源：vLLM Blog
@@ -148,7 +148,7 @@ display_order: 203
   - URL: https://www.lmsys.org/blog/2026-04-25-deepseek-v4/
 
 > 推理引擎适配横向阅读：如果你想比较 vLLM 与 SGLang 如何分别承接 DeepSeek-V4，优先读
-> [DeepSeek-V4 推理引擎适配案例研究 - vLLM 与 SGLang](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/deepseek-v4-inference-engines.md:1)。
+> [DeepSeek-V4 推理引擎适配案例研究 - vLLM 与 SGLang](cases/deepseek-v4-inference-engines.md)。
 
 - **Large-scale Expert Parallelism (大EP)**
   - 来源：vLLM Blog
@@ -180,7 +180,7 @@ display_order: 203
     - vLLM 报告在真实 agentic traces 上吞吐 3.8x、P50 TTFT 46x、端到端延迟 8.6x 改善，并在 60 张 GB200 GPU 上接近线性扩展
   - 建议引用章节：7.7, 10.2.3, 11.1, 11.8.4
   - URL: https://vllm.ai/blog/mooncake-store
-  - 横向案例：[vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/vllm-mooncake-store-agentic-serving.md:1)
+  - 横向案例：[vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](cases/vllm-mooncake-store-agentic-serving.md)
 
 #### vLLM架构与实现
 - **Berkeley EECS-2025-192**: Deconstructing vLLM
@@ -205,7 +205,7 @@ display_order: 203
     - OpenAI / Anthropic 兼容 server,可接本地 coding agent
   - 建议引用章节：11.1, 11.2, 附录A
   - URL: https://github.com/antirez/ds4
-  - 横向案例：[ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/ds4-local-metal-inference.md:1)
+  - 横向案例：[ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](cases/ds4-local-metal-inference.md)
 
 #### 性能分析
 - **vLLM Profiling Documentation**
@@ -229,7 +229,7 @@ display_order: 203
   - 引用章节：6.4.4, 8.5.4, 11.x
   - URL: https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/
   - 补充解读：https://towardsdatascience.com/kv-cache-is-eating-your-vram-heres-how-google-fixed-it-with-turboquant/
-  - 横向案例：[TurboQuant 案例研究 - 极限 KV Cache 压缩](/Users/mac/Documents/workspace/codespace/llm-inference-optimization/docs/cases/turboquant-kv-cache-compression.md:1)
+  - 横向案例：[TurboQuant 案例研究 - 极限 KV Cache 压缩](cases/turboquant-kv-cache-compression.md)
 
 - **Quantization-Aware Training (QAT)**
   - 引用章节：8.2.2

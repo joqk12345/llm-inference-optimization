@@ -93,7 +93,7 @@
 - [市场竞品对比分析](/docs/market-comparison) => [LLM推理性能优化](/README)
 - [市场竞品对比分析](/docs/market-comparison) => [第2章：技术全景与趋势](/chapters/chapter02-technology-landscape)
 - [Reader Success Stories](/docs/success-stories) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
-- [Reader Success Stories](/docs/success-stories) => [附录C: 性能基准测试与ROI案例](/appendix-c-benchmarks-roi)
+- [Reader Success Stories](/docs/success-stories) => [附录C: 基准测试与ROI教学算例（待验证）](/appendix-c-benchmarks-roi)
 - [Contributor Hall of Fame](/docs/contributors) => [LLM推理性能优化](/README)
 - [第1章补充案例 - 非经济学家对AI和经济学的思考](/docs/cases/boaz-barak-ai-economics) => [第1章 重新理解推理这件事](/chapters/chapter01-introduction)
 - [第1章补充案例 - 非经济学家对AI和经济学的思考](/docs/cases/boaz-barak-ai-economics) => [第2章：技术全景与趋势](/chapters/chapter02-technology-landscape)

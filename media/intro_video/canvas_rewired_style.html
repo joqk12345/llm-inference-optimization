@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>LLM Inference Optimization — Rewired-style Canvas Intro</title>
+<style>
+html,body{margin:0;background:#020303;color:#f4f5f0;font-family:Arial,"PingFang SC",sans-serif;height:100%;display:grid;place-items:center}
+#stage{width:min(96vw,1280px);aspect-ratio:16/9;background:#050606;box-shadow:0 20px 90px #000}
+canvas{width:100%;height:100%;display:block}.controls{position:fixed;bottom:16px;display:flex;gap:8px}
+button{background:#090c09;color:#d9ff3f;border:1px solid #d9ff3f;padding:8px 14px;border-radius:3px;cursor:pointer}
+</style>
+<div id="stage"><canvas id="c" width="1280" height="720"></canvas></div>
+<div class="controls"><button id="play">播放</button><button id="export">导出 Canvas 视频</button></div>
+<audio id="voice" preload="auto" src="canvas-voice.m4a"></audio>
+<script>
+const c=document.querySelector('#c'),g=c.getContext('2d'),W=1280,H=720, lime='#d7f238', grey='#80877f';
+const scenes=[
+ {tag:'A FIELD GUIDE TO SYSTEMS',title:['LLM INFERENCE','OPTIMIZATION'],sub:'从成本、延迟与吞吐，重新理解推理系统'},
+ {tag:'01 / THE QUESTION',title:['推理越来越贵。','瓶颈在哪里？'],sub:'模型、GPU、KV Cache，以及每一次等待',circles:true},
+ {tag:'02 / THE SYSTEM',title:['PREFILL','→  KV CACHE  →  DECODE'],sub:'把黑盒拆成可以测量、可以优化的阶段',flow:true},
+ {tag:'03 / THE TOOLKIT',title:['SCHEDULE.','QUANTIZE. SPECULATE.'],sub:'连续批处理 · 量化 · 投机采样'},
+ {tag:'04 / SHIP IT',title:['vLLM 0.30.0','IN PRODUCTION'],sub:'建立基线 → 定位瓶颈 → 优化 → 回归验证',steps:true},
+ {tag:'THE MANIFESTO / 宣言',title:['把性能，','变成工程能力。'],sub:'LLM Inference Optimization · 现在开始'}
+];
+function tx(t,x,y,size,color='#f4f5f0',align='left',weight=700){g.font=`${weight} ${size}px Arial,"PingFang SC",sans-serif`;g.fillStyle=color;g.textAlign=align;t.split('\n').forEach((s,i)=>g.fillText(s,x,y+i*size*1.05));}
+function bg(sec){g.fillStyle='#050606';g.fillRect(0,0,W,H);g.strokeStyle='#101612';g.lineWidth=1;for(let x=0;x<W;x+=64){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke()}for(let y=0;y<H;y+=48){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke()}const drift=(sec*35)%W;g.strokeStyle='#1d2f20';g.beginPath();g.moveTo(drift-300,0);g.lineTo(drift+200,H);g.stroke();}
+function scene(sec){const i=Math.min(5,Math.floor(sec/5)),p=sec%5,s=scenes[i],a=Math.min(1,p/.45,(5-p)/.45);bg(sec);g.globalAlpha=a;tx(s.tag,70,68,13,grey,'left',500);g.fillStyle=lime;g.fillRect(70,88,170,3);
+ if(s.circles){tx(s.title.join('\n'),70,220,58);tx(s.sub,70,390,18,grey, 'left',400);[['MODEL',920,190],['GPU',1035,340],['KV CACHE',820,485]].forEach(([t,x,y])=>{g.strokeStyle='#6e756d';g.lineWidth=1;g.beginPath();g.arc(x,y,84,0,Math.PI*2);g.stroke();tx(t,x,y+6,14,'#f4f5f0','center',600)});}
+ else if(s.flow){tx(s.title.join('\n'),70,230,55);tx(s.sub,70,410,18,grey,'left',400);g.strokeStyle=lime;g.lineWidth=2;g.beginPath();g.moveTo(70,525);g.lineTo(1190,525);g.stroke();['PROMPT','ATTENTION','TOKENS'].forEach((t,j)=>{let x=140+j*390;g.fillStyle=lime;g.beginPath();g.arc(x,525,7,0,Math.PI*2);g.fill();tx(t,x,570,14,'#f4f5f0','center',600)});}
+ else if(s.steps){tx(s.title.join('\n'),70,220,58);tx(s.sub,70,410,18,grey,'left',400);['BASELINE','PROFILE','OPTIMIZE','REGRESS'].forEach((t,j)=>{let x=80+j*290;tx(`0${j+1}`,x,540,13, lime,'left',700);tx(t,x,575,22,'#f4f5f0','left',700);if(j<3){tx('→',x+220,575,22,grey,'center',400)}})}
+ else {tx(s.title.join('\n'),70,260,66);tx(s.sub,70,455,20,grey,'left',400);if(i===0||i===5){g.strokeStyle='#25332a';g.beginPath();g.moveTo(70,560);g.lineTo(1210,560);g.stroke();}}
+ tx(`${String(i+1).padStart(2,'0')} / 06`,1210,675,13,grey,'right',500);g.globalAlpha=1;}
+let playing=false,start=0,raf=0;function tick(now){if(!playing)return;let sec=(now-start)/1000;scene(Math.min(29.99,sec));if(sec<30)raf=requestAnimationFrame(tick);else playing=false}function play(){cancelAnimationFrame(raf);playing=true;start=performance.now();voice.currentTime=0;voice.play().catch(()=>{});raf=requestAnimationFrame(tick)}
+const voice=document.querySelector('#voice');document.querySelector('#play').onclick=play;document.querySelector('#export').onclick=async()=>{const ac=new AudioContext(),src=ac.createMediaElementSource(voice),dest=ac.createMediaStreamDestination();src.connect(dest);src.connect(ac.destination);const stream=new MediaStream([...c.captureStream(30).getVideoTracks(),...dest.stream.getAudioTracks()]);const rec=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp9,opus'}),chunks=[];rec.ondataavailable=e=>chunks.push(e.data);rec.onstop=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download='llm-inference-optimization-rewired-style.webm';a.click()};rec.start();play();setTimeout(()=>rec.stop(),30200)};scene(0);
+</script>

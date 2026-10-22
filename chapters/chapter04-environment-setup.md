@@ -10,7 +10,7 @@ concepts: []
 tools:
   - "docker"
   - "cuda"
-  - "vLLM"
+  - "vllm"
 architecture_layer:
   - "hardware-and-runtime"
 learning_stage: "foundations"
@@ -21,13 +21,16 @@ related:
   - "chapters-chapter03-gpu-basics"
   - "chapters-chapter05-llm-inference-basics"
   - "appendix-b-troubleshooting"
-references: []
+references:
+  - "https://docs.vllm.ai/en/latest/getting_started/installation/gpu/"
+  - "https://docs.vllm.ai/en/stable/deployment/docker/"
+  - "https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html"
 status: "published"
 display_order: 5
 ---
 # 第4章 环境搭建
 
-> **💰 商业动机**：环境问题是最“无聊”但也最昂贵的推理成本。环境不当导致的故障，往往会把一次部署变成 4-8 小时的排查；而可复现的环境与清晰的排障路径，通常能把问题压缩到 30 分钟内定位并解决。
+> **💰 商业动机**：环境问题是最“无聊”但也最昂贵的推理成本之一。可复现的制品、兼容矩阵和清晰的排障路径，能减少版本漂移造成的发布失败，并让恢复时间成为可度量、可改进的指标。
 
 ## 简介
 
@@ -87,15 +90,17 @@ Docker 容器:
 - 标准的运行环境
 
 结果:
-→ 任何机器,同样的行为
-→ 易于复现和调试
-→ 一键部署到生产
+→ 用户态依赖与启动方式更容易复现
+→ 镜像 tag/digest 可以进入发布和回滚记录
+→ 宿主驱动、GPU、内核与容器运行时仍需单独核验
 ```
 
-**商业价值**：
-- 减少 80% 的环境相关 bug
-- 新人上手时间从 2 天降到 30 分钟
-- 部署时间从数小时降到数分钟
+**如何验证价值**：
+
+- 环境相关发布失败率与回滚率；
+- 从拉取制品到通过 smoke test 的时间；
+- 新环境首次成功部署时间；
+- 相同 digest 在开发、测试和生产的差异项数量。
 
 ---
 
@@ -152,15 +157,15 @@ Docker 容器:
                │
 ┌──────────────▼──────────────────────────────────────┐
 │  运行时层 (Runtime Layer)                          │
-│  - Python 3.8+                                     │
-│  - CUDA 12.x                                       │
+│  - 目标版本支持的 Python                            │
+│  - 与后端匹配的 CUDA / ROCm / XPU / Metal          │
 │  - cuDNN / cuBLAS (CUDA 加速库)                   │
 └──────────────┬──────────────────────────────────────┘
                │
 ┌──────────────▼──────────────────────────────────────┐
 │  驱动层 (Driver Layer)                             │
-│  - NVIDIA Driver (525+)                            │
-│  - GPU 硬件 (A100 / H100 / RTX 4090)              │
+│  - 目标后端支持的宿主驱动                           │
+│  - 已验证的 GPU / 加速器                            │
 └──────────────┬──────────────────────────────────────┘
                │
 ┌──────────────▼──────────────────────────────────────┐
@@ -417,61 +422,62 @@ pip install --upgrade pip
 
 ### 4.3.2 vLLM vs 其他推理框架
 
-| 特性 | vLLM | SGLang | TensorRT-LLM | Transformers |
-|------|------|--------|--------------|--------------|
-| **性能** | 高 | 高 | 高 | 中 |
-| **易用性** | 高 | 较高 | 中 | 高 |
-| **生态** | 高 | 中 | 较高 | 高 |
-| **OpenAI API** | 支持 | 支持 | 需适配 | 需适配 |
-| **生产就绪** | 高 | 较高 | 高 | 低 |
-| **学习曲线** | 低 | 中 | 高 | 低 |
+框架能力和支持矩阵变化很快，不使用“高/中/低”给出永久排名。先按以下问题筛选候选项，再在同一模型制品、流量和 SLO 下验证：
 
-**选择建议**：
-- **vLLM**: 大多数场景的首选,性能与易用性的最佳平衡
-- **SGLang**: 需要结构化生成或高级调度功能
-- **TensorRT-LLM**: 极致性能要求,愿意投入时间优化
-- **Transformers**: 快速原型,学习研究
+| 决策维度 | 需要核对的证据 |
+|----------|----------------|
+| 模型与硬件支持 | 目标版本支持矩阵、能否加载指定制品 |
+| 服务接口 | 流式输出、鉴权、取消、结构化输出和错误语义 |
+| 性能 | 同负载下的 TTFT、TPOT、goodput、显存和成本 |
+| 运维 | metrics、trace、滚动升级、故障回退和多租户隔离 |
+| 扩展能力 | 并行、量化、KV 传输、插件与自定义 kernel 边界 |
+
+本书以 vLLM 作为贯穿示例，不代表它对所有模型、硬件和组织都是默认最优解。
 
 ---
 
 ### 4.3.3 安装 vLLM
 
-**方式 1: pip 安装** (推荐用于开发):
+安装命令必须与 GPU 后端、Python 和目标 vLLM 版本配套。官方文档当前推荐使用隔离环境，并针对后端选择预编译 wheel；出版后这些条件仍可能变化。[CITE: vllm-installation-gpu-stable]
+
+**方式 1：预编译 wheel（开发验证）**：
 
 ```bash
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+# Python 版本按目标版本支持矩阵选择
+uv venv --python <supported-python> --seed
+source .venv/bin/activate
 
-# 安装 vLLM
-pip install vLLM
+# NVIDIA CUDA 后端示例；其他后端不能照抄
+uv pip install "vllm==<validated-version>" --torch-backend=auto
 
 # 验证安装
-python -c "import vLLM; print(vLLM.__version__)"
+python -c "import vllm; print(vllm.__version__)"
 ```
 
-**方式 2: 从源码安装** (用于开发或最新功能):
+安装后应保存 lockfile、Python 版本、wheel 来源、GPU 和驱动信息；只有一个安装命令不足以复现环境。
+
+**方式 2：从源码安装（仅在需要修改源码时）**：
 
 ```bash
-git clone https://github.com/vLLM-project/vLLM.git
-cd vLLM
+git clone https://github.com/vllm-project/vllm.git
+cd vllm
+git checkout <validated-commit>
 
-# 安装依赖
-pip install -r requirements.txt
-
-# 安装 vLLM (可编辑模式)
-pip install -e .
+# 具体构建命令按该 commit 的官方文档执行
+uv pip install -e . --torch-backend=auto
 ```
 
-**方式 3: Docker 镜像** (推荐用于生产):
+**方式 3：官方 Docker 镜像**：
 
 ```bash
-# 拉取官方镜像
-docker pull vLLM/vLLM-openai:latest
+# 选定经过验证的 release tag，并记录解析后的 digest
+docker pull vllm/vllm-openai:<validated-tag>
+docker image inspect vllm/vllm-openai:<validated-tag> --format '{{index .RepoDigests 0}}'
 
-# 或者构建你自己的镜像（当你需要固定依赖与可复现交付时）
-# 参考本章 4.4 的 Dockerfile/Compose 模板
+# 生产部署使用 registry/repository@sha256:<validated-digest>
 ```
+
+`latest` 可以用于一次性试跑，但不能作为可回滚的生产制品标识。
 
 ---
 
@@ -481,21 +487,20 @@ docker pull vLLM/vLLM-openai:latest
 
 ```bash
 # OpenAI API 兼容服务器
-python -m vLLM.entrypoints.openai.api_server \
-    --model meta-llama/Llama-2-7b-chat-hf \
-    --host 0.0.0.0 \
-    --port 8000
+vllm serve MODEL --host 0.0.0.0 --port 8000
 ```
 
 **使用 Docker**：
 
 ```bash
 docker run --gpus all \
-    --shm-size 10g \
+    --ipc=host \
     -p 8000:8000 \
-    vLLM/vLLM-openai:latest \
-    --model meta-llama/Llama-2-7b-chat-hf
+    registry/repository@sha256:<validated-digest> \
+    --model MODEL
 ```
+
+官方镜像为 `vllm/vllm-openai`，并要求按运行方式配置 GPU 与共享内存；生产环境应在此基础上锁定 tag/digest。[CITE: vllm-installation-gpu-stable]
 
 **测试推理服务**：
 
@@ -504,7 +509,7 @@ docker run --gpus all \
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "meta-llama/Llama-2-7b-chat-hf",
+    "model": "MODEL",
     "messages": [
       {"role": "user", "content": "Hello, how are you?"}
     ]
@@ -520,7 +525,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="meta-llama/Llama-2-7b-chat-hf",
+    model="MODEL",
     messages=[
         {"role": "user", "content": "Hello, how are you?"}
     ]
@@ -529,19 +534,19 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-**重要启动参数**：
+**启动参数实验骨架**：
 
 ```bash
-python -m vLLM.entrypoints.openai.api_server \
-    --model meta-llama/Llama-2-7b-chat-hf \  # 模型名称或路径
-    --tensor-parallel-size 2 \                # 张量并行度 (多GPU)
-    --gpu-memory-utilization 0.9 \            # GPU 内存利用率 (0-1)
-    --max-model-len 4096 \                    # 最大序列长度
-    --dtype half \                            # 数据类型 (half, bfloat16)
-    --quantization awq \                      # 量化格式 (awq, gptq, squeezellm)
-    --host 0.0.0.0 \                          # 监听地址
-    --port 8000                               # 监听端口
+vllm serve MODEL \
+    --tensor-parallel-size <validated> \
+    --gpu-memory-utilization <candidate> \
+    --max-model-len <product-limit> \
+    --dtype <artifact-compatible-dtype> \
+    --host 0.0.0.0 \
+    --port 8000
 ```
+
+量化格式不是任意模型都能启用的服务开关；它必须与模型制品、kernel 和质量回归配套。
 
 ---
 
@@ -549,146 +554,43 @@ python -m vLLM.entrypoints.openai.api_server \
 
 ### 4.4.1 Dockerfile 编写
 
-**基础版 Dockerfile**：
+不要从任意 CUDA 基础镜像手工拼接一组 PyTorch、vLLM、Transformers 和 CUDA 版本，并把它称为“生产级”。这些包存在编译和 ABI 约束，表面上的版本锁定不等于兼容。
+
+更稳妥的路线是从经过验证的官方 release 镜像派生，只增加业务必需层：
 
 ```dockerfile
-# 基础镜像: 包含 CUDA 12.1
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+# 构建系统将该 ARG 替换为已验证且带 digest 的官方制品
+ARG VLLM_BASE_IMAGE
+FROM ${VLLM_BASE_IMAGE}
 
-# 安装 Python 和基础工具
-RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-pip \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+# 只复制业务需要的、已经锁定的附加依赖
+COPY requirements-extra.lock /tmp/requirements-extra.lock
+RUN uv pip install --system --require-hashes \
+    -r /tmp/requirements-extra.lock
 
-# 安装 vLLM
-RUN pip3 install --no-cache-dir vLLM
-
-# 设置工作目录
-WORKDIR /app
-
-# 暴露端口
-EXPOSE 8000
-
-# 启动命令
-CMD ["python3", "-m", "vLLM.entrypoints.openai.api_server", \
-     "--host", "0.0.0.0", \
-     "--port", "8000"]
+# 不在镜像里写死模型密钥；模型制品也应有独立 revision/digest
 ```
 
-**生产级 Dockerfile** (多阶段构建):
-
-```dockerfile
-# ==========================================
-# 阶段 1: 构建阶段
-# ==========================================
-FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS builder
-
-# 安装构建依赖
-RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-pip \
-    git \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# 创建虚拟环境
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# 升级 pip
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
-
-# 复制依赖文件
-COPY requirements.txt .
-
-# 安装依赖
-RUN pip install --no-cache-dir -r requirements.txt
-
-# ==========================================
-# 阶段 2: 运行阶段
-# ==========================================
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
-
-# 只安装运行时依赖
-RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-venv \
-    && rm -rf /var/lib/apt/lists/*
-
-# 从构建阶段复制虚拟环境
-COPY --from=builder /opt/venv /opt/venv
-
-# 设置环境变量
-ENV PATH="/opt/venv/bin:$PATH"
-ENV PYTHONUNBUFFERED=1
-ENV TF_CPP_MIN_LOG_LEVEL=3
-
-# 创建非 root 用户
-RUN useradd -m -u 1000 appuser
-
-# 设置工作目录
-WORKDIR /app
-
-# 复制应用代码
-COPY --chown=appuser:appuser . .
-
-# 切换到非 root 用户
-USER appuser
-
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
-
-# 暴露端口
-EXPOSE 8000
-
-# 启动命令
-CMD ["python3", "-m", "vLLM.entrypoints.openai.api_server", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--model", "${MODEL_PATH}"]
-```
-
-**requirements.txt**：
-
-```txt
-vLLM==0.6.0
-torch==2.3.0
-transformers==4.41.0
-accelerate==0.30.0
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-pydantic==2.7.0
-```
+发布物必须同时记录：基础镜像 digest、附加依赖 lockfile、模型 revision、启动参数、GPU/驱动/运行时矩阵、smoke test 结果和回滚 digest。官方文档特别提醒，基于官方镜像增加 optional dependencies 时，附加安装的 vLLM 版本必须与基础镜像匹配。[CITE: vllm-installation-gpu-stable]
 
 ---
 
 ### 4.4.2 Docker Compose 配置
 
-**docker-compose.yml**：
+**docker-compose.yml 骨架**（所有 digest、模型和容量值由验证流水线填入）：
 
 ```yaml
-version: '3.8'
-
 services:
-  vLLM-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: llm-inference:latest
-    container_name: vLLM-server
+  vllm-server:
+    image: registry/llm-inference@sha256:<validated-digest>
+    container_name: vllm-server
 
     # GPU 配置 (Compose 模式)
     gpus: all
 
     # 环境变量
     environment:
-      - MODEL_PATH=meta-llama/Llama-2-7b-chat-hf
-      - GPU_MEMORY_UTILIZATION=0.9
-      - MAX_MODEL_LEN=4096
-      - NUM_GPU=1
+      - MODEL_PATH=${MODEL_PATH}
 
     # 端口映射
     ports:
@@ -699,7 +601,7 @@ services:
 
     # 数据卷
     volumes:
-      - model-cache:/root/.cache/huggingface
+      - model-cache:/home/vllm/.cache/huggingface
       - logs:/app/logs
 
     # 网络
@@ -726,7 +628,7 @@ services:
 
   # 可选: Nginx 反向代理
   nginx:
-    image: nginx:alpine
+    image: nginx@sha256:<validated-digest>
     container_name: nginx-proxy
     ports:
       - "80:80"
@@ -737,12 +639,12 @@ services:
     networks:
       - llm-network
     depends_on:
-      - vLLM-server
+      - vllm-server
     restart: unless-stopped
 
   # 可选: Prometheus 监控
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus@sha256:<validated-digest>
     container_name: prometheus
     ports:
       - "9090:9090"
@@ -755,12 +657,14 @@ services:
 
   # 可选: Grafana 可视化
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana@sha256:<validated-digest>
     container_name: grafana
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_admin_password
+    secrets:
+      - grafana_admin_password
     volumes:
       - grafana-data:/var/lib/grafana
     networks:
@@ -778,6 +682,10 @@ volumes:
 networks:
   llm-network:
     driver: bridge
+
+secrets:
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password
 ```
 
 **启动服务**：
@@ -787,7 +695,7 @@ networks:
 docker compose up -d
 
 # 查看日志
-docker compose logs -f vLLM-server
+docker compose logs -f vllm-server
 
 # 停止服务
 docker compose down
@@ -800,34 +708,9 @@ docker compose down -v
 
 ### 4.4.3 多阶段构建优化
 
-**为什么要多阶段构建?**
+多阶段构建适用于必须在本地编译扩展或业务组件的情况：构建阶段包含编译器和源码，运行阶段只复制运行时产物。是否真的减小镜像、漏洞面或发布时间，应由镜像 layer、SBOM、漏洞扫描和拉取时间验证，不能套用固定 GB 数字。
 
-```
-单阶段构建:
-├── 基础镜像: 5GB
-├── 构建工具: 2GB
-├── 源代码: 500MB
-├── 编译产物: 3GB
-└── 最终镜像: 10.5GB 
-
-多阶段构建:
-┌─ 构建阶段 ─────────────────┐
-│ 基础镜像: 5GB              │
-│ 构建工具: 2GB              │
-│ 源代码: 500MB              │
-└──────────────┬─────────────┘
-               │ 只复制编译产物
-┌─ 运行阶段 ───▼─────────────┐
-│ 基础镜像: 5GB              │
-│ 编译产物: 3GB              │
-└────────────────────────────┘
-│ 最终镜像: 8GB           │
-```
-
-**优势**：
-- 更小的镜像体积 (节省存储和传输)
-- 更高的安全性 (不包含源代码和构建工具)
-- 更快的部署速度
+若完全使用官方预编译 vLLM 镜像且只添加少量 Python 依赖，多阶段构建未必带来价值；优先保持派生层最少并锁定全部输入制品。
 
 ---
 
@@ -873,13 +756,11 @@ volumes:
 **Python API**：
 
 ```python
-from vLLM import LLM, SamplingParams
+from vllm import LLM, SamplingParams
 
 # 初始化模型
 llm = LLM(
-    model="meta-llama/Llama-2-7b-chat-hf",
-    gpu_memory_utilization=0.9,
-    max_model_len=4096,
+    model="MODEL",
 )
 
 # 采样参数
@@ -909,14 +790,13 @@ for i, output in enumerate(outputs):
 **OpenAI API**：
 
 ```python
-import openai
+from openai import OpenAI
 
 # 配置本地端点
-openai.api_base = "http://localhost:8000/v1"
-openai.api_key = "dummy"
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="dummy")
 
-response = openai.ChatCompletion.create(
-    model="meta-llama/Llama-2-7b-chat-hf",
+response = client.chat.completions.create(
+    model="MODEL",
     messages=[
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "What is the capital of France?"}
@@ -935,12 +815,11 @@ print(response.choices[0].message.content)
 **Python API**：
 
 ```python
-from vLLM import LLM, SamplingParams
+from vllm import LLM, SamplingParams
 
 # 初始化模型
 llm = LLM(
-    model="meta-llama/Llama-2-7b-chat-hf",
-    tensor_parallel_size=2,  # 使用 2 个 GPU
+    model="MODEL",
 )
 
 # 批量输入
@@ -978,7 +857,7 @@ print(json.dumps(results, indent=2, ensure_ascii=False))
 ```
 
 **性能优化建议**：
-- 使用更大的 batch size 提高吞吐量
+- 扫描并发和 token budget；更大的 batch 不保证更好的尾延迟或 goodput
 - 预处理 prompt,减少运行时开销
 - 使用异步 API 处理大量请求
 
@@ -986,21 +865,7 @@ print(json.dumps(results, indent=2, ensure_ascii=False))
 
 ### 4.5.3 流式输出
 
-**服务器端配置**：
-
-```python
-from vLLM.engine.arg_utils import AsyncEngineArgs
-from vLLM.engine.async_llm_engine import AsyncLLMEngine
-from vLLM.sampling_params import SamplingParams
-
-# 启用流式输出
-engine_args = AsyncEngineArgs(
-    model="meta-llama/Llama-2-7b-chat-hf",
-    enable_prefix_caching=True,
-)
-
-engine = AsyncLLMEngine.from_engine_args(engine_args)
-```
+OpenAI-compatible server 已提供流式接口。不要为了流式输出依赖 `AsyncLLMEngine` 等内部模块路径；它们可能随版本调整。
 
 **客户端使用**：
 
@@ -1015,7 +880,7 @@ async def stream_chat():
     )
 
     stream = await client.chat.completions.create(
-        model="meta-llama/Llama-2-7b-chat-hf",
+        model="MODEL",
         messages=[
             {"role": "user", "content": "Tell me a long story."}
         ],
@@ -1037,7 +902,7 @@ asyncio.run(stream_chat())
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "meta-llama/Llama-2-7b-chat-hf",
+    "model": "MODEL",
     "messages": [{"role": "user", "content": "Hello!"}],
     "stream": true
   }'
@@ -1047,65 +912,13 @@ curl http://localhost:8000/v1/chat/completions \
 
 ### 4.5.4 性能基准测试
 
-**简单的基准测试脚本**：
-
-```python
-import time
-import numpy as np
-from vLLM import LLM, SamplingParams
-
-def benchmark(llm, prompts, sampling_params, num_iterations=10):
-    latencies = []
-
-    for _ in range(num_iterations):
-        start_time = time.time()
-
-        outputs = llm.generate(prompts, sampling_params)
-
-        end_time = time.time()
-        latencies.append(end_time - start_time)
-
-    # 统计
-    latencies = np.array(latencies)
-    print(f"平均延迟: {np.mean(latencies):.3f} 秒")
-    print(f"P50 延迟: {np.percentile(latencies, 50):.3f} 秒")
-    print(f"P99 延迟: {np.percentile(latencies, 99):.3f} 秒")
-    print(f"吞吐量: {len(prompts) / np.mean(latencies):.2f} 请求/秒")
-
-# 运行基准测试
-llm = LLM(model="meta-llama/Llama-2-7b-chat-hf")
-
-sampling_params = SamplingParams(
-    temperature=0.8,
-    max_tokens=128,
-)
-
-prompts = ["Hello, world!"] * 32  # 批量 32 个请求
-
-benchmark(llm, prompts, sampling_params)
-```
-
-**使用 Apache Bench**：
+不要用十次同步调用计算“P99”。优先使用目标版本随附的 benchmark 工具，并先查看其子命令与参数：
 
 ```bash
-# 安装 ab
-sudo apt-get install apache2-utils
-
-# 运行基准测试
-ab -n 1000 -c 10 -T 'application/json' \
-  -p request.json \
-  http://localhost:8000/v1/chat/completions
+vllm bench --help
 ```
 
-**request.json**：
-```json
-{
-  "model": "meta-llama/Llama-2-7b-chat-hf",
-  "messages": [
-    {"role": "user", "content": "Hello!"}
-  ]
-}
-```
+基准记录至少包括：版本和 digest、模型 revision、硬件拓扑、dtype/量化、prompt/output 分布、到达过程、并发、warm-up、样本量、TTFT/TPOT/E2E 分位数、输入/输出 token 吞吐、错误率与原始结果文件。只有这些条件一致，结果才可比较。
 
 ---
 
@@ -1271,7 +1084,7 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'vLLM'
+  - job_name: 'vllm'
     static_configs:
       - targets: ['localhost:8000']
 ```
@@ -1284,7 +1097,7 @@ scrape_configs:
 
 **问题**：`CUDA_ERROR_INVALID_DEVICE`
 
-**原因**：驱动版本与 CUDA 版本不匹配
+**原因**：可能涉及宿主驱动、容器所带 CUDA compatibility libraries、GPU 架构或 PyTorch/vLLM wheel 不匹配，不能只比较两个版本号。
 
 **解决方案**：
 
@@ -1292,20 +1105,13 @@ scrape_configs:
 # 1. 检查驱动版本
 nvidia-smi
 
-# 2. 检查容器内 CUDA 版本
-docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
+# 2. 记录目标镜像 digest，并运行该镜像的 smoke test
+docker run --rm --gpus all <validated-cuda-image@sha256:digest> nvidia-smi
 
-# 3. 使用兼容的 Docker 镜像
-# CUDA 12.1 需要 Driver >= 525
-# CUDA 11.8 需要 Driver >= 450
+# 3. 对照目标镜像、GPU 和后端版本的官方支持矩阵
 ```
 
-**版本兼容表**：
-| CUDA 版本 | 最低驱动版本 |
-|-----------|-------------|
-| 12.x      | 525+        |
-| 11.x      | 450+        |
-| 10.x      | 410+        |
+不要维护“CUDA 12.x → 某个最低驱动”这种过度简化表。CUDA minor compatibility、forward compatibility、GPU 类型和容器内兼容库会改变边界，应记录实际驱动与镜像 digest，并链接该制品对应的官方兼容说明。
 
 ---
 
@@ -1326,22 +1132,10 @@ sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
 
 # 3. 测试
-docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
-
-# 4. 如果还不行,检查默认运行时
-# 编辑 /etc/docker/daemon.json
-{
-  "default-runtime": "nvidia",
-  "runtimes": {
-    "nvidia": {
-      "path": "nvidia-container-runtime",
-      "runtimeArgs": []
-    }
-  }
-}
-
-sudo systemctl restart docker
+docker run --rm --gpus all <validated-cuda-image@sha256:digest> nvidia-smi
 ```
+
+上述 `nvidia-ctk` 流程来自 NVIDIA Container Toolkit 官方安装指南；rootless Docker、containerd、CRI-O 与 Podman 使用不同配置路径，不应手写一份通用 `daemon.json`。[CITE: nvidia-container-toolkit-install]
 
 ---
 
@@ -1355,11 +1149,12 @@ sudo systemctl restart docker
 # 1. 查看占用端口的进程
 sudo lsof -i :8000
 
-# 2. 杀掉占用端口的进程
-sudo kill -9 <PID>
+# 2. 识别进程归属后再决定停止方式；不要默认使用 SIGKILL
+sudo kill <PID>
 
 # 3. 或者使用其他端口
-docker run --gpus all -p 8001:8000 vLLM/vLLM-openai:latest
+docker run --gpus all --ipc=host -p 8001:8000 \
+  registry/repository@sha256:<validated-digest> --model MODEL
 ```
 
 ---
@@ -1371,20 +1166,15 @@ docker run --gpus all -p 8001:8000 vLLM/vLLM-openai:latest
 **解决方案**：
 
 ```bash
-# 1. 升级 pip
-pip install --upgrade pip
-
-# 2. 清理缓存
-pip cache purge
-
-# 3. 使用预编译包
-pip install --only-binary :all: vLLM
-
-# 4. 如果还是失败,使用 conda
-conda install -c conda-forge vLLM
-
-# 5. 检查 Python 版本 (需要 3.8+)
+# 1. 记录 Python、OS/glibc、GPU 后端和驱动
 python --version
+nvidia-smi
+
+# 2. 对照目标版本官方安装矩阵，使用新的隔离环境复现
+uv venv --python <supported-python> --seed .venv-repro
+
+# 3. 安装明确版本并保存完整日志；不要在失败环境里反复无界升级
+uv pip install "vllm==<validated-version>" --torch-backend=auto -v
 ```
 
 ---
@@ -1396,7 +1186,7 @@ python --version
 - [ ] 理解为什么使用 Docker 进行环境隔离
 - [ ] 在本地搭建完整的 LLM 推理环境
 - [ ] 使用 vLLM 启动推理服务
-- [ ] 编写生产级的 Dockerfile 和 docker-compose.yml
+- [ ] 编写可锁定 digest、依赖和模型 revision 的容器配置
 - [ ] 使用 OpenAI API 兼容的接口进行推理
 - [ ] 排查常见的环境问题
 
@@ -1408,7 +1198,7 @@ python --version
 
 1. 安装 Docker 和 NVIDIA Container Toolkit
 2. 拉取 vLLM Docker 镜像
-3. 启动 Llama-2-7b 推理服务
+3. 选择一个目标版本支持且有权限访问的小模型，启动推理服务
 4. 使用 curl 发送测试请求
 5. 验证服务正常工作
 
