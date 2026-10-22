@@ -38,21 +38,21 @@
     },
     {
       "file": "chapters/chapter05-llm-inference-basics.md",
-      "bytes": 43515,
-      "lines": 1469,
-      "chars": 26362,
-      "non_ws": 21129,
-      "cjk": 7934,
-      "words": 4013
+      "bytes": 32980,
+      "lines": 1037,
+      "chars": 20666,
+      "non_ws": 16545,
+      "cjk": 5640,
+      "words": 3158
     },
     {
       "file": "chapters/chapter06-kv-cache-optimization.md",
-      "bytes": 55723,
-      "lines": 1733,
-      "chars": 36167,
-      "non_ws": 28998,
-      "cjk": 8897,
-      "words": 5156
+      "bytes": 59971,
+      "lines": 1792,
+      "chars": 38439,
+      "non_ws": 30973,
+      "cjk": 9779,
+      "words": 5429
     },
     {
       "file": "chapters/chapter07-request-scheduling.md",
@@ -92,21 +92,21 @@
     },
     {
       "file": "chapters/chapter11-advanced-topics.md",
-      "bytes": 67905,
-      "lines": 2095,
-      "chars": 43231,
-      "non_ws": 35740,
-      "cjk": 11303,
-      "words": 4476
+      "bytes": 61358,
+      "lines": 1708,
+      "chars": 36729,
+      "non_ws": 30910,
+      "cjk": 11294,
+      "words": 3653
     }
   ],
   "total": {
     "file": "TOTAL",
-    "bytes": 517435,
-    "lines": 15956,
-    "chars": 319729,
-    "non_ws": 255491,
-    "cjk": 85462,
-    "words": 37073
+    "bytes": 504601,
+    "lines": 15196,
+    "chars": 309803,
+    "non_ws": 248052,
+    "cjk": 84041,
+    "words": 35668
   }
 }
