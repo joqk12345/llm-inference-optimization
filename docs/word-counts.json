@@ -83,29 +83,29 @@
     },
     {
       "file": "chapters/chapter10-production-deployment.md",
-      "bytes": 79797,
+      "bytes": 79872,
       "lines": 2729,
-      "chars": 56241,
-      "non_ws": 43251,
+      "chars": 56316,
+      "non_ws": 43326,
       "cjk": 9331,
       "words": 5796
     },
     {
       "file": "chapters/chapter11-advanced-topics.md",
-      "bytes": 68073,
+      "bytes": 67905,
       "lines": 2095,
-      "chars": 43399,
-      "non_ws": 35908,
+      "chars": 43231,
+      "non_ws": 35740,
       "cjk": 11303,
       "words": 4476
     }
   ],
   "total": {
     "file": "TOTAL",
-    "bytes": 517528,
+    "bytes": 517435,
     "lines": 15956,
-    "chars": 319822,
-    "non_ws": 255584,
+    "chars": 319729,
+    "non_ws": 255491,
     "cjk": 85462,
     "words": 37073
   }
