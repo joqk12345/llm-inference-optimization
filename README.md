@@ -63,6 +63,8 @@ You'll learn:
 - **Selected Code Examples**: The repo currently ships runnable examples for the foundational chapters, with more chapter code added incrementally
 - **Docker Ready Foundations**: Environment checks and base examples are designed to be reproducible
 - **Production Grade**: Real-world deployment strategies
+- **DeepSeek-V4.1-Flash**: CED architecture, Global/SWA KV, FP4/FP8 KV, bounded replay, CUDA Graph partitioning, and model-specific kernels
+- **Specialized runtimes**: DeepInfer coverage for DeepSeek-V4.1-Flash, including its hardware boundary and the service-layer capabilities that still need to be supplied
 
 ---
 
@@ -79,6 +81,9 @@ The long-term editorial strategy is to keep mechanisms and experimental methods 
   - Chapter 11 focuses on advanced and frontier topics
 - Cross-chapter transitions, summary labels, and section lead-ins have been standardized for consistency
 - Runnable code is still concentrated in the foundational chapters, with later chapter examples being added incrementally
+- Chapter 6 now includes a DeepSeek-V4.1-Flash KV-state and bounded-replay analysis
+- Chapter 11 now includes a DeepInfer runtime-selection section and a controlled benchmark exercise
+- The publisher-oriented DOCX is generated at [`publish/LLM推理性能优化_正文_清华出版社体例_最终版_2026-10-22.docx`](publish/LLM推理性能优化_正文_清华出版社体例_最终版_2026-10-22.docx)
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the latest structural and editorial updates.
 

@@ -807,4 +807,4 @@ diagnose_bottleneck()
 
 ---
 
-**需要设计压测时，可参考 [附录C: 基准测试与ROI教学算例（待验证）](appendix-c-benchmarks-roi.md) 中的字段模板；不要把其中数字当作性能基线。**
+**需要设计压测时，可参考项目配套的 benchmark/ROI 字段模板；不要把教学算例中的数字当作性能基线。**

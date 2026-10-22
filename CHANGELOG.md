@@ -2,6 +2,26 @@
 
 All notable editorial and structural changes to this manuscript are documented in this file.
 
+## 2026-10-22
+
+### Added
+
+- Added a DeepSeek-V4.1-Flash model-architecture section to Chapter 6 covering CED execution, Global KV and SWA KV, FP4/FP8 storage, bounded replay, split CUDA Graph execution, model-specific kernels, and TP/DP/EP deployment trade-offs.
+- Added a DeepInfer section to Chapter 11 covering its DeepSeek-V4.1-Flash focus, SM100/Ascend 950 hardware boundary, specialized kernels, DSpark, SWA replay, structured output, and the service capabilities that remain outside the open-source release.
+- Added publisher-formatted references in [`docs/publisher-references.md`](docs/publisher-references.md), including the official DeepInfer repository and vLLM DeepSeek-V4.1-Flash analysis.
+- Added a dated Tsinghua University Press-style manuscript at [`publish/LLM推理性能优化_正文_清华出版社体例_最终版_2026-10-22.docx`](publish/LLM推理性能优化_正文_清华出版社体例_最终版_2026-10-22.docx).
+
+### Changed
+
+- Updated the book metadata and manuscript title to `LLM 推理性能优化`.
+- Compressed the content summary and clarified that Appendix C remains an unpublished validation draft rather than part of the formal manuscript.
+- Updated the DOCX generator to include the publisher reference list, a WPS-updatable TOC field, dated output naming, front-matter metadata fields, and separate Roman/Arabic page numbering.
+
+### Sources
+
+- [DeepInfer](https://github.com/deepseek-ai/DeepInfer)
+- [DeepSeek-V4.1-Flash on vLLM](https://vllm.ai/blog/2026-10-07-deepseek-v41-flash)
+
 ## 2026-09-26
 
 ### Added

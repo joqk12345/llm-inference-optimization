@@ -1,6 +1,6 @@
 ---
 id: "chapters-chapter11-advanced-topics"
-title: "第11章：高级话题"
+title: "第11章 高级话题"
 slug: "chapters-chapter11-advanced-topics"
 date: "2026-03-11"
 type: "article"
@@ -13,6 +13,7 @@ concepts:
   - "multimodal-inference"
 tools:
   - "vllm"
+  - "deepinfer"
   - "triton"
   - "torch-compile"
 architecture_layer:
@@ -928,102 +929,57 @@ communication_volume ≈ routed_tokens × hidden_state_bytes × dispatch_and_com
 
 常规 Transformer MoE 通常把专家放在 FFN 子层；KV Cache 属于 Attention 子层，不会因为 token 被路由到不同 FFN 专家就变成“专家专属 KV”。MoE 的总参数驻留、通信缓冲和 Attention KV 会共同争用显存，但应分别建模。若模型引入专家化 Attention 或其他特殊状态，再按该架构单独讨论，不能把它泛化为所有 MoE 的性质。
 
-### 11.3.3 专家路由优化
+### 11.3.3 保持模型语义的专家负载均衡
 
-**负载均衡策略**：
+模型 gate 决定 token 使用哪些专家；服务系统负责把这些计算放到合适的设备上执行。直接按实时队列长度修改 gate logits，会改变模型函数，不能作为无损的运行时优化。
 
-```python
-class LoadBalancedGate:
-    """负载均衡的路由网络"""
+可优先采用：
 
-    def __init__(self, num_experts: int):
-        self.num_experts = num_experts
-        self.expert_loads = [0] * num_experts
+- 统计每个逻辑专家的 token 数、排队时间及通信耗时。
+- 为热点逻辑专家建立权重一致的副本，在副本之间分配任务。
+- 调整专家放置和 token dispatch，保持 gate 选择的逻辑专家及合并权重。
+- 对数值误差、任务质量和 P95/P99 做回归；复制的显存与同步开销也计入成本。
 
-    def route(self, x: Tensor, capacity_factor: float = 1.0):
-        # 1. 计算每个token的专家偏好
-        logits = self.gate(x)  # [batch, num_experts]
+以下仅为控制流程伪代码，副本必须对应同一版本的同一逻辑专家：
 
-        # 2. 考虑专家负载
-        for i in range(self.num_experts):
-            logits[:, i] -= self.expert_loads[i] * 0.1
-
-        # 3. Top-k路由
-        top_k_experts = logits.topk(k=2)
-
-        # 4. 更新负载计数
-        for expert_id in top_k_experts:
-            self.expert_loads[expert_id] += 1
-
-        return top_k_experts
+```text
+expert_ids, combine_weights = model_gate(tokens)
+for token, logical_expert in routed_pairs(tokens, expert_ids):
+    replicas = healthy_replicas(logical_expert, model_revision)
+    if replicas is empty:
+        fail_or_retry_request()
+    else:
+        dispatch(token, least_queued(replicas))
+merge_outputs_using(combine_weights)
 ```
 
-**路由优化的边界**：服务系统可以优化 token dispatch、专家放置、复制热点专家以及通信—计算重叠，但不能在不重新训练或验证模型的情况下，按语义聚类任意改写模型 gate 的路由结果。路由策略属于模型语义的一部分；系统优化必须保持输出等价，或明确承担质量变化并做任务级回归。
+如果模型本身带有训练得到的负载均衡机制，应按模型定义执行。改变路由规则、丢弃 token 或改选其他专家属于模型行为变化，需另行评测。
 
-### 11.3.4 Checkpoint管理
+### 11.3.4 Checkpoint 与专家故障恢复
 
-**T级别模型checkpoint巨大**(张博涵@浙大):
+分片 checkpoint 可以减少单个文件大小，按需加载也能降低启动或迁移时的数据移动量，但必须维护完整的参数清单、模型版本、分片校验和与专家映射。
 
-```python
-# DeepSeek-V3: 671B参数
-# Checkpoint大小: TB级 (示意)
+专家进程故障时，依次考虑：
 
-# 问题:
-# 1. 保存时间长
-# 2. 加载时间长
-# 3. 存储成本高
+1. 将受影响请求切换到同一逻辑专家的健康副本，核验权重版本一致。
+2. 若没有副本，从原 checkpoint 恢复同一专家后重试。
+3. 恢复期间按服务策略拒绝、排队或切换完整模型副本，并记录失败和重试。
+4. 若业务允许切换不同模型，明确标记降级并执行独立质量验收。
 
-# 解决方案: Partial Checkpoint
-class PartialCheckpoint:
-    """部分checkpoint保存"""
+随机初始化专家、屏蔽专家或用其他专家权重替换都会改变模型行为，不能标作透明故障恢复。训练中的局部 checkpoint 策略也不能直接当作推理服务的恢复保证。
 
-    def save(self, experts: List[Expert], expert_ids: List[int]):
-        """只保存指定的专家"""
-        for expert_id in expert_ids:
-            expert = experts[expert_id]
-            self.save_expert(expert, expert_id)
+### 11.3.5 实战：先验证并行部署，再调整专家放置
 
-    def load(self, expert_ids: List[int]) -> List[Expert]:
-        """只加载需要的专家"""
-        experts = []
-        for expert_id in expert_ids:
-            expert = self.load_expert(expert_id)
-            experts.append(expert)
-        return experts
-
-# 故障恢复: 屏蔽挂掉的专家
-def handle_expert_failure(failed_expert_id: int):
-    """处理专家失败"""
-
-    # 方案1: 使用备用专家
-    backup_expert_id = get_backup_expert(failed_expert_id)
-    remap_routing(failed_expert_id, backup_expert_id)
-
-    # 方案2: 重新初始化专家
-    new_expert = initialize_expert()
-    replace_expert(failed_expert_id, new_expert)
-```
-
-### 11.3.5 实战: Mixtral部署
+下面是命令模板，沿用 [vLLM 0.30.0 适配卡](../docs/cards/vllm-0.30.0.md)的版本边界；未在本仓库完成多 GPU 实测。模型权重与 KV 是否能放入四张卡，取决于实际卡型、精度和上下文预算。
 
 ```bash
-# 使用vLLM部署Mixtral 8x7B
-vLLM serve mistralai/Mixtral-8x7B-Instruct-v0.1 \
-  --tensor-parallel-size 4 \  # 示例
-  --max-model-len 8192 \       # 示例
+vllm serve mistralai/Mixtral-8x7B-Instruct-v0.1 \
+  --tensor-parallel-size 4 \
+  --max-model-len 8192 \
   --enable-prefix-caching
-
-# 性能调优
-# 1. 调整expert并行度
-export EXPERT_PARALLEL_SIZE=2
-
-# 2. 启用专家负载均衡
-export LOAD_BALANCE_STRATEGY=capacity_factor
-
-# 3. 优化通信
-export USE_NCCL=1
-export NCCL_IB_DISABLE=0  # 启用InfiniBand
 ```
+
+不要用自定义的 `EXPERT_PARALLEL_SIZE`、`LOAD_BALANCE_STRATEGY` 环境变量代替引擎的正式配置。进入专家并行实验前，按锁定版本的帮助和启动日志确认参数被接受，记录专家放置、通信拓扑及回归结果；未生效的开关不能算作实验处理。
 
 ### 11.3.6 DeepSeek-V4：MoE 与长上下文的协同设计
 
@@ -1282,404 +1238,23 @@ async def async_generate(image: Image, prompt: str):
 
 ---
 
-## 11.5 Torch Compile优化
+## 11.5 编译优化：进入独立专题
 
-**背景**：编译优化的价值是减少 Python/调度开销与 kernel launch 开销，把计算图变得更“连续”。它常常在你已经完成基础系统优化后才开始体现收益。
+本章主线关注 Agent、异构、MoE 和多模态的系统约束。只有 profile 证明 Python、图执行或 kernel launch 位于关键路径时，才进入编译优化。
 
-**决策**：把编译优化放在“可回滚”的轨道上：它可能带来性能提升，也可能带来兼容性与调试成本。
+原有底层实现内容已整理到 [算子与运行时优化专题](../docs/topics/runtime-kernel-optimization.md#编译优化)。本节保留原编号作为阅读入口，不再要求读者在复杂工作负载章节中学习编译器配置。
 
-### 11.5.1 torch.compile原理
+## 11.6 FlashAttention：先验证数值，再测性能
 
-```python
-import torch
+FlashAttention 改变 Attention 的执行与访存方式。它不应与改变模型注意力结构的稀疏或线性方法混为一谈。在线 softmax 必须同时重缩放归一化项和输出累积项。[CITE: flashattention-2022]
 
-# 未优化
-def model_forward(x):
-    return model(x)
+正确递推、适用边界与 `code/chapter11/attention_reference.py` 见 [FlashAttention 专题](../docs/topics/runtime-kernel-optimization.md#flashattention-的在线-softmax)。原有错误的张量转置及输出更新代码已由可验证的参考实现替代。
 
-# 使用torch.compile
-compiled_model = torch.compile(model)
+## 11.7 自定义算子：进入条件与退出条件
 
-# torch.compile做什么?
-# 1. Tracing: 记录计算图
-# 2. Graph Analysis: 分析优化机会
-# 3. Code Generation: 生成优化后的代码
-# 4. Compilation: 编译为机器码
-```
+只有热点明确、现有实现无法满足目标、且团队能维护数值与性能回归时，才进入自定义算子开发。验收必须包含真实形状分布下的端到端收益；microbenchmark 加速不足以证明服务收益。
 
-**优化技术**：
-- **Dead Code Elimination**: 移除无用代码
-- **Operator Fusion**: 融合多个操作
-- **Memory Layout Optimization**: 优化内存布局
-- **Loop Unrolling**: 展开循环
-
-### 11.5.2 在推理中的应用
-
-```python
-import torch
-from vLLM import LLM
-
-# 原始模型
-llm = LLM(model="meta-llama/Llama-3.1-8B")  # 示例
-
-# 应用torch.compile
-# 注意: vLLM内部已经优化,可能不需要额外compile
-import torch._dynamo
-torch._dynamo.config.suppress_errors = True
-
-compiled_model = torch.compile(
-    llm.llm_engine.model_runner.model,
-    mode="reduce-overhead"
-)
-```
-
-### 11.5.3 与vLLM结合
-
-```python
-# vLLM 对 torch.compile 的支持随版本演进
-VLLM_USE_TORCH_COMPILE=1 vLLM serve meta-llama/Llama-3.1-8B  # 示例
-
-# 性能影响需基准测试验证
-# 注意: 提升幅度依模型与负载而定
-```
-
----
-
-## 11.6 Flash Attention
-
-**背景**：当上下文长度上来后，Attention 很容易从“算得动”变成“显存/带宽先炸”。标准 Attention 需要构建 `seq_len × seq_len` 的 attention scores，中间张量不仅占显存，而且会让访存效率很差，推理时常见现象是：算力没打满，带宽已经到顶。
-
-**决策**：把 Flash Attention 当作“更省显存的 Attention 实现”来理解更稳妥，而不是把它当作“固定倍数加速器”。是否值得切换，主要取决于：
-
-- 你的典型 `seq_len`（越长越容易受益）
-- 你的 mask/位置编码/融合算子是否被 kernel 支持（不支持会 fallback）
-- 你能否接受更复杂的依赖与构建链（编译、CUDA 版本、算子兼容）
-
-**落地**（建议顺序）：
-
-1. 先做正确性验证：同一输入下输出误差是否在可接受范围（尤其是长序列与极端 mask）
-2. 再做压测对比：固定 batch/seq_len/采样参数，比较 `TPOT/吞吐/显存峰值`
-3. 最后做灰度：只对长序列或特定流量桶启用，盯 `P95/P99` 与错误率
-
-**踩坑**：
-
-- kernel 不支持某些特性（例如特殊 mask、dropout、某些位置编码），会 silent fallback，结果“看起来启用了但其实没用”
-- 数值误差与稳定性问题往往只在长序列或特定 dtype 上出现，需要专门压测覆盖
-- 构建与依赖复杂：同一套代码在不同驱动/CUDA/SM 架构上表现可能差异很大
-
-**指标口径**：
-
-- 显存峰值（尤其是长上下文）与 OOM 率
-- decode `TPOT`、端到端吞吐（tokens/s）与 `P95/P99`
-- 正确性：对齐测试集的质量指标（别只看速度）
-
-### 11.6.1 Flash Attention原理
-
-**标准Attention的问题**：
-
-```python
-# 标准Attention: O(N²) 内存复杂度
-def standard_attention(Q, K, V):
-    # Q, K, V: [batch, seq_len, dim]
-
-    # 1. 计算attention scores: [batch, seq_len, seq_len]
-    scores = Q @ K.T / sqrt(d_k)  # O(N²) 内存!
-
-    # 2. Softmax
-    attn = softmax(scores)
-
-    # 3. 加权求和
-    output = attn @ V
-
-    return output
-```
-
-**Flash Attention的优化**：
-
-```python
-# Flash Attention: O(N) 内存复杂度
-# 分块计算 + 在线Softmax
-
-def flash_attention(Q, K, V, block_size=64):
-    seq_len = Q.shape[1]
-    outputs = []
-
-    for i in range(0, seq_len, block_size):
-        Q_block = Q[:, i:i+block_size, :]  # [batch, block, dim]
-
-        # 在线更新attention statistics
-        O_block = torch.zeros_like(Q_block)
-        l = torch.zeros(Q_block.shape[0], Q_block.shape[1])  # logsumexp
-        m = torch.full((Q_block.shape[0], Q_block.shape[1]), -float('inf'))  # max
-
-        for j in range(0, seq_len, block_size):
-            K_block = K[:, j:j+block_size, :]
-            V_block = V[:, j:j+block_size, :]
-
-            # 计算block attention
-            S_block = Q_block @ K_block.T / sqrt(d_k)
-            m_new = torch.max(m, S_block.max(dim=-1).values)
-            l_new = torch.exp(m - m_new) * l + torch.exp(S_block - m_new).sum(dim=-1)
-            O_block = (l / l_new).unsqueeze(-1) * O_block + \
-                      torch.exp(S_block - m_new.unsqueeze(-1)) @ V_block
-
-            m = m_new
-            l = l_new
-
-        outputs.append(O_block)
-
-    return torch.cat(outputs, dim=1)
-```
-
-### 11.6.2 Flash Attention 2
-
-**Flash Attention 2改进**：
-- 更好的work partition
-- 减少非矩阵计算
-- 更好的并行性
-
-```python
-# 使用Flash Attention 2
-from flash_attn import flash_attn_qkvpacked_func
-
-# QKV packed format: [batch, seq_len, 3, heads, dim]
-qkv = torch.stack([Q, K, V], dim=2)
-
-output = flash_attn_qkvpacked_func(qkv)
-```
-
-### 11.6.3 Sparse Attention vs Linear Attention
-
-**工程趋势（经验口径）**：
-- 线性 Attention 并不是“长上下文的万能解”，很多真实负载仍会落回到稀疏化/检索 + 常规 Attention 的组合（例如只让模型看“相关片段”）
-- Sparse Attention/检索的价值在于把计算预算集中在“更可能相关”的位置，但它把问题从“算力”转移到了“召回与对齐”
-
-**挑战**：
-- 在长上下文推理里，最难的是“不掉点”：召回错了、mask 设计不当、或检索与生成分布不一致，都会让质量回归
-- Needle-in-a-haystack 这类任务对“召回准确率”和“模型对长尾证据的利用能力”都很敏感，因此需要用你的任务指标做回归测试，而不是只看理论复杂度
-
-### 11.6.4 性能提升
-
-```
-标准Attention:
-  - FLOPs: 2N²d
-  - Memory: O(N²)
-  - Speed: Baseline
-
-Flash Attention:
-  - FLOPs: 2N²d (相同)
-  - Memory: O(N)
-  - Speed: 常见在长序列上更快/更稳（强依赖硬件、内核与序列长度分布）
-
-Flash Attention 2:
-  - FLOPs: 2N²d (相同)
-  - Memory: O(N)
-  - Speed: 相比早期实现通常有进一步优化，但具体收益必须以压测为准
-```
-
-### 11.6.5 在vLLM中的使用
-
-```bash
-# 示例：显式指定 attention backend（具体参数以你使用的版本为准）
-vLLM serve meta-llama/Llama-3.1-8B \
-  --attention-backend flash \
-  --max-model-len 32768
-
-# 说明：长序列场景通常更省显存，并可能提升吞吐/降低 OOM；实际收益以压测为准。
-```
-
----
-
-## 11.7 自定义算子开发
-
-**背景**：当你把 KV/调度/量化/attention kernel 都用上之后，剩下的性能问题往往不再是“有没有开关”，而是“你的关键路径里到底是哪一个算子/哪一段访存在拖后腿”。这时候自定义算子（CUDA/Triton）是一把很锋利的刀：用对了能解决核心瓶颈，用错了会带来维护与稳定性债务。
-
-**决策**：只有在下面问题回答为“是”时，才建议进入自定义算子路线：
-
-- profiling 明确指出瓶颈集中在 1-2 个算子（而不是系统层抖动）
-- 你能接受更复杂的构建/部署链（不同 GPU 架构、不同 CUDA 版本）
-- 你有正确性与回归测试的“护栏”（否则容易线上慢性错误）
-
-**落地**（建议顺序）：
-
-1. 先把瓶颈定位清楚：用 Nsight/torch profiler 把时间拆到 kernel 级
-2. 再做最小可行优化：先用 Triton 复现，再决定是否上手写 CUDA
-3. 最后做工程化：加单测/数值对齐测试、做 CI 编译矩阵、准备 fallback
-
-**踩坑**：
-
-- 正确性比速度更难：数值误差、边界条件、不同 dtype/不同长度的行为差异
-- 性能回归很隐蔽：某个形状快，不代表你线上形状快；要按真实分布做基准
-- 可移植性风险：一个 kernel 可能只在某些 SM 架构上表现好
-
-**指标口径**：
-
-- kernel time 与端到端收益（别只看 micro-benchmark）
-- GPU 利用率与带宽（是否把瓶颈从算子 A 移到了算子 B）
-- 正确性回归（质量指标、数值误差、异常率）
-
-### 11.7.1 何时需要自定义算子
-
-**场景**：
-1. **性能瓶颈**: 现有算子性能不够
-2. **新算法**: PyTorch没有实现
-3. **特殊优化**: 针对特定硬件优化
-
-**示例**：
-- 自定义Attention实现
-- 特殊量化算子
-- MoE专家路由
-
-### 11.7.2 CUDA编程基础
-
-```cuda
-// simple_add_kernel.cu
-__global__ void simple_add_kernel(float* A, float* B, float* C, int N) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (idx < N) {
-        C[idx] = A[idx] + B[idx];
-    }
-}
-
-// Host code
-extern "C" void launch_simple_add(float* A, float* B, float* C, int N) {
-    int threads_per_block = 256;  // 示例
-    int blocks = (N + threads_per_block - 1) / threads_per_block;
-
-    simple_add_kernel<<<blocks, threads_per_block>>>(A, B, C, N);
-    cudaDeviceSynchronize();
-}
-```
-
-### 11.7.3 Triton语言简介
-
-```python
-# Triton: Python-like GPU编程语言
-import triton
-import triton.language as tl
-
-@triton.jit
-def add_kernel(
-    x_ptr, y_ptr, output_ptr,
-    n_elements,
-    BLOCK_SIZE: tl.constexpr,
-):
-    # 程序ID
-    pid = tl.program_id(axis=0)
-    block_start = pid * BLOCK_SIZE
-    offsets = block_start + tl.arange(0, BLOCK_SIZE)
-    mask = offsets < n_elements
-
-    # 加载数据
-    x = tl.load(x_ptr + offsets, mask=mask)
-    y = tl.load(y_ptr + offsets, mask=mask)
-
-    # 计算
-    output = x + y
-
-    # 写回
-    tl.store(output_ptr + offsets, output, mask=mask)
-```
-
-### 11.7.4 开发流程
-
-**Step 1: PyTorch实现**
-
-```python
-def custom_op(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-    # 原型实现
-    return x + y
-```
-
-**Step 2: CUDA/Triton优化**
-
-```python
-# 使用Triton优化
-from triton import jit
-
-@jit
-def optimized_custom_op(x, y):
-    return add_kernel(x, y)
-```
-
-**Step 3: 集成到PyTorch**
-
-```python
-import torch
-from torch.autograd import Function
-
-class CustomOpFunction(Function):
-    @staticmethod
-    def forward(ctx, x, y):
-        return optimized_custom_op(x, y)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        # 反向传播
-        return grad_output, grad_output
-
-# 使用
-custom_op = CustomOpFunction.apply
-```
-
-**Step 4: 性能测试**
-
-```python
-import time
-
-def benchmark(func, *args, **kwargs):
-    start = time.time()
-    for _ in range(100):
-        func(*args, **kwargs)
-    torch.cuda.synchronize()
-    end = time.time()
-
-    return (end - start) / 100
-
-# 对比
-torch_time = benchmark(torch.add, x, y)
-custom_time = benchmark(custom_op, x, y)
-
-print(f"PyTorch: {torch_time*1000:.2f}ms")
-print(f"Custom: {custom_time*1000:.2f}ms")
-print(f"Speedup: {torch_time/custom_time:.2f}x")
-```
-
-### 11.7.5 前端性能优化
-
-**问题**(刘海超@vLLM):
-- Python写web service性能差
-- 需要加rest
-- Inference的CPU优化
-- 是否用C++(PyTorch也在考虑)
-
-**解决方案**：
-
-```python
-# 使用FastAPI + uvicorn
-from fastapi import FastAPI
-import uvicorn
-
-app = FastAPI()
-
-@app.post("/generate")
-async def generate(request: GenerateRequest):
-    # 异步处理
-    output = await llm.async_generate(request.prompt)
-    return {"output": output}
-
-if __name__ == "__main__":
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        workers=4,  # 示例
-        loop="uvloop",  # 高性能event loop
-    )
-```
-
----
+开发与回退流程见 [自定义算子专题](../docs/topics/runtime-kernel-optimization.md#自定义算子的验证流程)。服务端序列化和请求处理属于第10章的观测与部署范围，应先通过 trace 区分 CPU、队列和 GPU 时间。
 
 ## 11.8 技术发展与展望
 
@@ -1927,6 +1502,43 @@ kv_cache_cluster = Cluster(
 - 共享性能基准
 - 定期技术同步
 
+### 11.8.8 DeepInfer：面向 DeepSeek 模型的专用推理引擎
+
+DeepInfer 代表另一类推理引擎路线：它不是面向所有模型的通用服务层，而是围绕特定模型结构、硬件和大规模推理负载做深度协同优化。官方开源版本当前支持 DeepSeek-V4.1-Flash，并支持 NVIDIA SM100 GPU 与华为昇腾 950 NPU。它更适合作为“专用模型运行时”纳入引擎选型，而不是直接替换所有 vLLM 或 SGLang 部署。
+
+**核心能力**：
+
+- 针对模型结构提供 FlashMLA、DeepGEMM、DeepEP、TileKernels、DeepSelect 等优化 kernel；
+- 支持 Attention DP、balanced CP、MoE EP 与 EPLB 等并行方式；
+- 提供 DSpark 与 confidence-scheduled verification，用于草稿 token 和验证调度；
+- 提供 SWA bounded replay，减少部分 decoder prefill 工作；
+- 默认启用异步调度，并支持 batch-invariant inference、确定性采样和正则表达式/JSON Schema/EBNF 结构化输出。
+
+**适用边界**：
+
+DeepInfer 的公开版本更接近离线批量推理和专用运行时。官方明确列出的完整服务缺口包括 KV Cache 系统、VE/Prefill/Decode 分离，以及 prefill/decode 数据并行副本之间的负载均衡。因此，不能仅凭其 kernel 或单机 benchmark 结果推断它已经覆盖完整在线服务栈；这些能力仍需要结合外部缓存、编排、路由和服务治理系统补齐。
+
+**环境门槛**：
+
+官方构建路径要求 Linux、GCC 13 及以上、Python 3.12，以及 NVIDIA CUDA 13 或昇腾 CANN 9.2。当前版本对硬件和软件环境要求较新，不适合直接作为本书的默认入门环境。部署前应先确认 GPU/NPU 型号、驱动、编译器、CUDA/CANN、模型权重和通信库版本，随后再进行单节点离线推理和多卡扩展验证。
+
+**建议的引入方式**：
+
+1. 先以 DeepInfer 官方离线示例建立可重复基线，固定模型 revision、硬件、并行度、输入输出 token 分布和采样参数。
+2. 将 DeepInfer 与 vLLM/SGLang 的比较限定在同一模型、同一 batch、同一上下文长度和同一质量验收条件下，不把不同引擎的默认参数直接横向比较。
+3. 将指标拆成 prefill、decode、端到端延迟、吞吐、显存、通信、确定性和结构化输出成功率，避免只看 tokens/s。
+4. 如果要用于在线服务，额外实现 KV Cache 管理、PD/VE 分离、跨副本路由、故障转移和降级策略，并把这些部分纳入整体 SLO。
+
+**与本书其他章节的关系**：
+
+- 第 6 章的 KV Cache 管理决定 DeepInfer 能否进入长上下文在线服务；
+- 第 7 章的调度和 PD 分离用于补足其服务化边界；
+- 第 8 章的低精度与 kernel 评估用于解释专用硬件路径的收益；
+- 第 9 章的投机采样内容可与 DSpark/verification 机制做概念对照；
+- 第 10 章的服务治理内容用于完成从离线运行时到生产系统的最后一层封装。
+
+**实践练习 11.4**：在具备 SM100 或昇腾 950 的环境中，使用 DeepInfer 官方示例完成一次离线推理基线；记录 prefill/decode 时间、吞吐、显存、采样确定性和结构化输出结果，再与同模型的另一种推理后端进行受控对比。没有对应硬件时，不应把安装失败或模拟环境结果写成性能结论。
+
 ---
 
 ## 常见误区
@@ -2011,6 +1623,7 @@ kv_cache_cluster = Cluster(
 - [ ] 使用Flash Attention加速
 - [ ] 开发自定义CUDA算子
 - [ ] 理解大规模MoE服务的前沿技术
+- [ ] 判断 DeepInfer 这类专用模型运行时的适用边界
 
 ---
 
