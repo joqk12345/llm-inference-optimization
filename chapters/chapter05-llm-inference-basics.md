@@ -1,6 +1,6 @@
 ---
 id: "chapters-chapter05-llm-inference-basics"
-title: "第5章 推理的本质：Prefill 和 Decode 为什么要分开讲"
+title: "第5章 推理机制：Prefill 与 Decode"
 slug: "chapters-chapter05-llm-inference-basics"
 date: "2026-03-11"
 type: "article"
@@ -976,6 +976,9 @@ PagedAttention 通过块表访问非连续的 KV 存储，使按需分配及共�
 ---
 
 ## 动手练习
+
+先阅读[前缀缓存贯穿实验](../code/chapter10/README.md)，按“固定负载 → 基线 → 单变量优化 → 质量与性能回归”保存记录。客户端与 CPU 测试可在本地运行；模型服务需要适配的 GPU 环境。当前没有真实 GPU 跑分，不能从参考算法测试推导性能收益。
+
 
 练习 5.1: 计算 KV Cache 显存占用
 

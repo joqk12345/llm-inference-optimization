@@ -2,14 +2,31 @@
 
 All notable editorial and structural changes to this manuscript are documented in this file.
 
+## 2026-10-29
+
+- Put diagnosis and selection methods before trends in Chapter 2; replaced framework rankings with evidence requirements and conditioned PD selection on measured interference.
+- Moved model-specific KV and DeepInfer settings into dated implementation records, retaining source provenance and explicit verification limits.
+- Replaced unsupported Appendix C benchmark and customer results with experiment worksheets and ROI formulas, including a labelled hypothetical arithmetic example.
+- Promoted the executable prefix-cache experiment in the reader path; updated FAQ, contribution notes and code coverage, and archived the initial launch checklist.
+- Synchronized the Chapter 5 title and regenerated navigation and chapter counts. Dated publisher DOCX exports require separate regeneration and visual review.
+
 ## 2026-10-22
+
+### Review corrections
+
+- Corrected the Berkeley dissertation and DFlash bibliographic metadata, and added the sources referenced by manuscript citation markers.
+- Added explicit citation-to-bibliography mapping with fail-fast validation during DOCX generation.
+- Fixed linked-footer duplication and prefilled the TOC field with bookmarked three-level headings; final TOC page numbers still require WPS/Word pagination.
+- Documented NVIDIA-only DeepInfer determinism, its required settings, and the distinction between vLLM's 128-token replay and DeepInfer's default 140-token retained suffix.
+- Expanded the V4.1 discussion with CSA2, sparse indexers, Engram host tables, and mHC execution dependencies; replaced unconditional attention/MoE conclusions with workload-dependent comparisons.
+- Generated a separately named reviewed DOCX; structural checks completed, visual pagination review remains pending.
 
 ### Added
 
 - Added a DeepSeek-V4.1-Flash model-architecture section to Chapter 6 covering CED execution, Global KV and SWA KV, FP4/FP8 storage, bounded replay, split CUDA Graph execution, model-specific kernels, and TP/DP/EP deployment trade-offs.
 - Added a DeepInfer section to Chapter 11 covering its DeepSeek-V4.1-Flash focus, SM100/Ascend 950 hardware boundary, specialized kernels, DSpark, SWA replay, structured output, and the service capabilities that remain outside the open-source release.
 - Added publisher-formatted references in [`docs/publisher-references.md`](docs/publisher-references.md), including the official DeepInfer repository and vLLM DeepSeek-V4.1-Flash analysis.
-- Added a dated Tsinghua University Press-style manuscript at [`publish/LLM推理性能优化_正文_清华出版社体例_最终版_2026-10-22.docx`](publish/LLM推理性能优化_正文_清华出版社体例_最终版_2026-10-22.docx).
+- Added a dated Tsinghua University Press-style manuscript at `publish/LLM推理性能优化_正文_清华出版社体例_最终版_2026-10-22.docx`.
 
 ### Changed
 
@@ -28,7 +45,7 @@ All notable editorial and structural changes to this manuscript are documented i
 
 - Added a 30-second, 16:9 introduction video covering the book's core path from inference economics and GPU fundamentals through KV cache, scheduling, quantization, speculative sampling, production deployment, and vLLM 0.30.0 practice.
 - Added the playable MP4 at [`media/intro_video/llm-inference-optimization-rewired-style-30s.mp4`](media/intro_video/llm-inference-optimization-rewired-style-30s.mp4).
-- Added the editable Canvas source at [`media/intro_video/canvas_rewired_style.html`](media/intro_video/canvas_rewired_style.html).
+- Added the editable Canvas source at `media/intro_video/canvas_rewired_style.html`.
 
 ## 2026-04-26
 

@@ -28,7 +28,7 @@ display_order: 214
 ---
 # DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding
 
-**来源**: [DFlash: Transformer can be a Good Conditional Diffusion Denoiser for Fast Speculative Decoding](https://arxiv.org/abs/2602.06036)  
+**来源**: [DFlash: Block Diffusion for Flash Speculative Decoding](https://arxiv.org/abs/2602.06036v2)（Jian Chen、Yesheng Liang、Zhijian Liu）
 **日期**: 2026-02-05  
 **定位**: 这是对[第9章：投机采样](../../chapters/chapter09-speculative-sampling.md)的一篇前沿补充案例，关注“草稿模型本身仍然自回归”这一现有 speculative decoding 瓶颈。
 

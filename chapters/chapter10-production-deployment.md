@@ -1,6 +1,6 @@
 ---
 id: "chapters-chapter10-production-deployment"
-title: "第10章：生产环境部署"
+title: "第10章 生产环境部署"
 slug: "chapters-chapter10-production-deployment"
 date: "2026-03-11"
 type: "article"
@@ -773,7 +773,7 @@ open http://localhost:16686
 ```
 ┌─────────────────────────────────────────────────────┐
 │  Step 1: 建立基线                                   │
-│  - 使用benchmark_serving.py测试                     │
+│  - 使用vllm bench serve测试                     │
 │  - 记录TTFT、TPOT、吞吐量                           │
 │  - 记录GPU利用率                                    │
 └──────────────────┬──────────────────────────────────┘
@@ -803,11 +803,11 @@ open http://localhost:16686
 
 ### 10.5.2 瓶颈定位方法
 
-**使用vLLM内置benchmark**：
+**使用 vLLM 0.30.0 的 benchmark CLI**：
 
 ```bash
 # 运行benchmark
-python benchmark_serving.py \
+vllm bench serve \
   --model meta-llama/Llama-3.1-8B \
   --dataset-name sharegpt \
   --num-prompts 1000 \
@@ -820,6 +820,8 @@ python benchmark_serving.py \
 # Throughput: ...
 # GPU Util: ...
 ```
+
+0.30.0 的 benchmark 入口是 `vllm bench serve`；`--dataset-name`、`--num-prompts`、`--request-rate` 和 `--percentile-metrics` 的含义以该版本 CLI 文档为准。[CITE: vllm-0-30-0-upstream]
 
 **使用Nsight Systems**：
 
@@ -1010,7 +1012,7 @@ groups:
 
 ```python
 import torch
-from vLLM import LLM, SamplingParams
+from vllm import LLM, SamplingParams
 
 # 启用profiler
 with torch.profiler.profile(
@@ -1112,7 +1114,7 @@ ncu-ui output_report.ncu-rep
 ### 10.5.5.5 性能优化checklist
 
 **Step 1: 基线测试**
-- 使用`benchmark_serving.py`建立性能基线
+- 使用`vllm bench serve`建立性能基线
 - 记录关键指标: throughput (tokens/s), TTFT, TPOT, GPU利用率
 
 **Step 2: PyTorch Profiler快速诊断**
@@ -1178,7 +1180,7 @@ guidellm benchmark \
 
 ```bash
 # vLLM官方benchmark工具
-python benchmark_serving.py \
+vllm bench serve \
   --model meta-llama/Llama-3.1-8B \
   --dataset-name sharegpt \
   --num-prompts 1000 \
@@ -1200,7 +1202,7 @@ evalscope eval \
   --datasets mmlu,gsm8k
 
 # Step 2: 推理性能(llm-bench)
-python benchmark_serving.py \
+vllm bench serve \
   --model meta-llama/Llama-3.1-8B \
   --num-prompts 1000
 
@@ -1210,7 +1212,7 @@ guidellm benchmark \
   --framework vLLM
 
 # Step 4: vLLM专用优化
-# 使用vLLM内置benchmark_serving.py
+# 使用 vLLM 0.30.0 的 `vllm bench serve`
 # 验证特定优化效果
 ```
 

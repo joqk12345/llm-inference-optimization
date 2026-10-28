@@ -1,6 +1,6 @@
 ---
 id: "chapters-chapter03-gpu-basics"
-title: "第3章：GPU基础"
+title: "第3章 GPU基础"
 slug: "chapters-chapter03-gpu-basics"
 date: "2026-03-11"
 type: "article"

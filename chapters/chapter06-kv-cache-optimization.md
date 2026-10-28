@@ -1645,61 +1645,15 @@ def monitor_prefix_cache(llm):
 
 ## 6.9 DeepSeek-V4.1-Flash：模型结构如何重写 KV Cache 优化
 
-DeepSeek-V4.1-Flash 展示了一个重要趋势：KV Cache 优化不再只是把同一种 KV 状态压缩或分页，而是由模型结构直接决定状态的形态、复用边界和 prefill/decode 工作量。该模型采用 causal encoder-decoder（CED）结构，官方 vLLM 实现中观察到 decode 每个 token 激活约 16B 参数，而 prefill 每个 token 激活约 8B 参数。
+这个案例用于说明：模型结构可能使不同推理状态拥有不同的容量、生命周期和重建规则。评估时，应分别计算各类状态，而不是把一个 bytes/token 数字外推到整个服务。
 
-### 6.9.1 两类 KV 状态
+面对这类模型，先回答三个问题：
 
-V4.1-Flash 同时维护两类 KV：
+1. 前缀命中后，哪些状态可以直接复用，哪些需要重放或重建？
+2. 缓存节省是否引入额外计算、host lookup 或跨设备通信？
+3. 状态变化后，质量、TTFT、尾延迟和每个合格请求成本是否仍达标？
 
-- **Global KV**：跨层共享、压缩保存，并使用 FP4 表示；官方 vLLM 文章给出的全局 KV 规模约为 890 bytes/token。
-- **SWA KV**：不压缩，使用 FP8，覆盖 40 个层中每层最近 128 个位置的滑动窗口。
-
-这两类状态的生命周期不同，因此不能简单地用一个“KV Cache 命中率”概括。Global KV 更适合跨请求、跨轮次复用；SWA KV 则带来更高的边界存储成本。vLLM 文章指出，如果在每个可能的 prefix hit 边界都保存 SWA KV，其存储量可能超过 Global KV 的 10 倍。
-
-### 6.9.2 SWA bounded replay
-
-一种直接做法是在 prefix hit 后重新计算 SWA KV，但精确重建会沿层级传播，代价较高。SWA bounded replay 的做法是只重放最后 128 个 token，并从 replay 起点裁剪滑动窗口。它牺牲 bit-exact 一致性换取更低的重算成本，质量影响需要通过目标任务评估确认。
-
-vLLM 在两个位置使用这一机制：
-
-1. **Encoder 侧**：只缓存 Global KV，prefix 命中后重算命中边界前的最后 128 个 token，以恢复 SWA KV。
-2. **Decoder 侧**：每个 token 仍运行产生 Global KV 所需的层；后续层只处理请求的最后 128 个 token，从而跳过大部分长 prompt prefill。
-
-这说明 prefix caching 的关键不只是“命中多少 token”，还包括命中后需要恢复哪类状态、恢复状态需要运行哪些层，以及近似重放是否满足质量要求。
-
-### 6.9.3 CUDA Graph 与分段执行
-
-裁剪后的后半段层计算量很小，如果使用 eager 执行，CPU kernel launch 开销可能抵消计算节省。由于前后两段的输入形状不同，不能简单地放进同一个 CUDA Graph。vLLM 的做法是把前半段和裁剪后的后半段分别捕获，并为后半段使用独立的 capture size。
-
-这给工程实现一个通用启示：当模型结构让不同层组拥有不同的 token 形状时，应把图捕获、batch 组织和调度边界一起设计，而不是只在单个 kernel 上做优化。
-
-### 6.9.4 结构化 KV 优化与 kernel 协同
-
-V4.1-Flash 的推理优化还依赖一组与模型结构配套的 kernel：MegaAttention、Mega-mHC、Mega-Gate、DeepSelect，以及支持 NVFP4 KV 的 FlashMLA 路径。它们分别涉及稀疏注意力、mHC 融合、MoE 路由、稀疏 top-k 和压缩 KV 读取。
-
-对这类模型，评估时至少要分开记录：
-
-- Global KV 与 SWA KV 的字节数和生命周期；
-- prefix hit 后的 replay token 数量；
-- 每一层实际处理的 token 数量；
-- CUDA Graph 覆盖率与 eager fallback 比例；
-- KV 读取、索引、MoE 路由和 host lookup 的通信/访存时间。
-
-不能只用总显存或总 tokens/s 判断优化是否有效。
-
-### 6.9.5 部署策略启示
-
-vLLM 的公开实测将低延迟场景与高吞吐场景分开处理：低延迟采用 TP4，高吞吐采用 DEP2，并利用 Attention DP 避免在多卡间重复复制共享 KV。多轮 Agent 负载还需要 session affinity，以保持 prefix-cache locality。
-
-这些配置不是通用默认值。它们依赖具体 GPU、batch、上下文长度、请求轮次和通信域。正式部署时应分别压测：
-
-1. 单请求短 prompt 的 TTFT；
-2. 长 prompt prefix hit 后的 replay 成本；
-3. 多轮 Agent 的跨请求 KV 复用；
-4. TP、DP 和 EP 组合下的通信与显存；
-5. NVFP4/FP8 KV 对质量和并发的影响。
-
-本节依据 [vLLM 对 DeepSeek-V4.1-Flash 的实现分析](https://vllm.ai/blog/2026-10-07-deepseek-v41-flash)。其中的性能数字来自文章所述的特定 GPU、负载和 benchmark，不应直接当作本书的普遍性能承诺。
+具体 Global/SWA KV 布局、bounded replay、CUDA Graph 分区、kernel 和并行配置见 [DeepSeek-V4.1-Flash KV 实现记录](../docs/cards/deepseek-v41-flash-kv.md)。这些细节按来源快照维护，不能当作其他模型或引擎的默认配置。
 
 ---
 
@@ -1727,6 +1681,9 @@ vLLM 的公开实测将低延迟场景与高吞吐场景分开处理：低延迟
 ---
 
 ## 动手练习
+
+先阅读[前缀缓存贯穿实验](../code/chapter10/README.md)，按“固定负载 → 基线 → 单变量优化 → 质量与性能回归”保存记录。客户端与 CPU 测试可在本地运行；模型服务需要适配的 GPU 环境。当前没有真实 GPU 跑分，不能从参考算法测试推导性能收益。
+
 
 **练习 6.1**：计算 KV Cache 显存占用
 

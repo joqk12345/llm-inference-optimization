@@ -1,6 +1,6 @@
 ---
 id: "chapters-chapter04-environment-setup"
-title: "第4章：环境搭建"
+title: "第4章 环境搭建"
 slug: "chapters-chapter04-environment-setup"
 date: "2026-03-11"
 type: "article"

@@ -18,8 +18,13 @@ export default defineConfig({
   title: 'LLM推理性能优化',
   description: 'AI Knowledge Graph System for LLM inference optimization',
   cleanUrls: true,
+  srcExclude: ['appendix-d-exercise-answer-notes.md', 'docs/plans/2025-01-26-launch-checklist-legacy.md'],
   lastUpdated: true,
-  ignoreDeadLinks: [/^\.\/LICENSE$/, /^\.\.\/LICENSE$/, /^\.\/\.\.\/LICENSE$/, /^\.\/index$/],
+  ignoreDeadLinks: [
+    /^\.\/LICENSE$/, /^\.\.\/LICENSE$/, /^\.\/\.\.\/LICENSE$/, /^\.\/index$/,
+    /^\.\.\/code\/chapter(?:03|09|10|11)\//,
+    /^\.\/\.\/code\/chapter(?:03|09|10|11)\//
+  ],
   themeConfig: {
     search: {
       provider: 'local'

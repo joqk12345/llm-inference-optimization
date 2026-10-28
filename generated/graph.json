@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-08-25T15:51:10.688Z",
-  "nodeCount": 112,
-  "edgeCount": 509,
+  "generatedAt": "2026-10-28T16:51:25.290Z",
+  "nodeCount": 109,
+  "edgeCount": 511,
   "nodes": [
     {
       "id": "readme",
@@ -81,12 +81,12 @@
     },
     {
       "id": "chapters-chapter02-technology-landscape",
-      "label": "第2章：技术全景与趋势",
+      "label": "第2章 技术全景与关键趋势",
       "type": "article",
       "file": "chapters/chapter02-technology-landscape.md",
       "metadata": {
         "id": "chapters-chapter02-technology-landscape",
-        "title": "第2章：技术全景与趋势",
+        "title": "第2章 技术全景与关键趋势",
         "slug": "chapters-chapter02-technology-landscape",
         "date": "2026-03-11",
         "type": "article",
@@ -119,12 +119,12 @@
     },
     {
       "id": "chapters-chapter03-gpu-basics",
-      "label": "第3章：GPU基础",
+      "label": "第3章 GPU基础",
       "type": "article",
       "file": "chapters/chapter03-gpu-basics.md",
       "metadata": {
         "id": "chapters-chapter03-gpu-basics",
-        "title": "第3章：GPU基础",
+        "title": "第3章 GPU基础",
         "slug": "chapters-chapter03-gpu-basics",
         "date": "2026-03-11",
         "type": "article",
@@ -160,12 +160,12 @@
     },
     {
       "id": "chapters-chapter04-environment-setup",
-      "label": "第4章：环境搭建",
+      "label": "第4章 环境搭建",
       "type": "article",
       "file": "chapters/chapter04-environment-setup.md",
       "metadata": {
         "id": "chapters-chapter04-environment-setup",
-        "title": "第4章：环境搭建",
+        "title": "第4章 环境搭建",
         "slug": "chapters-chapter04-environment-setup",
         "date": "2026-03-11",
         "type": "article",
@@ -203,12 +203,12 @@
     },
     {
       "id": "chapters-chapter05-llm-inference-basics",
-      "label": "第5章：LLM推理基础",
+      "label": "第5章 推理机制：Prefill 与 Decode",
       "type": "article",
       "file": "chapters/chapter05-llm-inference-basics.md",
       "metadata": {
         "id": "chapters-chapter05-llm-inference-basics",
-        "title": "第5章：LLM推理基础",
+        "title": "第5章 推理机制：Prefill 与 Decode",
         "slug": "chapters-chapter05-llm-inference-basics",
         "date": "2026-03-11",
         "type": "article",
@@ -248,12 +248,12 @@
     },
     {
       "id": "chapters-chapter06-kv-cache-optimization",
-      "label": "第6章：KV Cache 优化",
+      "label": "第6章 KV Cache 优化",
       "type": "article",
       "file": "chapters/chapter06-kv-cache-optimization.md",
       "metadata": {
         "id": "chapters-chapter06-kv-cache-optimization",
-        "title": "第6章：KV Cache 优化",
+        "title": "第6章 KV Cache 优化",
         "slug": "chapters-chapter06-kv-cache-optimization",
         "date": "2026-03-11",
         "type": "article",
@@ -297,12 +297,12 @@
     },
     {
       "id": "chapters-chapter07-request-scheduling",
-      "label": "第7章：请求调度策略",
+      "label": "第7章 请求调度策略",
       "type": "article",
       "file": "chapters/chapter07-request-scheduling.md",
       "metadata": {
         "id": "chapters-chapter07-request-scheduling",
-        "title": "第7章：请求调度策略",
+        "title": "第7章 请求调度策略",
         "slug": "chapters-chapter07-request-scheduling",
         "date": "2026-03-11",
         "type": "article",
@@ -345,12 +345,12 @@
     },
     {
       "id": "chapters-chapter08-quantization",
-      "label": "第8章：量化技术",
+      "label": "第8章 量化技术",
       "type": "article",
       "file": "chapters/chapter08-quantization.md",
       "metadata": {
         "id": "chapters-chapter08-quantization",
-        "title": "第8章：量化技术",
+        "title": "第8章 量化技术",
         "slug": "chapters-chapter08-quantization",
         "date": "2026-03-11",
         "type": "article",
@@ -394,12 +394,12 @@
     },
     {
       "id": "chapters-chapter09-speculative-sampling",
-      "label": "第9章：投机采样",
+      "label": "第9章 投机采样",
       "type": "article",
       "file": "chapters/chapter09-speculative-sampling.md",
       "metadata": {
         "id": "chapters-chapter09-speculative-sampling",
-        "title": "第9章：投机采样",
+        "title": "第9章 投机采样",
         "slug": "chapters-chapter09-speculative-sampling",
         "date": "2026-03-11",
         "type": "article",
@@ -441,12 +441,12 @@
     },
     {
       "id": "chapters-chapter10-production-deployment",
-      "label": "第10章：生产环境部署",
+      "label": "第10章 生产环境部署",
       "type": "article",
       "file": "chapters/chapter10-production-deployment.md",
       "metadata": {
         "id": "chapters-chapter10-production-deployment",
-        "title": "第10章：生产环境部署",
+        "title": "第10章 生产环境部署",
         "slug": "chapters-chapter10-production-deployment",
         "date": "2026-03-11",
         "type": "article",
@@ -491,12 +491,12 @@
     },
     {
       "id": "chapters-chapter11-advanced-topics",
-      "label": "第11章：高级话题",
+      "label": "第11章 高级话题",
       "type": "article",
       "file": "chapters/chapter11-advanced-topics.md",
       "metadata": {
         "id": "chapters-chapter11-advanced-topics",
-        "title": "第11章：高级话题",
+        "title": "第11章 高级话题",
         "slug": "chapters-chapter11-advanced-topics",
         "date": "2026-03-11",
         "type": "article",
@@ -627,12 +627,12 @@
     },
     {
       "id": "appendix-c-benchmarks-roi",
-      "label": "附录C: 基准测试与ROI教学算例（待验证）",
+      "label": "附录C: 基准测试记录与ROI计算模板",
       "type": "reference",
       "file": "appendix-c-benchmarks-roi.md",
       "metadata": {
         "id": "appendix-c-benchmarks-roi",
-        "title": "附录C: 基准测试与ROI教学算例（待验证）",
+        "title": "附录C: 基准测试记录与ROI计算模板",
         "slug": "appendix-c-benchmarks-roi",
         "date": "2026-03-11",
         "type": "reference",
@@ -660,7 +660,7 @@
           "chapters-chapter10-production-deployment"
         ],
         "references": [],
-        "status": "draft",
+        "status": "published",
         "display_order": 15,
         "source_scope": "core"
       }
@@ -1472,6 +1472,15 @@
       }
     },
     {
+      "id": "url:https://github.com/joqk12345/llm-inference-optimization/issues",
+      "label": "github.com",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://github.com/joqk12345/llm-inference-optimization/issues",
+        "domain": "github.com"
+      }
+    },
+    {
       "id": "concept:latency-budget",
       "label": "latency-budget",
       "type": "concept"
@@ -1552,15 +1561,6 @@
       "type": "concept"
     },
     {
-      "id": "url:https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
-      "label": "www2.eecs.berkeley.edu",
-      "type": "external-reference",
-      "metadata": {
-        "url": "https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
-        "domain": "www2.eecs.berkeley.edu"
-      }
-    },
-    {
       "id": "url:https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vLLM/",
       "label": "hamzaelshafie.bearblog.dev",
       "type": "external-reference",
@@ -1587,6 +1587,15 @@
       "id": "concept:prefix-caching",
       "label": "prefix-caching",
       "type": "concept"
+    },
+    {
+      "id": "url:https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
+      "label": "www2.eecs.berkeley.edu",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
+        "domain": "www2.eecs.berkeley.edu"
+      }
     },
     {
       "id": "topic:request-scheduling",
@@ -1807,54 +1816,9 @@
       "type": "topic"
     },
     {
-      "id": "url:https://TODO",
-      "label": "todo",
-      "type": "external-reference",
-      "metadata": {
-        "url": "https://TODO",
-        "domain": "todo"
-      }
-    },
-    {
-      "id": "url:https://discord.gg/TODO",
-      "label": "discord.gg",
-      "type": "external-reference",
-      "metadata": {
-        "url": "https://discord.gg/TODO",
-        "domain": "discord.gg"
-      }
-    },
-    {
-      "id": "url:https://github.com/joqk12345/llm-inference-optimization/issues/new?template=question.md",
-      "label": "github.com",
-      "type": "external-reference",
-      "metadata": {
-        "url": "https://github.com/joqk12345/llm-inference-optimization/issues/new?template=question.md",
-        "domain": "github.com"
-      }
-    },
-    {
       "id": "topic:case-studies",
       "label": "case-studies",
       "type": "topic"
-    },
-    {
-      "id": "url:https://github.com/joqk12345/llm-inference-optimization/issues/new?template=success-story.md",
-      "label": "github.com",
-      "type": "external-reference",
-      "metadata": {
-        "url": "https://github.com/joqk12345/llm-inference-optimization/issues/new?template=success-story.md",
-        "domain": "github.com"
-      }
-    },
-    {
-      "id": "url:https://github.com/joqk12345/llm-inference-optimization/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22",
-      "label": "github.com",
-      "type": "external-reference",
-      "metadata": {
-        "url": "https://github.com/joqk12345/llm-inference-optimization/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22",
-        "domain": "github.com"
-      }
     },
     {
       "id": "url:https://github.com/sgl-project/sglang",
@@ -1899,6 +1863,15 @@
       "metadata": {
         "url": "https://github.com/openai/gpt-oss",
         "domain": "github.com"
+      }
+    },
+    {
+      "id": "url:https://arxiv.org/abs/2602.06036v2",
+      "label": "arxiv.org",
+      "type": "external-reference",
+      "metadata": {
+        "url": "https://arxiv.org/abs/2602.06036v2",
+        "domain": "arxiv.org"
       }
     },
     {
@@ -2019,6 +1992,21 @@
     {
       "source": "readme",
       "target": "chapters-chapter11-advanced-topics",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "appendix-c-benchmarks-roi",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "docs-contributors",
+      "type": "references"
+    },
+    {
+      "source": "readme",
+      "target": "url:https://github.com/joqk12345/llm-inference-optimization/issues",
       "type": "references"
     },
     {
@@ -2283,7 +2271,12 @@
     },
     {
       "source": "chapters-chapter05-llm-inference-basics",
-      "target": "url:https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf",
+      "target": "chapters-chapter06-kv-cache-optimization",
+      "type": "references"
+    },
+    {
+      "source": "chapters-chapter05-llm-inference-basics",
+      "target": "chapters-chapter07-request-scheduling",
       "type": "references"
     },
     {
@@ -3032,11 +3025,6 @@
       "type": "references"
     },
     {
-      "source": "appendix-b-troubleshooting",
-      "target": "appendix-c-benchmarks-roi",
-      "type": "references"
-    },
-    {
       "source": "appendix-c-benchmarks-roi",
       "target": "topic:benchmarks-and-roi",
       "type": "related"
@@ -3085,11 +3073,6 @@
       "source": "appendix-c-benchmarks-roi",
       "target": "chapters-chapter10-production-deployment",
       "type": "related"
-    },
-    {
-      "source": "appendix-c-benchmarks-roi",
-      "target": "appendix-a-tools-resources",
-      "type": "references"
     },
     {
       "source": "docs-book-metadata",
@@ -3223,17 +3206,17 @@
     },
     {
       "source": "docs-faq",
-      "target": "url:https://TODO",
+      "target": "appendix-c-benchmarks-roi",
       "type": "references"
     },
     {
       "source": "docs-faq",
-      "target": "url:https://discord.gg/TODO",
-      "type": "references"
+      "target": "appendix-c-benchmarks-roi",
+      "type": "extends"
     },
     {
       "source": "docs-faq",
-      "target": "url:https://github.com/joqk12345/llm-inference-optimization/issues/new?template=question.md",
+      "target": "url:https://github.com/joqk12345/llm-inference-optimization/issues",
       "type": "references"
     },
     {
@@ -3568,22 +3551,22 @@
     },
     {
       "source": "docs-success-stories",
-      "target": "url:https://github.com/joqk12345/llm-inference-optimization/issues/new?template=success-story.md",
+      "target": "url:https://github.com/joqk12345/llm-inference-optimization/issues",
       "type": "references"
-    },
-    {
-      "source": "docs-success-stories",
-      "target": "url:https://discord.gg/TODO",
-      "type": "references"
-    },
-    {
-      "source": "docs-success-stories",
-      "target": "chapters-chapter10-production-deployment",
-      "type": "extends"
     },
     {
       "source": "docs-success-stories",
       "target": "appendix-c-benchmarks-roi",
+      "type": "references"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "appendix-c-benchmarks-roi",
+      "type": "extends"
+    },
+    {
+      "source": "docs-success-stories",
+      "target": "chapters-chapter10-production-deployment",
       "type": "extends"
     },
     {
@@ -3603,12 +3586,7 @@
     },
     {
       "source": "docs-contributors",
-      "target": "url:https://github.com/joqk12345/llm-inference-optimization/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22",
-      "type": "references"
-    },
-    {
-      "source": "docs-contributors",
-      "target": "url:https://discord.gg/TODO",
+      "target": "url:https://github.com/joqk12345/llm-inference-optimization/issues",
       "type": "references"
     },
     {
@@ -3958,7 +3936,7 @@
     },
     {
       "source": "docs-cases-dflash-block-diffusion-analysis",
-      "target": "url:https://arxiv.org/abs/2602.06036",
+      "target": "url:https://arxiv.org/abs/2602.06036v2",
       "type": "references"
     },
     {
@@ -3970,6 +3948,11 @@
       "source": "docs-cases-dflash-block-diffusion-analysis",
       "target": "chapters-chapter09-speculative-sampling",
       "type": "extends"
+    },
+    {
+      "source": "docs-cases-dflash-block-diffusion-analysis",
+      "target": "url:https://arxiv.org/abs/2602.06036",
+      "type": "references"
     },
     {
       "source": "docs-cases-dflash-block-diffusion-analysis",

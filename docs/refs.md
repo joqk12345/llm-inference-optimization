@@ -84,7 +84,7 @@ display_order: 203
     - MoE 推理中的通信-计算重叠与 fused kernel
     - FP4 在 MoE expert 权重与 attention indexer 路径中的使用
     - 异构 KV Cache 与 shared-prefix reuse 的系统实现思路
-  - 建议引用章节：2.1.1, 5.4.6, 6.x, 8.3, 11.3, 11.8
+  - 建议引用章节：2.2.1, 5.4.6, 6.x, 8.3, 11.3, 11.8
   - 文件路径：/Users/mac/Downloads/DeepSeek_V4.pdf
 
 - **Kimi Linear: An Expressive, Efficient Attention Architecture**
@@ -96,7 +96,7 @@ display_order: 203
     - 在公平对比下宣称覆盖短上下文、长上下文与 RL scaling 场景
     - 在 1M context 下给出更高 decode throughput 与更低 KV cache 占用
     - 提供 KDA kernel 与 vLLM 实现
-  - 建议引用章节：2.1.6, 5.4.6, 6.x, 11.6, 11.8
+  - 建议引用章节：2.2.6, 5.4.6, 6.x, 11.6, 11.8
   - URL: https://arxiv.org/abs/2510.26692
 
 - **MiniMax-01: Scaling Foundation Models with Lightning Attention**
@@ -107,7 +107,7 @@ display_order: 203
     - 将 Lightning Attention 与 MoE 结合到超大模型训练和推理体系中
     - 强调 computation-communication overlap 与并行策略对长上下文推理的重要性
     - 训练支持 1M context，并宣称推理可外推到 4M context
-  - 建议引用章节：2.1.6, 5.4.6, 11.6, 11.8
+  - 建议引用章节：2.2.6, 5.4.6, 11.6, 11.8
   - URL: https://arxiv.org/abs/2501.08313
 
 - **DeepSeek-V4 昇腾 Day 0 首发：基于 CANN 的高性能推理优化实践**
@@ -119,7 +119,7 @@ display_order: 203
     - FP8/MXFP8、MXFP4、INT8、KV/Indexer cache 量化等低比特推理路径
     - Prefill CP+EP、Decode DP+EP、HCCL AIV、SHMEM/HIXL 等并行与通信优化
     - vLLM/SGLang、TileLang、torch.compile/NpuGraphEx 等生态接入
-  - 建议引用章节：2.1.5, 10.3, 11.2, 11.8
+  - 建议引用章节：2.2.5, 10.3, 11.2, 11.8
   - 文件路径：/Users/mac/Downloads/DeepSeek-V4昇腾首发_基于CANN的高性能推理优化实践.pdf
   - 横向案例：[DeepSeek-V4 昇腾 CANN 推理优化案例研究](cases/deepseek-v4-ascend-cann-inference.md)
 
@@ -183,9 +183,9 @@ display_order: 203
   - 横向案例：[vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](cases/vllm-mooncake-store-agentic-serving.md)
 
 #### vLLM架构与实现
-- **Berkeley EECS-2025-192**: Deconstructing vLLM
-  - 作者：UC Berkeley Research Team
-  - 发布日期：2025年1月
+- **Berkeley EECS-2025-192**: vLLM: An Efficient Inference Engine for Large Language Models
+  - 作者：Woosuk Kwon
+  - 类型与日期：博士学位论文，2025年秋季
   - 核心内容：
     - vLLM三层架构（Interfaces, Model Authoring, Runtime）
     - PagedAttention深度剖析（Block allocation, eviction策略）
@@ -232,7 +232,7 @@ display_order: 203
   - 横向案例：[TurboQuant 案例研究 - 极限 KV Cache 压缩](cases/turboquant-kv-cache-compression.md)
 
 - **Quantization-Aware Training (QAT)**
-  - 引用章节：8.2.2
+  - 引用章节：8.2.1
   - 核心内容：训练时量化，SGLang团队验证
 
 - **INT4 Quantization (W4A16)**
@@ -244,13 +244,13 @@ display_order: 203
   - 引用章节：9.3.4
   - 核心内容：Eagle, Eagle 2, Eagle 3投机采样
 
-- **DFlash: Transformer can be a Good Conditional Diffusion Denoiser for Fast Speculative Decoding**
-  - 作者：Yuejiao Chen, Ziyan Jiang, Cheng Hou, Kai Zhang, Jiajie Jin, Huan Peng, Jiashu Miao, An Yang, Haitao Mi
+- **DFlash: Block Diffusion for Flash Speculative Decoding**
+  - 作者：Jian Chen, Yesheng Liang, Zhijian Liu
   - 发布日期：2026年2月5日
   - 核心内容：
     - 用 block diffusion drafter 替代传统自回归 drafter
-    - 在 OPT-6.7B / Llama-2-7B 上实现约 1.99x / 2.14x 端到端加速
-    - 平均比 EAGLE-3 再快约 20.1%
+    - 以目标模型的上下文特征为条件，一次前向并行提出草稿 block
+    - 性能须按论文 v2 的模型、任务和实现配置引用，不保留未经核对的旧数字
   - 引用章节：9.3, 9.7, 11.9
   - URL: https://arxiv.org/abs/2602.06036
 
@@ -434,7 +434,7 @@ display_order: 203
 
 ### 第5章 - LLM推理基础
 - **5.7** vLLM架构全景
-  - Berkeley EECS-2025-192 - Deconstructing vLLM
+  - Woosuk Kwon，vLLM: An Efficient Inference Engine for Large Language Models，EECS-2025-192
 - **5.7.7** vLLM插件系统
   - vLLM Plugin System Blog
 

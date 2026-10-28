@@ -1,6 +1,6 @@
 ---
 id: "chapters-chapter07-request-scheduling"
-title: "第7章：请求调度策略"
+title: "第7章 请求调度策略"
 slug: "chapters-chapter07-request-scheduling"
 date: "2026-03-11"
 type: "article"

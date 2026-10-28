@@ -26,130 +26,58 @@ display_order: 202
 ---
 # Frequently Asked Questions
 
-## General Questions
+## 阅读与费用
 
-### Is this book free to read?
+### 仓库内容可以免费阅读吗？
 
-Yes! **90% of the content is completely free**:
-- All chapter text (100% free)
-- 18 basic videos (~4 hours, free)
-- Complete code repository (free)
+仓库中的正文和配套代码可直接阅读，使用条件见 [LICENSE](../LICENSE)。本仓库未提供已上线的 Pro 会员购买、折扣或退款入口；旧稿中的相关承诺已移除。
 
-The remaining 10% (advanced topics) is available through our [Pro membership](https://TODO).
+### 需要深度学习基础吗？
 
-### Do I need a GPU to follow along?
+需要 Python 和基本编程能力。第3章介绍 GPU，第4章介绍环境，第5章介绍推理机制。高级专题涉及分布式系统、模型结构和数值方法，可以在完成基础章节后按需阅读。
 
-Not necessarily! You can learn the concepts without a GPU. However, to run the code examples:
-- **Minimum**: Any NVIDIA GPU with 8+ GB VRAM
-- **Recommended**: RTX 4090 (24 GB) or better
-- **Alternative**: Use cloud GPU services (Lambda Labs, RunPod, etc.)
+### 需要 GPU 吗？
 
-### Do I need deep learning experience?
+阅读、CPU 参考算法和 HTTP 协议回归测试不需要 GPU。真实模型服务和性能实验需要满足目标模型、精度、上下文、并发及运行时要求的硬件，不能用固定显存下限保证所有示例可运行。先完成第3章容量估算和第4章环境检查。
 
-No! This book is designed for developers who:
-- Know Python
-- Have heard of ChatGPT/LLMs
-- Want to learn practical optimization techniques
+## 版本与验证
 
-We don't assume any deep learning background.
+### 本书使用什么 vLLM 版本？
 
-### How long does it take to complete?
+当前贯穿实验的执行目标为 `vllm==0.30.0`，详见[版本适配卡](cards/vllm-0.30.0.md)。该卡记录了文档核对范围，仓库尚无对应真实 GPU 性能结果。其他案例保留各自的来源日期和版本边界，不能混用参数或默认值。
 
-At **10 hours/week**, you can complete the book in about **5 months**:
-- Reading: ~6 hours/week
-- Hands-on code: ~3 hours/week
-- Community participation: ~1 hour/week
+### 哪些代码可以运行？
 
-## Technical Questions
+- 第3章：显存预算、GPU 监控和瓶颈诊断示例，GPU 部分需对应环境。
+- 第4章：环境检查脚本。
+- 第9章：投机采样 CPU 参考实现。
+- 第10章：前缀缓存实验客户端，需连接模型服务才能执行完整实验。
+- 第11章：Attention CPU 数值参考实现。
 
-### What vLLM version does this book use?
+在根目录运行 `python3 -m unittest discover -s tests -v` 执行 CPU 回归。覆盖范围与限制见[测试说明](../tests/README.md)。通过 CPU 测试不代表 GPU 后端、模型质量或性能已验证。
 
-We test all code with **vLLM v0.6.0**. Other versions may work but aren't guaranteed.
+### 能用于其他模型或硬件吗？
 
-### Can I use this for other models besides Llama?
+可以迁移诊断方法，但容量公式、状态结构、低精度 kernel 和参数支持需逐项核对。第11章及案例材料包含异构硬件讨论，不能理解为所有后端都已实测。多模态内容在第11章，核心优化技术在第6—9章。
 
-Yes! The techniques apply to any transformer-based LLM:
-- Llama (2, 3, etc.)
-- Mistral/Mixtral
-- Falcon
-- Qwen
-- And many more
+## 阅读路径与实验
 
-### What about multimodal models?
+### 从哪里开始？
 
-Chapter 9 covers multimodal model inference optimization. The core techniques (Chapters 4-7) apply to all models.
+1. 第1—2章：优化目标、诊断方法与技术地图。
+2. 第3—5章：硬件、环境与推理机制。
+3. 第6—9章：KV、调度、量化与投机采样。
+4. 第10章：生产部署与运行治理。
+5. 第11章：按业务需要选择高级专题。
 
-### Will this work with AMD GPUs or Apple Silicon?
+完整目录见 [SUMMARY](../SUMMARY.md)。第5章之后可先阅读[贯穿实验](../code/chapter10/README.md)，将基线与质量门槛带入后续章节。学习时间取决于基础和实验环境，本仓库不承诺固定完成周期。
 
-The focus is on NVIDIA GPUs (CUDA). However, the concepts apply to any hardware. We don't provide AMD/M1 specific examples.
+### 如何证明一次优化有效？
 
-## Progression Questions
+固定环境和负载，只改变一个变量，同时检查质量、错误率、SLO、goodput 与成本，保留失败记录并重复 A/B。默认贯穿实验仅允许比较前缀缓存开关；调度、量化和投机需要另行设计控制变量与质量评测。记录模板见[附录C](../appendix-c-benchmarks-roi.md)。
 
-### What should I read first?
+## 反馈与贡献
 
-Read in order! Each chapter builds on the previous:
-1. Chapter 1: Introduction
-2. **Chapter 2: GPU Basics** ← Start here if you're new to GPUs
-3. Chapter 3: Environment Setup
-4. Chapters 4-7: Core techniques (KV Cache, Scheduling, Quantization, Speculative Sampling)
-5. Chapter 8: Production Deployment
+### 遇到问题或想参与怎么办？
 
-### Can I skip ahead?
-
-Technically yes, but we don't recommend it. Chapters are designed to be read sequentially.
-
-### I'm stuck on Chapter X. What should I do?
-
-1. Re-read the chapter carefully
-2. Run the code examples
-3. Ask in the [Discord community](https://discord.gg/TODO)
-4. Open a GitHub Issue with your question
-
-## Community Questions
-
-### How do I join the Discord?
-
-[Click here to join](https://discord.gg/TODO). It's free and open to everyone!
-
-### What are the Office Hours?
-
-Every **Wednesday and Friday, 20:00-21:00 UTC** in Discord #office-hour.
-
-### How can I contribute?
-
-See our [Contributing Guide](../CONTRIBUTING.md). Ways to help:
-- Fix typos
-- Report bugs
-- Answer questions
-- Share success stories
-- Write code examples
-
-## Business Questions
-
-### Why is some content paid?
-
-To sustain the project:
-- Free content covers everything you need
-- Paid content goes deeper (advanced topics)
-- Paid memberships fund continued development
-
-### Can I get a refund?
-
-Yes! If you're not satisfied with the Pro membership, contact us within 30 days for a full refund.
-
-### Do you offer discounts?
-
-Yes! Available for:
-- Students (50% off)
-- Open source contributors (free)
-- Bulk purchases (contact us)
-
-## Still Have Questions?
-
-- **GitHub Issues**: [Open a question](https://github.com/joqk12345/llm-inference-optimization/issues/new?template=question.md)
-- **Discord**: Join and ask in #questions
-- **Email**: TODO
-
----
-
-**Last updated**: 2025-01-26
+通过 [GitHub Issues](https://github.com/joqk12345/llm-inference-optimization/issues)提交章节与段落、预期行为、复现命令和环境信息，删除凭证及私有数据。贡献方式见[贡献指南](../CONTRIBUTING.md)。本仓库暂未提供有效的 Discord 邀请或固定 Office Hours 公告，请以仓库中的实际公告为准。

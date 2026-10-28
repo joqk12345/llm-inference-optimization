@@ -1,6 +1,6 @@
 # 第2章 新增内容（发布版本）
 
-## 2.1.6 混合注意力机制：Attention + 状态空间模型的崛起
+## 2.2.6 混合注意力机制：Attention + 状态空间模型的崛起
 
 当序列长度持续增长时，纯 Attention 的二次复杂度成为刚性瓶颈，混合模型（Hybrid Models）正在从研究走向生产。
 
@@ -192,7 +192,7 @@ vLLM serve NVIDIA/Nemotron-Nano-12B-v2 \
 **监控混合状态使用**：
 
 ```python
-from vLLM import LLM
+from vllm import LLM
 
 llm = LLM(model="NVIDIA/Nemotron-Nano-12B-v2")
 

@@ -40,7 +40,13 @@ lines.forEach((line, index) => {
   }
   const entryMatch = line.match(/^\s+\*\s+\[([^\]]+)\]\(([^)]+)\)\s*$/);
   if (entryMatch && currentSection) {
-    currentSection.entries.push(entryMatch[1].trim());
+    const article = require('./knowledge-lib.js').parseArticle(entryMatch[2]);
+    const title = article.metadata.title;
+    if (entryMatch[1] !== title) {
+      lines[index] = line.replace(`[${entryMatch[1]}]`, `[${title}]`);
+      changed = true;
+    }
+    currentSection.entries.push(title);
   }
 });
 

@@ -13,7 +13,6 @@ concepts:
   - "multimodal-inference"
 tools:
   - "vllm"
-  - "deepinfer"
   - "triton"
   - "torch-compile"
 architecture_layer:
@@ -1504,40 +1503,11 @@ kv_cache_cluster = Cluster(
 
 ### 11.8.8 DeepInfer：面向 DeepSeek 模型的专用推理引擎
 
-DeepInfer 代表另一类推理引擎路线：它不是面向所有模型的通用服务层，而是围绕特定模型结构、硬件和大规模推理负载做深度协同优化。官方开源版本当前支持 DeepSeek-V4.1-Flash，并支持 NVIDIA SM100 GPU 与华为昇腾 950 NPU。它更适合作为“专用模型运行时”纳入引擎选型，而不是直接替换所有 vLLM 或 SGLang 部署。
+专用运行时将优化集中在特定模型和执行路径上。选型时要分别验收离线执行能力与在线服务能力：kernel 加速不能替代缓存管理、路由、故障恢复和服务 SLO 的验证。
 
-**核心能力**：
+引入前固定模型、负载、硬件和质量门槛，分别测量 prefill、decode、通信、显存及端到端成本；如果还需要外围服务组件，应将其开销一并计入。
 
-- 针对模型结构提供 FlashMLA、DeepGEMM、DeepEP、TileKernels、DeepSelect 等优化 kernel；
-- 支持 Attention DP、balanced CP、MoE EP 与 EPLB 等并行方式；
-- 提供 DSpark 与 confidence-scheduled verification，用于草稿 token 和验证调度；
-- 提供 SWA bounded replay，减少部分 decoder prefill 工作；
-- 默认启用异步调度，并支持 batch-invariant inference、确定性采样和正则表达式/JSON Schema/EBNF 结构化输出。
-
-**适用边界**：
-
-DeepInfer 的公开版本更接近离线批量推理和专用运行时。官方明确列出的完整服务缺口包括 KV Cache 系统、VE/Prefill/Decode 分离，以及 prefill/decode 数据并行副本之间的负载均衡。因此，不能仅凭其 kernel 或单机 benchmark 结果推断它已经覆盖完整在线服务栈；这些能力仍需要结合外部缓存、编排、路由和服务治理系统补齐。
-
-**环境门槛**：
-
-官方构建路径要求 Linux、GCC 13 及以上、Python 3.12，以及 NVIDIA CUDA 13 或昇腾 CANN 9.2。当前版本对硬件和软件环境要求较新，不适合直接作为本书的默认入门环境。部署前应先确认 GPU/NPU 型号、驱动、编译器、CUDA/CANN、模型权重和通信库版本，随后再进行单节点离线推理和多卡扩展验证。
-
-**建议的引入方式**：
-
-1. 先以 DeepInfer 官方离线示例建立可重复基线，固定模型 revision、硬件、并行度、输入输出 token 分布和采样参数。
-2. 将 DeepInfer 与 vLLM/SGLang 的比较限定在同一模型、同一 batch、同一上下文长度和同一质量验收条件下，不把不同引擎的默认参数直接横向比较。
-3. 将指标拆成 prefill、decode、端到端延迟、吞吐、显存、通信、确定性和结构化输出成功率，避免只看 tokens/s。
-4. 如果要用于在线服务，额外实现 KV Cache 管理、PD/VE 分离、跨副本路由、故障转移和降级策略，并把这些部分纳入整体 SLO。
-
-**与本书其他章节的关系**：
-
-- 第 6 章的 KV Cache 管理决定 DeepInfer 能否进入长上下文在线服务；
-- 第 7 章的调度和 PD 分离用于补足其服务化边界；
-- 第 8 章的低精度与 kernel 评估用于解释专用硬件路径的收益；
-- 第 9 章的投机采样内容可与 DSpark/verification 机制做概念对照；
-- 第 10 章的服务治理内容用于完成从离线运行时到生产系统的最后一层封装。
-
-**实践练习 11.4**：在具备 SM100 或昇腾 950 的环境中，使用 DeepInfer 官方示例完成一次离线推理基线；记录 prefill/decode 时间、吞吐、显存、采样确定性和结构化输出结果，再与同模型的另一种推理后端进行受控对比。没有对应硬件时，不应把安装失败或模拟环境结果写成性能结论。
+DeepInfer 的硬件/软件边界、确定性设置、bounded replay 参数和实践练习 11.4 已移入 [DeepInfer 专用运行时实现记录](../docs/cards/deepinfer-runtime.md)，按来源快照独立维护。没有对应硬件时，先完成选型与实验设计，不生成性能结论。
 
 ---
 
@@ -1560,7 +1530,7 @@ DeepInfer 的公开版本更接近离线批量推理和专用运行时。官方�
 # 70B Dense vs 8x7B MoE
 # - Dense: 固定成本
 # - MoE: 基础成本 + 路由成本 + 通信成本
-# - 结论: 只有在高并发时MoE才更便宜
+# - 结论: 成本取决于激活计算、权重容量、路由和通信，需按负载测量
 ```
 
 ### "更多GPU总是更快"
@@ -1593,21 +1563,11 @@ DeepInfer 的公开版本更接近离线批量推理和专用运行时。官方�
 开源生态缺失是最大的机会!
 ```
 
-### "Linear Attention是未来"
+### 注意力路线不存在统一优胜者
 
-**实际情况**：Sparse Attention更实用。
+线性、稀疏和混合注意力分别改变状态表示或访问模式，不能仅凭类别判断精度与工程价值。线性方法的序列长度复杂度还需注明状态维度等条件；稀疏方法的计算量取决于每个 query 实际访问的位置数及选择这些位置的开销，不能统一写成 O(N log N)。
 
-```python
-# Linear Attention
-# - 理论: O(N)复杂度
-# - 实际: 精度损失大
-
-# Sparse Attention
-# - 理论: O(N log N)复杂度
-# - 实际: 精度损失小,工程可行
-
-# 趋势: 大厂收敛到Sparse Attention
-```
+比较时应固定任务质量、上下文长度、训练方式、batch、硬件和 kernel，再分别测量 prefill、decode、状态容量与端到端成本。第 6.9 节中的 V4.1-Flash 仅提供一种具体设计，不能据此推断整个行业收敛到单一路线。
 
 ---
 
