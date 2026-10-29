@@ -9,6 +9,7 @@ features used by this repository and maps them to publisher-facing Word styles.
 from __future__ import annotations
 
 import re
+from datetime import date
 from pathlib import Path
 
 from docx import Document
@@ -22,14 +23,14 @@ from docx.shared import Cm, Pt, RGBColor
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLISH_DIR = ROOT / "publish"
-OUTPUT = PUBLISH_DIR / "LLM推理优化实战_正文_清华体例.docx"
+GENERATED_DATE = date.today().isoformat()
+OUTPUT = PUBLISH_DIR / f"LLM推理性能优化_正文_清华出版社体例_最终版_{GENERATED_DATE}.docx"
 
-BOOK_TITLE = "LLM推理优化实战"
-AUTHOR_LINE = "编著"
+BOOK_TITLE = "LLM 推理性能优化"
+BOOK_SUBTITLE = "从原理到生产环境的性能优化实战"
+AUTHOR_LINE = "作者署名：待补"
 
 MANUSCRIPT_FILES = [
-    ROOT / "content-summary.md",
-    ROOT / "preface.md",
     ROOT / "chapters/chapter01-introduction.md",
     ROOT / "chapters/chapter02-technology-landscape.md",
     ROOT / "chapters/chapter03-gpu-basics.md",
@@ -43,9 +44,12 @@ MANUSCRIPT_FILES = [
     ROOT / "chapters/chapter11-advanced-topics.md",
     ROOT / "appendix-a-tools-resources.md",
     ROOT / "appendix-b-troubleshooting.md",
-    ROOT / "appendix-c-benchmarks-roi.md",
-    ROOT / "appendix-d-exercise-answer-notes.md",
-    ROOT / "generated/references.md",
+    ROOT / "docs/publisher-references.md",
+]
+
+FRONT_MATTER_FILES = [
+    ROOT / "content-summary.md",
+    ROOT / "preface.md",
 ]
 
 
@@ -103,7 +107,16 @@ def configure_sections(doc: Document) -> None:
         section.footer_distance = Cm(1.4)
 
 
-def add_page_number(section) -> None:
+def add_page_number(section, *, number_format: str = "decimal", start: int | None = None) -> None:
+    sect_pr = section._sectPr
+    pg_num_type = sect_pr.find(qn("w:pgNumType"))
+    if pg_num_type is None:
+        pg_num_type = OxmlElement("w:pgNumType")
+        sect_pr.append(pg_num_type)
+    pg_num_type.set(qn("w:fmt"), number_format)
+    if start is not None:
+        pg_num_type.set(qn("w:start"), str(start))
+
     footer = section.footer
     paragraph = footer.paragraphs[0]
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -161,8 +174,8 @@ def add_inline_runs(paragraph, text: str, *, size: float = 10.5, paragraph_bold:
         set_run_font(run, size=size, bold=paragraph_bold)
 
 
-def add_body_paragraph(doc: Document, text: str, *, first_line_indent: bool = True, bold: bool = False) -> None:
-    paragraph = doc.add_paragraph()
+def add_body_paragraph(doc: Document, text: str, *, first_line_indent: bool = True, bold: bool = False, style: str | None = None) -> None:
+    paragraph = doc.add_paragraph(style=style) if style else doc.add_paragraph()
     paragraph.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
     paragraph.paragraph_format.space_after = Pt(3)
     paragraph.paragraph_format.first_line_indent = Pt(21) if first_line_indent else None
@@ -265,6 +278,8 @@ def process_markdown(doc: Document, path: Path) -> None:
 
         if line.startswith("#"):
             unordered_counter = 0
+            if path.name == "references.md" and line == "# Generated References":
+                line = "# 参考文献"
             add_heading(doc, line)
             i += 1
             continue
@@ -288,10 +303,10 @@ def process_markdown(doc: Document, path: Path) -> None:
         ordered = re.match(r"^(\d+)\.\s+(.*)$", line)
         if bullet:
             unordered_counter += 1
-            add_body_paragraph(doc, f"（{unordered_counter}）{bullet.group(2)}", first_line_indent=True)
+            add_body_paragraph(doc, bullet.group(2), first_line_indent=False, style="List Bullet")
         elif ordered:
             unordered_counter = 0
-            add_body_paragraph(doc, f"{ordered.group(1)}. {ordered.group(2)}", first_line_indent=True)
+            add_body_paragraph(doc, ordered.group(2), first_line_indent=False, style="List Number")
         else:
             unordered_counter = 0
             add_body_paragraph(doc, line)
@@ -305,11 +320,23 @@ def add_cover(doc: Document) -> None:
     run = title.add_run(BOOK_TITLE)
     set_run_font(run, size=22, east_asia="黑体", bold=True)
 
+    subtitle = doc.add_paragraph()
+    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    subtitle.paragraph_format.space_before = Pt(12)
+    run = subtitle.add_run(BOOK_SUBTITLE)
+    set_run_font(run, size=14, east_asia="宋体")
+
     author = doc.add_paragraph()
     author.alignment = WD_ALIGN_PARAGRAPH.CENTER
     author.paragraph_format.space_before = Pt(24)
     run = author.add_run(AUTHOR_LINE)
     set_run_font(run, size=14, east_asia="宋体")
+
+    editorial = doc.add_paragraph()
+    editorial.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    editorial.paragraph_format.space_before = Pt(12)
+    run = editorial.add_run("主审署名：待补    著作方式：编著")
+    set_run_font(run, size=10.5, east_asia="宋体")
     doc.add_page_break()
 
 
@@ -318,21 +345,53 @@ def add_toc_placeholder(doc: Document) -> None:
     paragraph.add_run("目录")
     set_paragraph_font(paragraph, size=16, east_asia="黑体", bold=True)
 
-    note = doc.add_paragraph()
-    note.paragraph_format.first_line_indent = Pt(21)
-    add_inline_runs(note, "请在 Word 中右键更新域，以生成正式目录。")
-    doc.add_page_break()
+    paragraph = doc.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    paragraph.paragraph_format.first_line_indent = None
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = ' TOC \\o "1-3" \\h \\z \\u '
+    separate = OxmlElement("w:fldChar")
+    separate.set(qn("w:fldCharType"), "separate")
+    placeholder = paragraph.add_run("目录将在 WPS 中更新")
+    set_run_font(placeholder, size=10.5)
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    field_run = paragraph.add_run()
+    field_run._r.append(begin)
+    field_run._r.append(instr)
+    field_run._r.append(separate)
+    field_run._r.append(end)
 
 
 def main() -> None:
     PUBLISH_DIR.mkdir(exist_ok=True)
     doc = Document()
+    settings = doc.settings._element
+    update_fields = settings.find(qn("w:updateFields"))
+    if update_fields is None:
+        update_fields = OxmlElement("w:updateFields")
+        settings.append(update_fields)
+    update_fields.set(qn("w:val"), "true")
     configure_styles(doc)
     configure_sections(doc)
-    add_page_number(doc.sections[0])
+    add_page_number(doc.sections[0], number_format="lowerRoman", start=1)
 
     add_cover(doc)
+
+    # Front matter: content summary and preface precede the table of contents.
+    for path in FRONT_MATTER_FILES:
+        if path.exists():
+            process_markdown(doc, path)
+            doc.add_page_break()
     add_toc_placeholder(doc)
+
+    # The publisher separates front-matter Roman pages from body Arabic pages.
+    body_section = doc.add_section(WD_SECTION.NEW_PAGE)
+    configure_sections(doc)
+    add_page_number(body_section, number_format="decimal", start=1)
 
     for index, path in enumerate(MANUSCRIPT_FILES):
         if not path.exists():

@@ -1,6 +1,6 @@
 ---
 id: "chapters-chapter05-llm-inference-basics"
-title: "第5章：LLM推理基础"
+title: "第5章 推理机制：Prefill 与 Decode"
 slug: "chapters-chapter05-llm-inference-basics"
 date: "2026-03-11"
 type: "article"
@@ -11,7 +11,7 @@ concepts:
   - "paged-attention"
   - "continuous-batching"
 tools:
-  - "vLLM"
+  - "vllm"
 architecture_layer:
   - "inference-mechanics"
 learning_stage: "foundations"
@@ -22,11 +22,14 @@ optimization_axes:
 related:
   - "chapters-chapter06-kv-cache-optimization"
   - "chapters-chapter07-request-scheduling"
-references: []
+references:
+  - "https://arxiv.org/abs/2309.06180"
+  - "https://aclanthology.org/2023.emnlp-main.298/"
+  - "https://docs.vllm.ai/en/stable/usage/metrics/"
 status: "published"
 display_order: 6
 ---
-# 第5章 推理的本质：Prefill 和 Decode 为什么要分开讲
+# 第5章 推理机制：Prefill 与 Decode
 
 >  教学理念 (参考: Hugging Face "Continuous batching from first principles"、Hamza Elshafie "Paged Attention from First Principles")
 >
@@ -49,7 +52,7 @@ display_order: 6
 - 训练vs推理: 为什么推理是内存密集型而训练是计算密集型
 - LLM 如何生成文本 (Prefill 和 Decode 阶段)
 - Attention 机制的工作原理和计算复杂度
-- KV Cache 如何将复杂度从 O(n²) 降到 O(n)
+- KV Cache 如何避免历史 token 的重复计算，并区分单步与完整生成的计算量
 - 内存碎片化问题: 为什么后续会出现更复杂的 KV 管理方案
 - 操作系统类比: 如何用虚拟内存视角理解分页式 KV 管理
 - Chunked Prefill、PagedAttention、Continuous Batching 分别在解决什么问题
@@ -119,33 +122,29 @@ display_order: 6
 推理工作负载 (Decode):
 - Forward pass: O(n·d) 计算 (每步只计算1个token)
 - 内存访问: 频繁加载KV Cache和模型权重
-- GPU: 内存带宽瓶颈
+- GPU: 常见为内存带宽或访存延迟瓶颈，但需要按实际 kernel 验证
 ```
 
 ### 5.1.3 为什么优化推理更关键
 
-商业现实:
+商业现实不是一组可以跨公司复用的固定数字，而是一条持续发生的成本流。下面给出计算框架：
 
 ```
-训练成本: 一次性投入
-- GPT-3训练: 约$4.6M
-- LLaMA-2训练: 约$2-3M
+月推理成本
+= 实例单价 × 实例数量 × 运行小时
++ 网络、存储、CPU 与运维成本
 
-推理成本: 持续运营
-- 每天处理1M请求
-- 每请求平均1000 tokens
-- 每token成本: $0.0001
-- 每月成本: $3M
+单位输出成本
+= 月推理总成本 / 实际交付的输出 token 数
 ```
 
-优化推理的收益:
+如果一次优化把同一 SLO 和质量约束下的单卡有效吞吐从 `Q_before` 提高到 `Q_after`，理论容量需求比例为：
 
 ```
-优化前: 每GPU处理10 req/s
-优化后: 每GPU处理30 req/s (3x提升)
-→ GPU需求减少 67%
-→ 成本降低 67%
+容量需求比例 = Q_before / Q_after
 ```
+
+这只是容量上界。真实成本还取决于流量峰谷、最小副本、高可用冗余、计费粒度和尾延迟；吞吐提高 3 倍并不自动等于账单下降 67%。
 
 ---
 
@@ -321,52 +320,54 @@ Decode 阶段:
 - 调度开销: 队列等待、调度器决策、KV Cache 管理
 ```
 
-**典型分布（Llama-2-7B, A100-80GB, 512 input / 128 output）**：
+**延迟分解记录模板**：
 
-| 阶段 | 耗时 | 占比 | 瓶颈类型 | 优化方向 |
-|------|------|------|----------|----------|
-| TTFT | 120ms | 50% | Compute-bound | 更快的 kernel、FP8、Chunked Prefill |
-| TPOT (×128) | 80ms | 33% | Memory-bound | KV Cache、量化、PagedAttention |
-| 网络开销 | 20ms | 8% | Network | gRPC 优化、连接复用 |
-| 调度开销 | 20ms | 8% | CPU | 连续批处理、减少锁竞争 |
+| 阶段 | 测量值 | 证据 | 候选优化 |
+|------|--------|------|----------|
+| 排队 + TTFT | P50/P95/P99 | 服务 histogram + trace | admission、prefill、缓存、路由 |
+| TPOT / ITL | P50/P95/P99 | 服务 histogram + token timeline | KV、kernel、batch、量化 |
+| 网络与序列化 | 客户端和服务端时间戳 | 分布式追踪 | 连接复用、协议与 payload |
+| 调度与 CPU | iteration 时间线 | profiler / trace | 调度流水线、采样与 launch |
 
 **不同场景下的瓶颈迁移**：
 
-| 场景特征 | TTFT 占比 | TPOT 占比 | 瓶颈判断 |
-|----------|-----------|-----------|----------|
-| 短 prompt (< 256 tokens) | 30% | 50% | TPOT 主导 |
-| 长 prompt (> 2K tokens) | 70% | 20% | TTFT 主导 |
-| 长输出 (> 512 tokens) | 15% | 75% | TPOT 主导 |
-| 高并发 (> 32 concurrent) | 变化大 | 变化大 | 调度开销上升 |
-| 显存接近上限 | 可能增加 | 可能增加 | 碎片化导致抖动 |
+| 场景特征 | 优先检查 | 不能直接推出 |
+|----------|----------|--------------|
+| prompt 相对较长 | prefill 执行、队列和 prefix 命中 | TTFT 一定由算力主导 |
+| 输出相对较长 | TPOT 随 batch、上下文增长的曲线 | decode 一定只受带宽限制 |
+| 高并发 | 排队、抢占、KV 使用率和尾延迟 | GPU 利用率高就代表系统健康 |
+| 显存接近容量边界 | OOM、抢占、重算和临时 buffer | 问题一定来自碎片化 |
 
 **实战诊断方法**：
 
 ```bash
 # 1. 监控 TTFT vs TPOT 分布
-# vLLM 默认暴露以下指标：
-# - vLLM:prompt_tokens_total
-# - vLLM:generation_tokens_total
-# - vLLM:request_latency_seconds (包含 TTFT + generation)
+# 当前稳定文档中的代表性指标：
+# - vllm:time_to_first_token_seconds
+# - vllm:request_time_per_output_token_seconds
+# - vllm:num_requests_waiting
+# - vllm:kv_cache_usage_perc
+# 指标名会随弃用策略演进，升级前检查目标版本 /metrics。
 
 # 2. 判断瓶颈类型
-# 如果 TTFT 占比 > 60% → 优先优化 prefill
-# 如果 TPOT 占比 > 60% → 优先优化 decode/内存
+# 把主要延迟贡献与业务 SLO 对齐，再选择优化对象。
 
 # 3. 使用 nsight systems 做深度分析
 nsys profile -o inference_trace ./run_inference.py
 # 查看 GPU 时间线，确认是计算还是内存等待
 ```
 
-**优化收益预估表**：
+上述指标口径以 vLLM 稳定版生产指标文档为边界。[CITE: vllm-production-metrics-stable]
 
-| 优化手段 | 预期 TTFT 改善 | 预期 TPOT 改善 | 适用场景 |
-|----------|---------------|---------------|----------|
-| FP8 量化 | +20% | +30% | 显存紧张、带宽瓶颈 |
-| PagedAttention | +5% | +15% | 长序列、多请求 |
-| Chunked Prefill | +30% | -5% | 长 prompt 场景 |
-| 连续批处理 | +10% | +20% | 高并发场景 |
-| PD 分离 | +40% | +25% | 混合负载、对延迟敏感 |
+**优化实验矩阵**：
+
+| 优化手段 | 机制假设 | 同时观察 | 主要风险 |
+|----------|----------|----------|----------|
+| 权重/KV 量化 | 减少容量或数据移动 | 质量、TTFT、TPOT、显存 | 反量化开销与质量回归 |
+| PagedAttention | 降低外部碎片与分配浪费 | 并发、KV 使用率、尾延迟 | block 元数据与调度开销 |
+| Chunked Prefill | 控制长 prefill 对 decode 的干扰 | TTFT、TPOT、公平性 | prefill 完成更晚 |
+| 连续批处理 | 提高 iteration 中的有效工作量 | 吞吐、排队、尾延迟 | 高负载下排队扩大 |
+| PD 分离 | 隔离阶段并独立扩缩容 | goodput、KV 传输、成本 | 网络和运维复杂度 |
 
 > **关键洞察**：优化必须"对症下药"。如果瓶颈在 TTFT，却花时间优化 TPOT，往往事倍功半。
 
@@ -528,10 +529,10 @@ attn_weights @ V:
 # Attention Mask
 # shape: [seq_len, seq_len]
 mask = torch.tensor([
-    [True,  True,  True,  True],  # Token 0 可以 attend to 0,1,2,3
-    [False, True,  True,  True],  # Token 1 可以 attend to 1,2,3
-    [False, False, True,  True],  # Token 2 可以 attend to 2,3
-    [False, False, False, True],  # Token 3 只能 attend to 3
+    [True,  False, False, False],  # Token 0 只能 attend to 0
+    [True,  True,  False, False],  # Token 1 可以 attend to 0,1
+    [True,  True,  True,  False],  # Token 2 可以 attend to 0,1,2
+    [True,  True,  True,  True],   # Token 3 可以 attend to 0,1,2,3
 ])
 ```
 
@@ -748,42 +749,25 @@ Decode 阶段 - 第 2 步:
 
 ---
 
-### 5.4.4 计算复杂度降低: 从 O(n²) 到 O(n)
+### 5.4.4 计算量如何变化：区分 prompt 与生成长度
 
-无 KV Cache:
-```
-每个 token: O(n²)
-总复杂度: O(n³)
-```
+不能只用一个 `n` 同时表示输入长度和生成长度。设 prompt 长度为 `P`，随后生成 `T` 个 token，并暂时忽略层数、head 数和隐藏维度等共同因子。
 
-有 KV Cache:
-```
-第 1 个 token (Prefill): O(n²)
-第 2 个 token (Decode): O(n)  (只计算新 token)
-第 3 个 token (Decode): O(n)
-...
-第 n 个 token (Decode): O(n)
+**不使用 KV Cache** 时，第 `t` 个生成步骤需要把长度约为 `P+t` 的整段序列重新送入模型，既重复计算旧 token 的投影，也重复执行旧位置之间的 Attention：
 
-总复杂度: O(n²) + (n-1) × O(n) = O(n²)
-平均复杂度: O(n)
+```text
+总计算量 ≈ Σ(t=1..T) O((P+t)²)
 ```
 
-加速效果: 序列越长,加速越明显
+**使用 KV Cache** 时，prompt 只做一次 prefill；每个 decode 步骤只为新 token 计算 Q/K/V，并让新 query 读取已有的 K/V：
 
+```text
+Prefill ≈ O(P²)
+Decode  ≈ Σ(t=1..T) O(P+t)
+总计算量 ≈ O(P² + TP + T²)
 ```
-序列长度 n = 10:
-- 无 KV Cache: 10³ = 1000 次运算
-- 有 KV Cache: 10² + 9×10 = 190 次运算
-- 加速比: 1000/190 = 5.26x
 
-序列长度 n = 100:
-- 无 KV Cache: 100³ = 1,000,000 次运算
-- 有 KV Cache: 100² + 99×100 = 19,900 次运算
-- 加速比: 1,000,000/19,900 = 50.25x
-
-序列长度 n = 1000:
-- 加速比: ~500x!
-```
+因此，KV Cache 消除的是跨 decode 步骤对历史 token 的重复计算；它不会把 Attention 本身变成常数复杂度，也不会自动给出某个固定加速倍数。实际收益还取决于模型结构、`P/T` 比例、batch、显存带宽、kernel 实现与调度开销，应通过端到端基准测试确认。
 
 ---
 
@@ -843,18 +827,18 @@ Multi-Query Attention (MQA):
 MQA:
 - 所有heads共享一组K、V
 - 32 heads → 1组K、V
-- 内存减少: 32x!
+- 仅按 KV 元素数量计算，约为对应 MHA 的 1/32
 - 代价: 模型质量可能下降
 ```
 
-Grouped-Query Attention (GQA) - LLaMA-2使用:
+Grouped-Query Attention (GQA) - 现代模型中的常见折中:
 
 ```
 折中方案:
 - 32 heads分成8组
 - 每组(4个heads)共享一组K、V
-- 内存减少: 4x
-- 质量: 接近MHA
+- 仅按 KV 元素数量计算，约为对应 MHA 的 1/4
+- 质量: 需要在模型训练与下游任务中验证
 ```
 
 Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
@@ -872,7 +856,7 @@ Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
 | 变体 | K、V数量 | 内存占用 | 模型质量 | 使用场景 |
 |------|---------|---------|---------|---------|
 | MHA | H组 | 基准 | 最佳 | 推理不受限 |
-| GQA | H/G组 | 减少G倍 | 接近MHA | 平衡性能与质量 |
+| GQA | 可配置 KV heads | 按 KV head 比例减少 | 任务相关 | 平衡容量与质量 |
 | MQA | 1组 | 减少H倍 | 可能下降 | 内存极度受限 |
 | MLA | 1组latent | 最小 | 有竞争力 | 超大模型 |
 
@@ -885,6 +869,8 @@ Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
 - 典型收益：在不改写整体 attention 机制的前提下，直接降低 KV Cache 占用
 
 这类方法最像“给每个 token 减肥”。token 数量没有变，但每个 token 背后的 K/V 存储成本下降了。
+
+这里的比例只描述理论 KV 元素数量，不包含元数据、block 舍入和 kernel 效率；GQA 的质量结论也必须限定在具体训练与评测设置中。[CITE: gqa-emnlp-2023]
 
 **第二类：线性化路线**
 
@@ -916,499 +902,61 @@ Multi-Head Latent Attention (MLA) - DeepSeek V2/V3使用:
 
 ## 5.5 KV Cache的内存管理挑战
 
->  为什么重要: 理解内存碎片化问题,才能理解PagedAttention的设计动机。
+KV 会随上下文和并发增长。按最大长度预留会产生未使用空间，要求连续大块的分配方式还可能遇到外部碎片。问题是“状态怎么放、何时释放”，不是 Attention 的数学定义。
 
-### 5.5.1 内存碎片化: 隐形的性能杀手
-
-场景: 在A100 40GB上运行LLaMA-2-13B
-
-```
-内存分配:
-- 模型权重: ~26 GB (固定)
-- KV Cache可用: ~12 GB
-
-单个请求的KV Cache (FP16):
-- 每token: 0.78 MB
-- 2048 token窗口: 1.56 GB
-- 理论并发: 12 / 1.56 = 7个请求
-```
-
-问题: 实际只能运行2-3个请求!
-
-原因: 内存碎片化浪费了60-80%的KV Cache内存
-
-### 5.5.2 内部碎片化 (Internal Fragmentation)
-
-定义: 已分配但未使用的内存
-
-原因: 预分配策略
-
-```
-传统做法:
-- 为每个请求预分配最大可能需要的内存
-- 例如: 预分配2048 token的空间
-
-问题:
-- 短请求: 实际生成100 tokens就结束
-- 浪费: 1948个token的空间被占用但未使用
-- 其他请求无法使用这块内存
-```
-
-示例:
-
-```
-Request A: 预分配2048 slots, 实际使用100
-Request B: 预分配2048 slots, 实际使用200
-Request C: 预分配2048 slots, 实际使用300
-
-已分配内存: 3 × 2048 = 6144 slots
-实际使用: 100 + 200 + 300 = 600 slots
-浪费: (6144 - 600) / 6144 = 90%!
-```
-
-### 5.5.3 外部碎片化 (External Fragmentation)
-
-定义: 内存总量足够,但无法分配连续的大块
-
-原因: Buddy Allocator等内存分配器的行为
-
-示例:
-
-```
-初始状态: 128 MB连续内存
-
-步骤1: 分配32 MB给Request A
-  [0-31: A][32-127: 空闲]
-
-步骤2: 分配16 MB给Request B
-  [0-31: A][32-47: B][48-127: 空闲]
-
-步骤3: 分配8 MB给Request C
-  [0-31: A][32-47: B][48-55: C][56-127: 空闲]
-
-步骤4: Request A完成,释放32 MB
-  [0-31: 空闲][32-47: B][48-55: C][56-127: 空闲]
-
-问题: 虽然有40 + 72 = 112 MB空闲,
-      但无法分配64 MB的连续块!
-      → 外部碎片化
-```
-
-可视化:
-
-```
-内存布局:
-┌────────┬──────┬─────┬──────────┐
-│  32MB  │ 16MB │ 8MB │   72MB   │
-│ 空闲   │  B   │  C  │  空闲    │
-└────────┴──────┴─────┴──────────┘
-   ↓      ↓      ↓       ↓
-  可用   可用   可用    可用
-
-  总空闲: 112 MB
-  但最大连续块: 72 MB
-
-  需要分配: 64 MB
-  结果:  可以
-
-  需要分配: 80 MB
-  结果:  失败! (虽然有112 MB空闲)
-```
-
-### 5.5.4 传统解决方案的困境
-
-静态分配:
--  简单
--  大量内部碎片
-
-动态分配:
--  减少内部碎片
--  严重外部碎片
--  分配器开销大
-
-结论: 需要新的内存管理策略!
-
----
+例如总内存 128 MB，中间 24 MB 被占用，两端分别空闲 32 MB 和 72 MB。总空闲为 104 MB，但仍无法提供连续的 80 MB。固定块管理如何改变这一约束，留到 [第6章](chapter06-kv-cache-optimization.md)展开。
 
 ## 5.6 操作系统类比: 虚拟内存与分页
 
->  核心洞察：PagedAttention的设计思想直接借鉴了操作系统的虚拟内存机制。
+分页类比只需记住：逻辑连续不要求物理连续，映射表把请求的逻辑 KV 块指向物理块。GPU Attention kernel 按映射访问数据；这不意味着操作系统 MMU 自动管理 KV，也不自动提供磁盘换页。
 
-### 5.6.1 操作系统面临的内存管理问题
-
-场景: 运行总大小超过物理内存的程序
-
-```
-程序需求: 1 GB
-物理内存: 512 MB
-
-传统做法: 无法运行
-
-虚拟内存解决方案:
-- 将程序分成固定大小的页 (pages)
-- 将物理内存分成帧 (frames)
-- 只将需要的页保持在内存中
-- 其他页存储在磁盘上
-```
-
-### 5.6.2 虚拟内存的核心概念
-
-页 (Page): 虚拟地址空间中的固定大小块
-
-页帧 (Frame): 物理内存中的固定大小块
-
-页表 (Page Table): 记录页到帧的映射
-
-MMU (Memory Management Unit): 硬件单元,负责地址翻译
-
-示例:
-
-```
-虚拟地址空间 (64 KB):
-  页0: [0-4 KB]
-  页1: [4-8 KB]
-  页2: [8-12 KB]
-  ...
-  页15: [60-64 KB]
-
-物理内存 (32 KB):
-  帧0: [0-4 KB]
-  帧1: [4-8 KB]
-  帧2: [8-12 KB]
-  ...
-  帧7: [28-32 KB]
-
-页表映射:
-  页0 → 帧2 (在内存中)
-  页1 → 帧5 (在内存中)
-  页2 → 缺失 (在磁盘上)
-  页3 → 帧0 (在内存中)
-  ...
-```
-
-### 5.6.3 地址翻译流程
-
-```
-程序访问: 虚拟地址 10000
-↓
-MMU计算: 页号 = 10000 / 4096 = 2, 偏移 = 10000 % 4096 = 1808
-↓
-查页表: 页2 → 缺失 (在磁盘)
-↓
-触发缺页中断 (Page Fault)
-↓
-操作系统:
-  1. 找一个空闲帧 (或驱逐一个旧页)
-  2. 从磁盘加载页2到该帧
-  3. 更新页表: 页2 → 帧3
-  4. 重启指令
-↓
-MMU重新翻译: 页2 → 帧3
-↓
-物理地址: 帧3起始 + 偏移 = 12288 + 1808 = 14096
-↓
-访问内存:
-```
-
-### 5.6.4 虚拟内存的优势
-
-解决外部碎片化:
-- 所有分配都是固定大小的页
-- 任何空闲帧都可以满足任何页请求
-
-解决内部碎片化:
-- 只分配实际需要的页
-- 最后一页可能有少量浪费,但最多一个页
-
-透明性:
-- 程序不需要知道实际的物理内存大小
-- 程序认为自己拥有连续的大地址空间
-
-灵活性:
-- 可以运行比物理内存大的程序
-- 可以动态加载/卸载代码段
-
-### 5.6.5 从操作系统到LLM推理
-
-类比映射:
-
-| 操作系统概念 | LLM推理对应 |
-|-------------|-----------|
-| 虚拟地址空间 | 请求的逻辑KV Cache |
-| 物理内存 | GPU的KV Cache存储 |
-| 页 (Page) | KV Block |
-| 页帧 (Frame) | Physical KV Block |
-| 页表 (Page Table) | Block Table |
-| MMU | PagedAttention Kernel |
-| 缺页中断 | Block分配请求 |
-
-关键洞察:
-- 操作系统通过分页解决了内存碎片化问题
-- LLM推理面临的KV Cache碎片化问题与OS类似
-- 可以借鉴OS的分页机制!
-
----
+页大小、分配、释放、共享和写时复制统一见 [第6章](chapter06-kv-cache-optimization.md)。
 
 ## 5.7 Chunked Prefill: 处理长 prompt
 
-> 这一节只建立问题直觉和基本流程。更完整的调度策略放到第7章展开。
+把长 prompt 的 prefill 拆成多轮，可以控制单轮计算和中间激活，并给已有 decode 请求留下执行机会。但已处理 token 的 KV 仍要保留；切块不能保证任意长度都不 OOM。
 
-### 5.7.1 为什么会需要它
-
-当 prompt 很长时,问题往往不是模型参数放不下,而是一次性 prefill 需要的中间激活和 KV 增长超过了当前显存预算。
-
-典型场景:
-
-```text
-一个请求携带超长上下文
-→ 一次性 prefill 太大
-→ TTFT 变高,甚至直接 OOM
-```
-
-### 5.7.2 它在做什么
-
-Chunked Prefill 的核心不是新算法,而是一种更保守的执行方式:
-
-- 不一次吞下整个 prompt
-- 把 prefill 拆成若干段
-- 每处理完一段,就把已经得到的 KV 保留下来
-- 下一段在已有 KV 的基础上继续推进
-
-如果只记一句话,就是:
-
-```text
-把“大 prompt 的一次性峰值显存压力”换成“多轮可控的增量处理”。
-```
-
-### 5.7.3 在系统里它意味着什么
-
-Chunk size 不是越大越好,而是要和三件事一起看:
-
-- 显存预算: 太大容易 OOM
-- TTFT: 太小会让 prefill 被切得过碎
-- 调度公平性: 超长请求不能长期霸占整轮资源
-
-所以到这里你只需要建立直觉:
-
-- 它解决的是"长 prompt 怎么进系统"
-- 它通常和调度器一起工作,而不是单独存在
-- 第7章会继续讲它如何和 Continuous Batching、token budget 结合
-
----
+chunk 大小影响 TTFT、其他请求的 TPOT 和公平性。如何与每轮 token budget 配合，见 [第7章](chapter07-request-scheduling.md)。[CITE: sarathi-serve-osdi-2024]
 
 ## 5.8 PagedAttention入门: 借鉴OS的内存管理
 
->  核心洞察：将KV Cache分成固定大小的blocks,就像OS将内存分成pages一样。
->
-> 这一节聚焦为什么需要分页式 KV 管理。更具体的实现与工程权衡放到第6章继续展开。
+PagedAttention 通过块表访问非连续的 KV 存储，使按需分配及共享更容易。它改变存储与访问组织，不改变 Attention 的数学目标。尾块仍可能存在内部浪费，映射和管理也有开销。[CITE: pagedattention-sosp-2023]
 
-### 5.8.1 传统连续分配为什么麻烦
-
-如果把每个请求的 KV 都当成一整块连续内存来管理,很快就会遇到三个问题:
-
-- 请求提前结束时,预留空间被浪费
-- 请求继续变长时,需要搬迁或重新分配大块空间
-- 多请求并发时,连续大块越来越难找
-
-也就是说,麻烦不在"KV Cache 有没有",而在"KV Cache 怎么放"。
-
-### 5.8.2 PagedAttention 的基本直觉
-
-vLLM 的关键想法是:
-
-- 不把 KV 当成一整段连续空间
-- 改成固定大小的 blocks
-- 用一张映射表记录"逻辑顺序"和"物理位置"
-
-可以把它类比成操作系统里的分页:
-
-```text
-逻辑上的连续序列
-≠
-物理上的连续存储
-```
-
-这个变化本身不会改变 Attention 的数学结果,改变的是内存管理方式。
-
-### 5.8.3 你现在只需要记住的收益
-
-分页式 KV 管理最重要的收益有三类:
-
-- 更少的碎片化: 显存利用率更稳定
-- 更容易复用: 相同前缀更容易共享 blocks
-- 更利于调度: 多请求并发时,分配和回收更灵活
-
-对应地,复杂度也被转移到了系统实现里:
-
-- 需要额外的 block table
-- 需要更复杂的分配与回收策略
-- kernel 不能再假设 KV 一定连续
-
-这些实现细节正是第6章的重点。
-
----
+容量估算、前缀复用和工程权衡见 [第6章](chapter06-kv-cache-optimization.md)。
 
 ## 5.9 批处理的挑战: 从静态到动态
 
-### 5.9.1 静态批处理为什么会失效
+请求的输入长度、输出长度和到达时间不同。固定批次可能等待最慢请求，稠密 padding 实现还会产生额外计算；两种浪费要分开讨论。ragged/packed 表示能减少 padding，但不等同于迭代级调度。
 
-批处理的初心没有错: 把多个请求一起送进 GPU,提高吞吐。
+## 5.10 Continuous Batching 入门
 
-问题在于,在线流量几乎从来都不是整齐的:
+核心是每个迭代边界重新选择活跃请求：移出完成者、加入等待者，并分配本轮 token 预算。它不以“去掉 batch 维度”为定义，也不能保证 GPU 始终满载。[CITE: orca-osdi-2022]
 
-- prompt 长度不同
-- 输出长度不同
-- 新请求会不断到达
-- 有些请求已经进入 decode,有些请求还在 prefill
+| 方式 | 改变工作集的时机 |
+| --- | --- |
+| Static batching | 固定批次完成后 |
+| Dynamic batching | 请求进入执行前按等待窗口凑批 |
+| Continuous batching | 生成过程中的迭代边界 |
 
-一旦长度不一致,传统 batch 就会用 padding 把所有请求补到同一尺寸。
-
-### 5.9.2 真正被浪费的是什么
-
-padding 不是"显示上补几个空位"这么简单,而是会把本来不需要的计算也一起带进去。
-
-例如三个请求长度分别是 2、5、10:
-
-```text
-静态 batch 需要按 10 对齐
-→ 实际 token: 2 + 5 + 10 = 17
-→ 计算 token: 10 + 10 + 10 = 30
-→ 有效占比: 17 / 30 ≈ 57%
-```
-
-这还只是 prefill 阶段的简单例子。到了在线 decode 阶段,问题通常更严重,因为:
-
-- 老请求每轮只新增 1 个 token
-- 新请求可能一下子带来很长的 prompt
-
-这时如果还坚持传统 batch,就会出现"少量真实 token + 大量对齐填充"的局面。
-
-### 5.9.3 这一节想把你带到哪里
-
-所以第5章在这里要完成的认知转折只有一个:
-
-```text
-在线推理的问题,不只是“能不能 batch”,
-而是“怎样 batch 才不会浪费掉绝大多数计算”。
-```
-
-接下来 Continuous Batching 就是在回答这个问题,而更完整的调度设计会在第7章展开。
-
----
-
-## 5.10 Continuous Batching 入门 
->  核心洞察：去掉 batch 维度,用 attention mask 控制 token 交互,让 GPU 时刻满载。
->
-> 本节只解释核心直觉。更系统的请求调度、负载取舍与线上指标放到第7章。
-
-### 5.10.1 它到底改变了什么
-
-Continuous Batching 的关键变化是:
-
-- 不再把每个请求硬塞进一个固定矩形 batch
-- 改成把当前活跃的工作拼接起来
-- 用 attention mask 保证不同请求彼此隔离
-
-所以它真正去掉的不是"批处理",而是"必须按同一长度对齐"这件事。
-
-### 5.10.2 为什么它适合在线推理
-
-在线推理的典型状态是:
-
-- 有些请求刚进入系统,还在 prefill
-- 有些请求已经在 decode,每轮只新增 1 个 token
-- 有些请求刚好结束,可以被新请求替换
-
-Continuous Batching 适合这种场景,因为它允许调度器在每一轮都重新组织工作集:
-
-- 完成的请求移出
-- 等待中的请求补进
-- 长 prompt 可以按 chunk 逐步进入
-
-这也是为什么它本质上属于"调度问题",而不是单纯的 tensor 形状技巧。
-
-### 5.10.3 用一句话区分三种思路
-
-| 方法 | 你该记住的核心特征 |
-|------|--------------------|
-| Static Batching | 简单,但长度不齐时 padding 浪费大 |
-| Dynamic Batching | 能动态凑 batch,但仍容易被 padding 拖累 |
-| Continuous Batching | 让调度器按轮重组活跃请求,尽量只计算真正有意义的 token |
-
-如果只看第5章,你只需要接受这个结论:
-
-```text
-Continuous Batching 不是“又一种 batch 技巧”,
-而是在线推理系统从静态批处理走向迭代级调度的入口。
-```
-
-更具体的工作流程、调度器实现、PD 分离与参数调优,统一放到第7章。
-
----
+实际框架可能组合这些机制。准入、抢占、公平性与延迟权衡见 [第7章](chapter07-request-scheduling.md)。
 
 ## 5.11 vLLM 架构预览
-**参考链接（可选）**：[Berkeley EECS-2025-192 - Deconstructing vLLM](https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf)
 
-**核心价值**：用一张模块地图把前面出现的概念串起来,为后续章节铺垫架构知识。
-
-**为什么重要**：
-- 从"会用 vLLM"到"理解 vLLM"的关键转变
-- 调试问题、性能优化、扩展开发的基础
-- 为第6章 (KV Cache)、第7章 (调度)、第10章 (部署) 铺垫
-
-本节只回答一个问题: 当一个请求进入 vLLM 后,哪些模块分别负责接口、内存、调度和执行? 具体实现细节不要在这里展开,否则会和后续章节重复。
-
-### 5.11.1 vLLM 的三层架构
-
-可以先把 vLLM 看成三层:
-
-```
-接口层 → 引擎/策略层 → 运行时层
-```
-
-| 层级 | 代表模块 | 主要职责 | 对应后续章节 |
-|------|----------|----------|--------------|
-| 接口层 | OpenAI-Compatible Server、API Server | 接收请求、参数校验、协议兼容 | 第10章 |
-| 引擎/策略层 | LLMEngine、Scheduler、BlockManager | 请求编排、调度决策、KV 资源管理 | 第6章、第7章 |
-| 运行时层 | Worker、CacheEngine、GPU kernels | 执行 forward、维护 cache、调用底层 kernel | 第6章、第11章 |
-
-读这张表时要抓住一点: vLLM 的性能并不是某一个 kernel 单独决定的,而是接口、调度、内存管理和运行时共同作用的结果。
-
----
-
-### 5.11.2 一个请求如何穿过这三层
-
-可以把请求路径简化成下面这条线:
+用与框架版本无关的职责理解请求路径：
 
 ```text
-用户请求
-  → API 层接收和校验
-  → LLMEngine 创建请求对象
-  → Scheduler 决定本轮谁先执行
-  → BlockManager / CacheEngine 准备 KV 资源
-  → Worker 在 GPU 上执行 prefill 或 decode
-  → 结果返回给用户
+接口接收与校验 → 调度分配预算 → KV 管理准备状态
+             → 运行时执行 → 采样与返回 → 下一轮
 ```
 
-这条链路里最值得记住的是两个分工:
+| 职责 | 需要回答的问题 | 后续章节 |
+| --- | --- | --- |
+| 接口 | 请求如何校验、限流和观测 | 第10章 |
+| 调度 | 本轮谁运行、分配多少 token | 第7章 |
+| 状态管理 | KV 如何分配、共享和释放 | 第6章 |
+| 运行时 | 算子与通信耗时在哪里 | [独立专题](../docs/topics/runtime-kernel-optimization.md) |
 
-- `Scheduler` 负责"这轮该跑谁、跑多少"
-- `BlockManager / CacheEngine` 负责"KV 放哪、怎么复用、什么时候释放"
-
-前者主要决定吞吐、排队和尾延迟,后者主要决定显存效率、上下文承载能力和 OOM 风险。
-
----
-
-### 5.11.3 与后续章节的衔接
-
-从这里开始,后面几章其实是在把这张地图拆开看:
-
-- 第6章回答: KV Cache 为什么难管,`PagedAttention / Prefix Caching` 如何提升显存效率与复用能力
-- 第7章回答: 调度器如何在吞吐、延迟、公平性之间做取舍
-- 第10章回答: 当这些模块进入生产环境后,如何部署、观测、扩缩容和回滚
-- 第11章回答: 当系统继续演化到 Agent、异构硬件和底层优化时,运行时会遇到什么新问题
-
-如果你能把一个性能问题先归类到"接口层 / 调度层 / KV 层 / 运行时层",后面的大部分章节就会更容易读。
+具体内部类名会随版本改变。学完本章，应能把问题定位到某类职责，再进入对应专题，而不是记住某个版本的对象树。
 
 ---
 
@@ -1418,7 +966,7 @@ Continuous Batching 不是“又一种 batch 技巧”,
 
 - [ ] 解释 LLM 生成文本的两个阶段 (Prefill 和 Decode)
 - [ ] 理解 Attention 机制的计算过程和复杂度
-- [ ] 说明 KV Cache 如何将复杂度从 O(n²) 降到 O(n)
+- [ ] 区分 KV Cache 对 prefill、单步 decode 和完整生成计算量的影响
 - [ ] 计算 KV Cache 的显存占用
 - [ ] 解释 Chunked Prefill 的原理和应用场景
 - [ ] 对比 Static Batching、Dynamic Batching 和 Continuous Batching
@@ -1428,6 +976,9 @@ Continuous Batching 不是“又一种 batch 技巧”,
 ---
 
 ## 动手练习
+
+先阅读[前缀缓存贯穿实验](../code/chapter10/README.md)，按“固定负载 → 基线 → 单变量优化 → 质量与性能回归”保存记录。客户端与 CPU 测试可在本地运行；模型服务需要适配的 GPU 环境。当前没有真实 GPU 跑分，不能从参考算法测试推导性能收益。
+
 
 练习 5.1: 计算 KV Cache 显存占用
 
@@ -1451,8 +1002,8 @@ Llama-2-7B 的配置:
 
 任务:
 1. 计算 Static Batching 的 padding 数量
-2. 画出 Continuous Batching 的 attention mask
-3. 计算 GPU 利用率 (有效 tokens / 总 tokens)
+2. 假设三个请求在不同迭代完成，画出移出完成者、加入新请求的调度时间线
+3. 计算 padding 实现的有效 token 比例，并解释为什么它不等于 GPU 利用率
 
 练习 5.3: 用模块地图分析一个请求流程
 
@@ -1466,17 +1017,16 @@ Llama-2-7B 的配置:
 ## 本章小结
 
 关键要点：
-- 训练vs推理: 训练是计算密集型,推理是内存带宽密集型
-- LLM 推理分为 Prefill (计算密集) 和 Decode (带宽密集) 两个阶段
-- Attention 是唯一让 token 交互的操作,复杂度为 O(n²)
-- KV Cache 通过缓存历史 token 的 K、V,将复杂度降到 O(n)
-- 内存碎片化: 传统KV Cache管理的60-80%内存浪费问题
+- 训练、prefill 和 decode 的资源画像不同，瓶颈要结合 batch、形状、硬件与实际 kernel 判断
+- Prefill 通常具有较高计算强度，低 batch 的 decode 常受带宽限制，但不是无条件分类
+- 在标准 Transformer block 中，self-attention 负责跨 token 聚合；完整序列 Attention 的计算复杂度随序列长度二次增长
+- KV Cache 缓存历史 token 的 K、V，使单个 decode 步骤只为新 token 计算投影，并读取随上下文线性增长的历史状态
+- 传统连续 KV 分配会产生预留浪费、内部/外部碎片与复制开销，具体比例依工作负载而变
 - PagedAttention 借鉴操作系统虚拟内存技术,将 KV Cache 分块管理
-- PagedAttention 通过按需分配 blocks 解决内部碎片
-- PagedAttention 通过固定大小的 blocks 重用缓解外部碎片
-- PagedAttention 支持相同前缀请求共享物理 blocks
-- Chunked Prefill 允许处理超长 prompt,避免显存溢出
-- Continuous Batching 通过去除 padding 和动态调度,大幅提升 GPU 利用率
+- PagedAttention 通过按需分配固定大小 blocks 限制预留浪费并缓解碎片
+- 论文中的 vLLM 设计支持在序列内部及请求之间灵活共享 KV blocks [CITE: pagedattention-sosp-2023]
+- Chunked Prefill 控制单轮预算，但不能消除长期 KV 容量限制
+- Continuous Batching 在迭代边界调整活跃请求，收益取决于负载与调度策略
 - vLLM 的三层架构 (接口层、引擎/策略层、运行时层) 提供了清晰的抽象
 
 ## 章节衔接

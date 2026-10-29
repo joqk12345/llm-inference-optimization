@@ -6,28 +6,24 @@
 
 ### arxiv.org
 
-- [第5章：LLM推理基础](/chapters/chapter05-llm-inference-basics) -> https://arxiv.org/abs/2309.06180
+- [第5章 推理机制：Prefill 与 Decode](/chapters/chapter05-llm-inference-basics) -> https://arxiv.org/abs/2309.06180
+- [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) -> https://arxiv.org/abs/2602.06036v2
 - [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) -> https://arxiv.org/abs/2602.06036
 - [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) -> https://arxiv.org/html/2602.06036v1
 
 ### blog.vllm.ai
 
-- [第11章：高级话题](/chapters/chapter11-advanced-topics) -> https://blog.vLLM.ai/2025/12/17/large-scale-serving.html
-- [第11章：高级话题](/chapters/chapter11-advanced-topics) -> https://blog.vLLM.ai/2025/12/15/vLLM-epd.html
-
-### discord.gg
-
-- [Frequently Asked Questions](/docs/faq) -> https://discord.gg/TODO
-- [Reader Success Stories](/docs/success-stories) -> https://discord.gg/TODO
-- [Contributor Hall of Fame](/docs/contributors) -> https://discord.gg/TODO
+- [第11章 高级话题](/chapters/chapter11-advanced-topics) -> https://blog.vLLM.ai/2025/12/17/large-scale-serving.html
+- [第11章 高级话题](/chapters/chapter11-advanced-topics) -> https://blog.vLLM.ai/2025/12/15/vLLM-epd.html
 
 ### github.com
 
-- [第11章：高级话题](/chapters/chapter11-advanced-topics) -> https://github.com/vLLM-project/vLLM/issues/20323
-- [第11章：高级话题](/chapters/chapter11-advanced-topics) -> https://github.com/kvcache-aif/MoonCake
-- [Frequently Asked Questions](/docs/faq) -> https://github.com/joqk12345/llm-inference-optimization/issues/new?template=question.md
-- [Reader Success Stories](/docs/success-stories) -> https://github.com/joqk12345/llm-inference-optimization/issues/new?template=success-story.md
-- [Contributor Hall of Fame](/docs/contributors) -> https://github.com/joqk12345/llm-inference-optimization/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22
+- [LLM推理性能优化](/README) -> https://github.com/joqk12345/llm-inference-optimization/issues
+- [第11章 高级话题](/chapters/chapter11-advanced-topics) -> https://github.com/vLLM-project/vLLM/issues/20323
+- [第11章 高级话题](/chapters/chapter11-advanced-topics) -> https://github.com/kvcache-aif/MoonCake
+- [Frequently Asked Questions](/docs/faq) -> https://github.com/joqk12345/llm-inference-optimization/issues
+- [Reader Success Stories](/docs/success-stories) -> https://github.com/joqk12345/llm-inference-optimization/issues
+- [Contributor Hall of Fame](/docs/contributors) -> https://github.com/joqk12345/llm-inference-optimization/issues
 - [SGLang INT4 QAT案例研究 - 端到端RL实践](/docs/cases/sglang-int4-qat-rl-analysis) -> https://github.com/sgl-project/sglang
 - [SGLang INT4 QAT案例研究 - 端到端RL实践](/docs/cases/sglang-int4-qat-rl-analysis) -> https://github.com/slime-dev/slime
 - [SGLang INT4 QAT案例研究 - 端到端RL实践](/docs/cases/sglang-int4-qat-rl-analysis) -> https://github.com/IST-DasLab/marlin
@@ -37,7 +33,7 @@
 
 ### hamzaelshafie.bearblog.dev
 
-- [第5章：LLM推理基础](/chapters/chapter05-llm-inference-basics) -> https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vLLM/
+- [第5章 推理机制：Prefill 与 Decode](/chapters/chapter05-llm-inference-basics) -> https://hamzaelshafie.bearblog.dev/paged-attention-from-first-principles-a-view-inside-vLLM/
 
 ### img.shields.io
 
@@ -45,73 +41,69 @@
 
 ### lmsys.org
 
-- [第7章：请求调度策略](/chapters/chapter07-request-scheduling) -> https://lmsys.org/blog/2025-12-17-minisgl/
-- [第10章：生产环境部署](/chapters/chapter10-production-deployment) -> https://lmsys.org/blog/2025-12-17-minisgl/
+- [第7章 请求调度策略](/chapters/chapter07-request-scheduling) -> https://lmsys.org/blog/2025-12-17-minisgl/
+- [第10章 生产环境部署](/chapters/chapter10-production-deployment) -> https://lmsys.org/blog/2025-12-17-minisgl/
 
 ### manus.im
 
-- [第10章：生产环境部署](/chapters/chapter10-production-deployment) -> https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
-- [第11章：高级话题](/chapters/chapter11-advanced-topics) -> https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
+- [第10章 生产环境部署](/chapters/chapter10-production-deployment) -> https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
+- [第11章 高级话题](/chapters/chapter11-advanced-topics) -> https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
 
 ### projectdiscovery.io
 
-- [第10章：生产环境部署](/chapters/chapter10-production-deployment) -> https://projectdiscovery.io/blog/how-we-cut-llm-cost-with-prompt-caching
-
-### todo
-
-- [Frequently Asked Questions](/docs/faq) -> https://TODO
+- [第10章 生产环境部署](/chapters/chapter10-production-deployment) -> https://projectdiscovery.io/blog/how-we-cut-llm-cost-with-prompt-caching
 
 ### www2.eecs.berkeley.edu
 
-- [第5章：LLM推理基础](/chapters/chapter05-llm-inference-basics) -> https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf
-- [第6章：KV Cache 优化](/chapters/chapter06-kv-cache-optimization) -> https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf
-- [第7章：请求调度策略](/chapters/chapter07-request-scheduling) -> https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf
+- [第6章 KV Cache 优化](/chapters/chapter06-kv-cache-optimization) -> https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf
+- [第7章 请求调度策略](/chapters/chapter07-request-scheduling) -> https://www2.eecs.berkeley.edu/Pubs/TechRpts/2025/EECS-2025-192.pdf
 
 ## 次级知识对主路径的补充
 
 - [书籍元数据](/docs/book-metadata) => [LLM推理性能优化](/README)
 - [书籍元数据](/docs/book-metadata) => [第1章 重新理解推理这件事](/chapters/chapter01-introduction)
-- [书籍元数据](/docs/book-metadata) => [第2章：技术全景与趋势](/chapters/chapter02-technology-landscape)
+- [书籍元数据](/docs/book-metadata) => [第2章 技术全景与关键趋势](/chapters/chapter02-technology-landscape)
 - [内容摘要](/docs/content-summary) => [LLM推理性能优化](/README)
 - [内容摘要](/docs/content-summary) => [第1章 重新理解推理这件事](/chapters/chapter01-introduction)
+- [Frequently Asked Questions](/docs/faq) => [附录C: 基准测试记录与ROI计算模板](/appendix-c-benchmarks-roi)
 - [Frequently Asked Questions](/docs/faq) => [LLM推理性能优化](/README)
-- [Frequently Asked Questions](/docs/faq) => [第4章：环境搭建](/chapters/chapter04-environment-setup)
+- [Frequently Asked Questions](/docs/faq) => [第4章 环境搭建](/chapters/chapter04-environment-setup)
 - [Frequently Asked Questions](/docs/faq) => [附录B: 故障排查指南](/appendix-b-troubleshooting)
 - [参考资料汇总](/docs/refs) => [附录A: 工具与资源](/appendix-a-tools-resources)
-- [参考资料汇总](/docs/refs) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
-- [关键词](/docs/keywords) => [第5章：LLM推理基础](/chapters/chapter05-llm-inference-basics)
-- [关键词](/docs/keywords) => [第6章：KV Cache 优化](/chapters/chapter06-kv-cache-optimization)
-- [关键词](/docs/keywords) => [第7章：请求调度策略](/chapters/chapter07-request-scheduling)
-- [关键词](/docs/keywords) => [第8章：量化技术](/chapters/chapter08-quantization)
-- [关键词](/docs/keywords) => [第9章：投机采样](/chapters/chapter09-speculative-sampling)
+- [参考资料汇总](/docs/refs) => [第10章 生产环境部署](/chapters/chapter10-production-deployment)
+- [关键词](/docs/keywords) => [第5章 推理机制：Prefill 与 Decode](/chapters/chapter05-llm-inference-basics)
+- [关键词](/docs/keywords) => [第6章 KV Cache 优化](/chapters/chapter06-kv-cache-optimization)
+- [关键词](/docs/keywords) => [第7章 请求调度策略](/chapters/chapter07-request-scheduling)
+- [关键词](/docs/keywords) => [第8章 量化技术](/chapters/chapter08-quantization)
+- [关键词](/docs/keywords) => [第9章 投机采样](/chapters/chapter09-speculative-sampling)
 - [选题背景与特色](/docs/topic-background) => [LLM推理性能优化](/README)
 - [选题背景与特色](/docs/topic-background) => [第1章 重新理解推理这件事](/chapters/chapter01-introduction)
-- [选题背景与特色](/docs/topic-background) => [第2章：技术全景与趋势](/chapters/chapter02-technology-landscape)
+- [选题背景与特色](/docs/topic-background) => [第2章 技术全景与关键趋势](/chapters/chapter02-technology-landscape)
 - [市场需求与发展趋势](/docs/market-analysis) => [LLM推理性能优化](/README)
 - [市场需求与发展趋势](/docs/market-analysis) => [第1章 重新理解推理这件事](/chapters/chapter01-introduction)
-- [市场需求与发展趋势](/docs/market-analysis) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
+- [市场需求与发展趋势](/docs/market-analysis) => [第10章 生产环境部署](/chapters/chapter10-production-deployment)
 - [市场竞品对比分析](/docs/market-comparison) => [LLM推理性能优化](/README)
-- [市场竞品对比分析](/docs/market-comparison) => [第2章：技术全景与趋势](/chapters/chapter02-technology-landscape)
-- [Reader Success Stories](/docs/success-stories) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
-- [Reader Success Stories](/docs/success-stories) => [附录C: 性能基准测试与ROI案例](/appendix-c-benchmarks-roi)
+- [市场竞品对比分析](/docs/market-comparison) => [第2章 技术全景与关键趋势](/chapters/chapter02-technology-landscape)
+- [Reader Success Stories](/docs/success-stories) => [附录C: 基准测试记录与ROI计算模板](/appendix-c-benchmarks-roi)
+- [Reader Success Stories](/docs/success-stories) => [第10章 生产环境部署](/chapters/chapter10-production-deployment)
 - [Contributor Hall of Fame](/docs/contributors) => [LLM推理性能优化](/README)
 - [第1章补充案例 - 非经济学家对AI和经济学的思考](/docs/cases/boaz-barak-ai-economics) => [第1章 重新理解推理这件事](/chapters/chapter01-introduction)
-- [第1章补充案例 - 非经济学家对AI和经济学的思考](/docs/cases/boaz-barak-ai-economics) => [第2章：技术全景与趋势](/chapters/chapter02-technology-landscape)
-- [2025"青稞"AI嘉年华 - Infra专题研讨会核心内容分析](/docs/cases/qingke-ai-infra-2025-analysis) => [第7章：请求调度策略](/chapters/chapter07-request-scheduling)
-- [2025"青稞"AI嘉年华 - Infra专题研讨会核心内容分析](/docs/cases/qingke-ai-infra-2025-analysis) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
-- [2025"青稞"AI嘉年华 - Infra专题研讨会核心内容分析](/docs/cases/qingke-ai-infra-2025-analysis) => [第11章：高级话题](/chapters/chapter11-advanced-topics)
-- [SGLang INT4 QAT案例研究 - 端到端RL实践](/docs/cases/sglang-int4-qat-rl-analysis) => [第8章：量化技术](/chapters/chapter08-quantization)
-- [SGLang INT4 QAT案例研究 - 端到端RL实践](/docs/cases/sglang-int4-qat-rl-analysis) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
-- [LMSYS QAT案例研究 - 基于gpt-oss MXFP4](/docs/cases/lmsys-qat-mxfp4-analysis) => [第8章：量化技术](/chapters/chapter08-quantization)
-- [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) => [第9章：投机采样](/chapters/chapter09-speculative-sampling)
-- [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) => [第11章：高级话题](/chapters/chapter11-advanced-topics)
-- [TurboQuant 案例研究 - 极限 KV Cache 压缩](/docs/cases/turboquant-kv-cache-compression) => [第6章：KV Cache 优化](/chapters/chapter06-kv-cache-optimization)
-- [TurboQuant 案例研究 - 极限 KV Cache 压缩](/docs/cases/turboquant-kv-cache-compression) => [第8章：量化技术](/chapters/chapter08-quantization)
-- [TurboQuant 案例研究 - 极限 KV Cache 压缩](/docs/cases/turboquant-kv-cache-compression) => [第11章：高级话题](/chapters/chapter11-advanced-topics)
-- [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第7章：请求调度策略](/chapters/chapter07-request-scheduling)
-- [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
-- [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第11章：高级话题](/chapters/chapter11-advanced-topics)
-- [ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](/docs/cases/projectdiscovery-prompt-caching-agent-cost) => [第10章：生产环境部署](/chapters/chapter10-production-deployment)
-- [ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](/docs/cases/projectdiscovery-prompt-caching-agent-cost) => [第11章：高级话题](/chapters/chapter11-advanced-topics)
-- [ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](/docs/cases/ds4-local-metal-inference) => [第11章：高级话题](/chapters/chapter11-advanced-topics)
+- [第1章补充案例 - 非经济学家对AI和经济学的思考](/docs/cases/boaz-barak-ai-economics) => [第2章 技术全景与关键趋势](/chapters/chapter02-technology-landscape)
+- [2025"青稞"AI嘉年华 - Infra专题研讨会核心内容分析](/docs/cases/qingke-ai-infra-2025-analysis) => [第7章 请求调度策略](/chapters/chapter07-request-scheduling)
+- [2025"青稞"AI嘉年华 - Infra专题研讨会核心内容分析](/docs/cases/qingke-ai-infra-2025-analysis) => [第10章 生产环境部署](/chapters/chapter10-production-deployment)
+- [2025"青稞"AI嘉年华 - Infra专题研讨会核心内容分析](/docs/cases/qingke-ai-infra-2025-analysis) => [第11章 高级话题](/chapters/chapter11-advanced-topics)
+- [SGLang INT4 QAT案例研究 - 端到端RL实践](/docs/cases/sglang-int4-qat-rl-analysis) => [第8章 量化技术](/chapters/chapter08-quantization)
+- [SGLang INT4 QAT案例研究 - 端到端RL实践](/docs/cases/sglang-int4-qat-rl-analysis) => [第10章 生产环境部署](/chapters/chapter10-production-deployment)
+- [LMSYS QAT案例研究 - 基于gpt-oss MXFP4](/docs/cases/lmsys-qat-mxfp4-analysis) => [第8章 量化技术](/chapters/chapter08-quantization)
+- [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) => [第9章 投机采样](/chapters/chapter09-speculative-sampling)
+- [DFlash案例研究：用 Block Diffusion 改造 Speculative Decoding](/docs/cases/dflash-block-diffusion-analysis) => [第11章 高级话题](/chapters/chapter11-advanced-topics)
+- [TurboQuant 案例研究 - 极限 KV Cache 压缩](/docs/cases/turboquant-kv-cache-compression) => [第6章 KV Cache 优化](/chapters/chapter06-kv-cache-optimization)
+- [TurboQuant 案例研究 - 极限 KV Cache 压缩](/docs/cases/turboquant-kv-cache-compression) => [第8章 量化技术](/chapters/chapter08-quantization)
+- [TurboQuant 案例研究 - 极限 KV Cache 压缩](/docs/cases/turboquant-kv-cache-compression) => [第11章 高级话题](/chapters/chapter11-advanced-topics)
+- [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第7章 请求调度策略](/chapters/chapter07-request-scheduling)
+- [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第10章 生产环境部署](/chapters/chapter10-production-deployment)
+- [vLLM x Mooncake Store 案例研究 - Agentic Workload 的分布式 KV Cache 池](/docs/cases/vllm-mooncake-store-agentic-serving) => [第11章 高级话题](/chapters/chapter11-advanced-topics)
+- [ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](/docs/cases/projectdiscovery-prompt-caching-agent-cost) => [第10章 生产环境部署](/chapters/chapter10-production-deployment)
+- [ProjectDiscovery Prompt Caching 案例研究 - 多步 Agent 成本优化](/docs/cases/projectdiscovery-prompt-caching-agent-cost) => [第11章 高级话题](/chapters/chapter11-advanced-topics)
+- [ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](/docs/cases/ds4-local-metal-inference) => [第11章 高级话题](/chapters/chapter11-advanced-topics)
 - [ds4.c 案例研究 - DeepSeek V4 Flash 的本地 Metal 推理](/docs/cases/ds4-local-metal-inference) => [附录A: 工具与资源](/appendix-a-tools-resources)

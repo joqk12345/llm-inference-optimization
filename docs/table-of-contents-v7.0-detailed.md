@@ -1,3 +1,5 @@
+> 历史目录快照：章节顺序和标题可能已调整，当前目录以 [SUMMARY](../SUMMARY.md) 为准。
+
 # LLM推理优化实战 - 完整目录（V2+V3融合版）
 
 **创建日期**：2025-01-27
@@ -2766,7 +2768,7 @@ vLLM插件系统提供了更好的解决方案。
 
   **6.3.4.8 SGLang的LRU Cache管理**
 
-  > **💡 深度来源**：[SGLang v0.2 Slides](/Users/mac/Downloads/sglang_v0_2.pdf)
+  > **💡 深度来源**：SGLang v0.2 Slides（内部资料；发布前替换为公开、可访问的版本化链接）
   >
   > **核心机制**：Radix Tree + LRU Eviction
   >
@@ -4072,7 +4074,7 @@ vLLM插件系统提供了更好的解决方案。
 
 - 7.4.7 Dynamic Memory Management (SGLang)
 
-  > **💡 深度来源**：[SGLang v0.2 Slides](/Users/mac/Downloads/sglang_v0_2.pdf)
+  > **💡 深度来源**：SGLang v0.2 Slides（内部资料；发布前替换为公开、可访问的版本化链接）
   >
   > **核心问题**：max_new_tokens预留空间浪费
   >

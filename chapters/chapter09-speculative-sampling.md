@@ -1,6 +1,6 @@
 ---
 id: "chapters-chapter09-speculative-sampling"
-title: "第9章：投机采样"
+title: "第9章 投机采样"
 slug: "chapters-chapter09-speculative-sampling"
 date: "2026-03-11"
 type: "article"
@@ -10,7 +10,7 @@ concepts:
   - "speculative-decoding"
   - "latency-budget"
 tools:
-  - "vLLM"
+  - "vllm"
   - "sglang"
 architecture_layer:
   - "optimization-techniques"
@@ -24,7 +24,10 @@ related:
   - "chapters-chapter08-quantization"
   - "chapters-chapter11-advanced-topics"
   - "docs-cases-dflash-block-diffusion-analysis"
-references: []
+references:
+  - "https://arxiv.org/abs/2211.17192"
+  - "https://arxiv.org/abs/2402.02057"
+  - "https://arxiv.org/abs/2401.15077"
 status: "published"
 display_order: 10
 ---
@@ -175,182 +178,78 @@ CPU 分支预测:
 - 验证策略是否高效（验证开销是否会吞掉收益）
 - 你的负载是否真的 decode-heavy（如果主要时间在 prefill，收益会变小）
 
-### 9.2.1 核心思想: 小模型先行
+### 9.2.1 草稿生成与并行验证
 
-**两模型架构**：
-```
-主模型 (Main Model):
-  - 大模型 (如 Llama-2-70B)
-  - 准确但慢
-  - 负责验证草稿
+设目标模型的条件分布为 `p`，草稿模型的条件分布为 `q`，每轮最多提议 `m` 个 token。两者必须使用可对齐的 token 空间；模型架构不必相同。
 
-草稿模型 (Draft Model):
-  - 小模型 (如 Llama-2-7B)
-  - 快但不够准确
-  - 负责生成草稿
-```
+普通自回归草稿模型依次生成 `m` 个 token，需要 `m` 个草稿解码步骤。多 token 预测或块生成方法可能改变这个过程，但不能把它们的成本假设套在普通小模型上。
 
-**工作流程**：
-```
-步骤 1: 草稿模型快速生成
-  输入: [t0]
-  草稿模型: 生成 [t1, t2, ..., t10] (快速)
-  时间: 1 次 forward pass (小模型)
+目标模型随后以“已确认前缀 + 草稿”为输入，在一次带因果 mask 的前向计算中取得各位置的条件分布。这里使用的是 forward 的 logits，并非再次调用自回归 `generate()`。验证必须正确对齐“当前位置的输出预测下一个 token”，并复用已确认前缀的 KV。[CITE: speculative-decoding-icml-2023]
 
-步骤 2: 主模型并行验证
-  输入: [t0, t1, t2, ..., t10]
-  主模型: 并行验证所有 tokens (1 次 forward pass)
-  输出: [t0, t1', t2', ..., t10']
+### 9.2.2 贪心解码的验证
 
-步骤 3: 比对结果
-  如果 t1' == t1, t2' == t2, ..., t10' == t10:
-    → 全部正确! 
-    → 接受草稿,节省时间
-  否则:
-    → 找到第一个不匹配的 token (如 t3)
-    → 丢弃 t3-t10
-    → 从 t2 重新开始
+当目标是复现目标模型的贪心输出时，可逐位置比较草稿 token 与目标分布的 argmax：
+
+1. 接受连续匹配的草稿前缀。
+2. 第一次不匹配时，输出目标模型在该位置的 argmax，并丢弃此位置及其后的草稿。
+3. 若全部匹配，则额外输出目标模型在完整草稿后的 argmax。
+
+平局处理、logits processor 和停止条件必须与基线一致。贪心匹配规则不能直接用于声称随机采样分布等价。
+
+### 9.2.3 随机采样的接受与修正
+
+对于在同一前缀下由 `q` 提议的 token `x`，以概率
+
+```text
+accept(x) = min(1, p(x) / q(x))
 ```
 
----
+接受它。被提议的 token 满足 `q(x) > 0`。首次拒绝时，保留已接受前缀，从修正分布中补采一个 token：
 
-### 9.2.2 草稿模型 (Draft Model)
-
-**草稿模型的作用**：
-```
-主模型和草稿模型的关系:
-  主模型: "老师" - 准确但慢
-  草稿模型: "助教" - 快速但不完美
-
-草稿模型的要求:
-  速度快 (小模型,如 7B)
-  接受率尚可 (依任务而定)
-  与主模型架构相同或兼容
-  不需要完美 (可以接受一些错误)
+```text
+r(y) = max(0, p(y) - q(y)) / Σ_z max(0, p(z) - q(z))
 ```
 
-**草稿模型的类型**：
-```
-类型 1: 小型号模型
-  - Llama-2-7B 作为 Llama-2-70B 的草稿
-  - 快速,但接受率较低
+随后丢弃被拒位置及其后的草稿。若全部接受，则从目标模型在完整草稿后的条件分布额外采一个 token。这使每轮至少前进一个 token，并在精确概率运算等假设下保持目标采样分布；不保证与一次独立的目标模型采样逐字相同。[CITE: speculative-decoding-icml-2023]
 
-类型 2: 量化后的主模型
-  - Llama-2-70B-INT4 作为 Llama-2-70B-FP16 的草稿
-  - 快速,且架构完全相同
+温度、top-k/top-p 等处理必须先转化为归一化后的实际采样分布，再用于接受和修正。有限精度、停止 token、输出长度截断及 KV 回滚需要另外验证。
 
-类型 3: 专门训练的草稿模型
-  - 针对"预测主模型输出"优化
-  - 接受率最高
-  - 训练成本高
-```
+下面是流程伪代码，`target_forward_distributions` 表示一次因果 forward 后对齐的 `m+1` 个分布，不能用 `generate()` 替代：
 
----
-
-### 9.2.3 验证过程
-
-**并行验证**：
-```python
-def verify_draft(main_model, prompt, draft_tokens):
-    """
-    主模型并行验证草稿 tokens
-
-    Args:
-        main_model: 主模型
-        prompt: 输入 prompt (t0)
-        draft_tokens: 草稿 tokens (t1, t2, ..., tn)
-
-    Returns:
-        verified_tokens: 验证通过的 tokens
-        reject_position: 第一个不匹配的位置
-    """
-    # 拼接 prompt 和草稿 tokens
-    full_input = [prompt] + draft_tokens
-
-    # 主模型一次 forward pass
-    outputs = main_model.generate(full_input)
-
-    # 逐个比对
-    for i in range(len(draft_tokens)):
-        if outputs[i] == draft_tokens[i]:
-            verified_tokens.append(draft_tokens[i])
-        else:
-            # 第 i 个 token 不匹配
-            return verified_tokens, i
-
-    # 全部匹配
-    return verified_tokens, -1
+```text
+draft, q = autoregressive_draft(prefix, m)       # m 个草稿步骤
+p = target_forward_distributions(prefix, draft)
+accepted = []
+for i, token in enumerate(draft):
+    if uniform_0_1() < min(1, p[i][token] / q[i][token]):
+        accepted.append(token)
+    else:
+        correction = normalize(maximum(p[i] - q[i], 0))
+        return accepted + [sample(correction)]
+return accepted + [sample(p[m])]
 ```
 
-**为什么可以并行验证?**
-```
-关键洞察: Attention 机制允许并行计算
+配套 `code/chapter09/speculative_reference.py` 用于验证接受与拒绝逻辑，不模拟 GPU 并行加速。概率回归测试见 `tests/README.md`。
 
-传统生成:
-  Token 0 → Token 1 → Token 2
-  (串行,因为依赖关系)
+### 9.2.4 状态与时间线
 
-投机采样验证:
-  输入: [t0, t1, t2, ..., t10]
-  → Attention 可以并行计算所有 tokens 的输出
-  → 串行依赖关系体现在 attention mask 上
-  → 一次 forward pass 验证所有 tokens
+```text
+已确认前缀
+  → 草稿模型串行提议 m 个 token
+  → 目标模型一次 forward 取得验证分布
+  → 接受连续前缀，输出修正 token 或额外 token
+  → 丢弃未接受草稿对应的 KV，同步两模型状态
+  → 下一轮
 ```
 
----
+工程实现需区分“已经输出的 token”与“已经计算并写入 KV 的 token”：修正或额外 token 可能要在下一轮 forward 才进入 KV。不能把未经验证的后缀留在可复用缓存里。
 
-### 9.2.4 图解完整流程
-
-```
-时间线:
-
-┌─────────────────────────────────────────────────┐
-│ Step 1: 草稿模型生成                              │
-├─────────────────────────────────────────────────┤
-│ Input:  [t0]                                    │
-│ Draft Model: 快速生成                         │
-│ Output: [t0, t1, t2, t3, t4, t5, t6, t7, t8]    │
-│ Time:   示意 (小模型,1 次 forward pass)        │
-└─────────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────┐
-│ Step 2: 主模型验证                                │
-├─────────────────────────────────────────────────┤
-│ Input:  [t0, t1, t2, t3, t4, t5, t6, t7, t8]       │
-│ Main Model: 并行验证                           │
-│ Output: [t0, t1, t2, t3', t4', t5', t6', t7', t8']  │
-│ Time:   示意 (大模型,1 次 forward pass)         │
-└─────────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────┐
-│ Step 3: 比对结果                                  │
-├─────────────────────────────────────────────────┤
-│ Compare:                                         │
-│   t1 == t1'                                │
-│   t2 == t2'                                │
-│   t3 == t3' (不匹配!)                       │
-│ Result:                                         │
-│   Accept: [t1, t2] (验证通过)                  │
-│   Reject: [t3'-t8'] (丢弃)                      │
-└─────────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────┐
-│ Step 4: 继续生成                                  │
-├─────────────────────────────────────────────────┤
-│ Current: [t0, t1, t2]                           │
-│ Draft Model: 生成 [t3, t4, ..., t12]             │
-│ Main Model: 验证                               │
-│ ...                                             │
-└─────────────────────────────────────────────────┘
-
-总时间（示意）:
-  无投机采样: N × t_main
-  投机采样: (t_draft + t_verify) × 批次数 + 回退开销
-
-说明：具体数值依模型、上下文、实现与接受率而变，这里只强调“减少大模型步数”的结构性来源。
+```text
+T_base ≈ N × t_main_decode
+T_spec ≈ cycles × (t_draft(m) + t_verify(m)) + 状态管理开销
 ```
 
----
+草稿长度影响接受前缀长度，也影响计算与显存开销。收益应在固定负载和质量口径下测量，不由模型参数量或单一接受率决定。
 
 ## 9.3 投机采样变体
 
@@ -361,6 +260,7 @@ def verify_draft(main_model, prompt, draft_tokens):
 ### 9.3.1 Speculative Decoding
 
 **原始投机采样方法**：
+[CITE: speculative-decoding-icml-2023]
 ```
 核心特点:
   - 使用小模型或量化模型作为草稿
@@ -403,33 +303,9 @@ def verify_draft(main_model, prompt, draft_tokens):
 
 ### 9.3.3 Lookahead Decoding
 
-**前瞻解码**：
-```
-核心特点:
-  - 使用多个小草稿模型
-  - 每个草稿模型"预测"不同长度的 tokens
-  - 选择最长的正确序列
+Lookahead Decoding 不是“同时运行多个小草稿模型”。原始工作提出一种不需要辅助模型或外部 datastore 的精确并行解码方法，通过并行生成和验证 n-gram 候选来用额外的并行计算换取更少的串行 decode 步骤。[CITE: lookahead-decoding-2024]
 
-示例:
-  草稿模型 1: 预测 4 tokens
-  草稿模型 2: 预测 8 tokens
-  草稿模型 3: 预测 12 tokens
-
-  验证结果:
-    草稿 1: 4/4 正确 
-    草稿 2: 6/8 正确 
-    草稿 3: 10/12 正确 
-
-  接受: 草稿 1 的 4 tokens
-  最远验证: 草稿 3 的前 10 个 tokens
-```
-
-**优势**：
-```
-多个草稿模型提高接受率
-自适应 speculation 长度
-计算复杂度高
-```
+它与经典 speculative decoding 的主要区别不是“草稿长度更多”，而是候选产生机制不同。是否有净收益仍取决于并行硬件、候选命中、序列形态与实现开销。
 
 ---
 
@@ -455,11 +331,7 @@ def verify_draft(main_model, prompt, draft_tokens):
 - 只看平均 TPS 容易误判；有些实现吞吐上升但尾延迟变差
 - 验证开销的实现差异很大（kernel、batch、mask 处理都会影响）
 
-**Eagle 系列演进（示例口径）**：
-
-- **Eagle（早期）**：基础投机采样草稿训练，往往是固定 spec_len、单层草稿为主
-- **Eagle 2（改进）**：更重视接受率与回退控制，可能引入更强的训练/蒸馏策略
-- **Eagle 3（更工程化）**：更强调在推理框架里稳定集成与可观测性（但仍以你的压测结果为准）
+**当前证据边界**：初代 EAGLE 论文提出的是特征层自回归 drafter，并通过提前一位的 token 预测处理特征不确定性。[CITE: eagle-2024] 在 EAGLE-2、EAGLE-3 的原始论文或官方技术报告分别进入证据账本之前，本章不再用“更强训练”“更工程化”等模糊标签描述版本演进。
 
 ---
 

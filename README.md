@@ -38,7 +38,17 @@ display_order: 1
 - Main reading path: [`SUMMARY.md`](SUMMARY.md)
 - Repo landing page: [`index.md`](index.md)
 - Back-cover style summary: [`docs/content-summary.md`](docs/content-summary.md)
+- Ten-year durability review and restructuring blueprint: [`docs/book-longevity-review.md`](docs/book-longevity-review.md)
+- Architecture decision record: [`ADR-0001`](docs/adr/0001-stable-core-and-versioned-adapters.md)
 - Editorial changelog: [`CHANGELOG.md`](CHANGELOG.md)
+
+### 🎬 Video Introduction
+
+Prefer a quick overview? The repository includes a 30-second, 16:9 introduction
+video in the same dark editorial style as the reference design:
+
+- [Download the MP4 introduction](media/intro_video/llm-inference-optimization-rewired-style-30s.mp4)
+- Canvas source in the repository: `media/intro_video/canvas_rewired_style.html`
 
 ---
 
@@ -50,13 +60,17 @@ You'll learn:
 
 - **11 Chapters in 4 Parts**: From motivation and GPU basics to production deployment and advanced topics
 - **GPU Fundamentals**: Understand how GPUs work and how to leverage them for inference
-- **Selected Code Examples**: The repo currently ships runnable examples for the foundational chapters, with more chapter code added incrementally
+- **Selected Code Examples**: Chapter 3 diagnostics, Chapter 4 environment checks, Chapter 9 speculation and Chapter 11 Attention CPU references, plus a Chapter 10 prefix-cache experiment client
 - **Docker Ready Foundations**: Environment checks and base examples are designed to be reproducible
 - **Production Grade**: Real-world deployment strategies
+- **Model implementation records**: [DeepSeek-V4.1-Flash KV](docs/cards/deepseek-v41-flash-kv.md) and [DeepInfer](docs/cards/deepinfer-runtime.md), maintained separately from the core mechanisms
+- **Specialized runtimes**: DeepInfer coverage for DeepSeek-V4.1-Flash, including its hardware boundary and the service-layer capabilities that still need to be supplied
 
 ---
 
 ## 📝 Current Editorial Status
+
+The long-term editorial strategy is to keep mechanisms and experimental methods stable while moving framework, hardware, model, and version-specific material into replaceable cards and playbooks. This is recorded in [`ADR-0001`](docs/adr/0001-stable-core-and-versioned-adapters.md); see [`docs/book-longevity-review.md`](docs/book-longevity-review.md) for the chapter-by-chapter audit and migration plan.
 
 - The manuscript is currently organized into **4 parts / 11 chapters**
 - Chapter boundaries have been tightened so the main path now reads more cleanly:
@@ -66,7 +80,10 @@ You'll learn:
   - Chapter 10 focuses on production deployment and runtime governance
   - Chapter 11 focuses on advanced and frontier topics
 - Cross-chapter transitions, summary labels, and section lead-ins have been standardized for consistency
-- Runnable code is still concentrated in the foundational chapters, with later chapter examples being added incrementally
+- CPU reference and protocol regression tests cover later-chapter tools; real GPU performance results are still pending
+- Chapter 6 links to a separate DeepSeek-V4.1-Flash KV-state and bounded-replay implementation record
+- Chapter 11 explains specialized runtime selection and links to the DeepInfer implementation record and exercise
+- The reviewed publisher-oriented DOCX is available at `publish/LLM推理性能优化_正文_清华出版社体例_审校版_2026-10-22.docx`. It includes numbered citations and a navigable three-level TOC; refresh the TOC in WPS/Word after pagination to obtain page numbers. Visual page review is still pending. This dated DOCX predates the current Markdown revisions and must be regenerated before publication.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the latest structural and editorial updates.
 
@@ -105,11 +122,21 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the latest structural and editorial updat
 ### Appendices
 - **Appendix A: Tools and Resources** - A curated list of helpful tools
 - **Appendix B: Troubleshooting** - Common issues and solutions
-- **Appendix C: Performance Benchmarks** - Real-world numbers
+- **Appendix C: Benchmark and ROI Worksheets** - [Experiment records and cost calculation templates](appendix-c-benchmarks-roi.md); no measured GPU benchmarks
 
 ---
 
 ## 🚀 Quick Start
+
+Start with [the reading path](SUMMARY.md). After Chapter 5, read the [prefix-cache experiment](code/chapter10/README.md) to connect baseline, one-variable optimization, quality checks and cost measurement. It includes an executable client and workload; real GPU results are pending.
+
+Run the CPU regression checks without a model server:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+CPU checks validate reference algorithms and protocol handling. Full experiments require a compatible GPU model service; see [test coverage](tests/README.md).
 
 ```bash
 # Clone the repository
@@ -173,10 +200,7 @@ We welcome contributions! Here are ways you can help:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-**Top contributors** get recognized:
-- Monthly Top 10: Free Pro membership
-- Quarterly Top 3: 1:1 consulting session
-- Annual contributors: Your name in the book acknowledgments
+Contributions are tracked in GitHub history and [contributor notes](docs/contributors.md). Feedback and questions go through [GitHub Issues](https://github.com/joqk12345/llm-inference-optimization/issues).
 
 ---
 

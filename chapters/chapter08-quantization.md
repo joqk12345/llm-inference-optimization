@@ -1,6 +1,6 @@
 ---
 id: "chapters-chapter08-quantization"
-title: "第8章：量化技术"
+title: "第8章 量化技术"
 slug: "chapters-chapter08-quantization"
 date: "2026-03-11"
 type: "article"
@@ -11,7 +11,7 @@ concepts:
   - "int4-qat"
   - "precision-alignment"
 tools:
-  - "vLLM"
+  - "vllm"
   - "sglang"
   - "modelopt"
 architecture_layer:
@@ -27,7 +27,9 @@ related:
   - "chapters-chapter09-speculative-sampling"
   - "chapters-chapter11-advanced-topics"
   - "docs-cases-turboquant-kv-cache-compression"
-references: []
+references:
+  - "https://arxiv.org/abs/2306.00978"
+  - "https://arxiv.org/abs/2210.17323"
 status: "published"
 display_order: 9
 ---
@@ -227,7 +229,7 @@ FP16 → INT4:
 ```
 
 **常见方法**：
-- **GPTQ**: Gradient-based Post-Training Quantization
+- **GPTQ**: 使用近似二阶信息的 one-shot 权重量化方法（名称不展开为 “Gradient-based”）
 - **AWQ**: Activation-aware Quantization
 - **bitsandbytes**: 简单易用的 INT8 量化
 - **SpQR**: 混合精度量化
@@ -486,23 +488,20 @@ R = (Q - Z) * S
 
 **推荐**：生产环境标准方案之一，具体收益需结合硬件与任务回归验证。
 
-#### INT8 量化 Trade-off 详细数据
+#### INT8 量化 Trade-off 应如何测
 
-> **数据来源**：vLLM 基准测试、AWQ/GPTQ 论文、Llama-2 技术报告
-> **测试条件**：Llama-2-7B/70B，A100-80GB，batch_size=1
+AWQ 和 GPTQ 的原始工作主要讨论低比特 weight-only PTQ，不能作为所有 INT8 权重—激活方案的统一质量表。正文不再给出脱离模型和实现的固定 MMLU、HumanEval 或加速数字。[CITE: awq-mlsys-2024] [CITE: gptq-2022]
 
-| 模型 | 量化方法 | 质量损失 (MMLU) | 质量损失 (HumanEval) | 推理加速 | 显存节省 | 推荐场景 |
-|------|---------|-----------------|---------------------|---------|---------|----------|
-| Llama-2-7B | FP16 (baseline) | baseline | baseline | 1× | - | 质量优先 |
-| Llama-2-7B | INT8 (AWQ) | -0.3 ± 0.2 pt | -0.5 pt | ~1.3× | 50% | 推荐首选 |
-| Llama-2-7B | INT8 (GPTQ) | -0.4 ± 0.2 pt | -0.7 pt | ~1.3× | 50% | 推荐首选 |
-| Llama-2-70B | INT8 (AWQ) | -0.5 ± 0.3 pt | -0.8 pt | ~1.4× | 50% | 显存受限 |
-| Llama-2-70B | INT8 (GPTQ) | -0.6 ± 0.3 pt | -1.0 pt | ~1.4× | 50% | 显存受限 |
+至少应分别记录：
 
-**工程决策**：
-- 质量敏感场景（> 1% MMLU 损失不可接受）：使用 INT8 + 校准
-- 成本敏感场景（> 50% 显存节省目标）：INT8 是最佳平衡点
-- 复杂推理任务（数学、代码）：建议 FP16 或 FP8，避免 INT8
+| 维度 | 必填条件 | 输出指标 |
+|------|----------|----------|
+| 模型与格式 | checkpoint、weight-only/W8A8、group size、scale 粒度 | 实际权重与运行时显存 |
+| 硬件与 kernel | GPU、推理引擎、kernel backend、batch/shape | TTFT、TPOT、吞吐、功耗 |
+| 质量 | 校准集、业务回归集、采样参数 | 任务成功率、长尾错误、PPL/公开基准（辅助） |
+| 生产约束 | 并发、输入/输出长度分布、SLA | P95/P99、失败率、单位有效 token 成本 |
+
+**工程决策**：只有在同一模型、同一负载和同一质量门槛下，INT8 与 FP16/BF16 的对比才有决策价值。
 
 ---
 
@@ -540,36 +539,15 @@ FP16 激活:
 
 **推荐**：适合极限压缩场景，但必须配合任务级质量回归。
 
-#### INT4 量化 Trade-off 详细数据
+#### INT4 量化 Trade-off 的证据边界
 
-> **数据来源**：QLoRA 论文、AWQ/GPTQ 论文、vLLM 基准测试
-> **测试条件**：Llama-2-7B/70B，A100-80GB
-
-| 模型 | 量化方法 | 质量损失 (MMLU) | 质量损失 (HumanEval) | 推理加速 | 显存节省 | 推荐场景 |
-|------|---------|-----------------|---------------------|---------|---------|----------|
-| Llama-2-7B | FP16 (baseline) | baseline | baseline | 1× | - | 质量优先 |
-| Llama-2-7B | INT4 (AWQ) | -1.2 ± 0.4 pt | -1.5 pt | ~1.5× | 75% | 激进压缩 |
-| Llama-2-7B | INT4 (GPTQ) | -1.5 ± 0.5 pt | -2.0 pt | ~1.5× | 75% | 激进压缩 |
-| Llama-2-7B | INT4 (QLoRA*) | -0.8 ± 0.3 pt | -1.0 pt | ~1.5× | 75% | 需要微调 |
-| Llama-2-70B | INT4 (AWQ) | -1.8 ± 0.5 pt | -2.5 pt | ~1.6× | 75% | 大模型极限压缩 |
-
-> * QLoRA 需要微调，推理时使用量化权重
+按位宽计算，FP16 权重降为 4 bit 的理论存储下界是原来的四分之一；实际制品还包含 scales、zero points、padding 与格式元数据。是否加速则取决于目标硬件是否有匹配 kernel，以及反量化开销能否被带宽节省覆盖。[CITE: awq-mlsys-2024] [CITE: gptq-2022]
 
 **工程决策**：
 - **强烈建议**：在业务回归集上验证质量损失
-- 简单任务（客服、内容生成）：INT4 质量损失通常可接受
-- 复杂推理（数学证明、代码生成）：**谨慎使用**，建议 FP8 或 INT8
-- 边缘部署：INT4 是必须的，但需要更精细的校准
-
-**质量损失容忍度参考**：
-
-| 业务场景 | 可接受 MMLU 损失 | 推荐量化 |
-|----------|-----------------|----------|
-| 客服对话 | < 2% | INT4 可接受 |
-| 内容生成 | < 1.5% | INT4 可接受 |
-| 代码补全 | < 1% | INT8 首选 |
-| 数学推理 | < 0.5% | FP16/FP8 |
-| 专业领域问答 | < 1% | INT8 首选 |
+- 不按“客服简单、代码复杂”预先指定精度；使用真实任务分布和失败成本定义验收阈值
+- 边缘部署也不是“必须 INT4”，还可以在模型大小、蒸馏、offload、上下文上限与硬件之间权衡
+- 公开基准只能辅助发现回归，不能替代业务质量门槛
 
 ---
 
@@ -644,23 +622,9 @@ FP4 vs INT4:
   生态仍在发展
 ```
 
-#### FP8 量化 Trade-off 详细数据
+#### FP8 的评估边界
 
-> **数据来源**：NVIDIA Hopper 架构白皮书、vLLM 基准测试
-> **测试条件**：Llama-2-7B on H100，FP8 原生支持
-
-| 模型 | 量化方法 | 质量损失 (MMLU) | 质量损失 (HumanEval) | 推理加速 | 显存节省 | 推荐场景 |
-|------|---------|-----------------|---------------------|---------|---------|----------|
-| Llama-2-7B | FP16 (baseline) | baseline | baseline | 1× | - | 质量优先 |
-| Llama-2-7B | FP8 (E5M2) | -0.2 ± 0.1 pt | -0.3 pt | ~1.2× | 50% | **推荐首选** |
-| Llama-2-7B | FP8 (E4M3) | -0.1 ± 0.1 pt | -0.2 pt | ~1.15× | 50% | 精度敏感 |
-| Llama-2-70B | FP8 (E5M2) | -0.3 ± 0.2 pt | -0.4 pt | ~1.25× | 50% | **推荐首选** |
-
-**为什么 FP8 是"推荐首选"**：
-- **硬件原生支持**：H100/B200 等新一代 GPU 有 Tensor Core 加速
-- **精度损失最小**：< 0.3% MMLU 损失，几乎可忽略
-- **无额外校准**：vLLM 0.5.0+ 支持自动 FP8 推理
-- **向后兼容**：比 INT4 更安全，比 FP16 更快
+FP8 是否适合作为第一刀，取决于 GPU 架构、权重制品、scale 策略、kernel 覆盖和任务质量。不能把“硬件支持 FP8”直接等价为“任意模型无需校准即可获得固定加速且质量几乎无损”。框架能力还必须引用并核对对应版本的官方文档。
 
 **硬件要求**：
 | GPU | FP8 支持 | 推荐度 |
@@ -672,13 +636,12 @@ FP4 vs INT4:
 
 #### 量化方法选型决策表
 
-| 场景 | 推荐方法 | 质量损失 | 实施复杂度 |
-|------|---------|---------|-----------|
-| 生产环境首次量化 | **FP8** | < 0.3% | 低 (vLLM 原生) |
-| 显存紧张 (70B+) | **INT8** | < 0.5% | 中 (需校准) |
-| 极限压缩 (边缘部署) | **INT4** | 1-2% | 高 (需验证) |
-| NVIDIA 硬件 + 追求性能 | **TensorRT-LLM FP8** | < 0.3% | 中 |
-| 复杂推理任务 | **FP16/FP8** | baseline | - |
+| 场景 | 优先比较 | 决策条件 |
+|------|---------|---------|
+| 首次量化 | FP8、INT8 与现有 BF16/FP16 基线 | kernel 可用、质量过线、端到端成本下降 |
+| 权重容量受限 | weight-only INT4/INT8、较小模型 | 制品放得下且有效吞吐提高 |
+| 长上下文容量受限 | KV 精度、上下文上限、并发策略 | 任务质量、KV 容量与 TPOT 同时过线 |
+| 边缘部署 | 模型大小、量化、offload 与硬件组合 | 在功耗、延迟和质量预算内可运行 |
 
 ---
 
@@ -687,36 +650,35 @@ FP4 vs INT4:
 **AWQ (Activation-aware Quantization)**：
 ```
 原理:
-  基于激活值的重要性来量化权重
-  重要的权重保持高精度
+  使用激活统计识别 salient weight channels
+  通过等价缩放降低重要通道的量化误差
 
 步骤:
   1. 收集激活值统计
   2. 计算权重重要性
-  3. 非均匀量化 (重要权重精度高)
+  3. 对权重应用等价变换后执行低比特量化
 
 优点:
-  精度优于 GPTQ
-  速度快
+  无需反向传播或重构
+  适合 weight-only 低比特部署
 
 缺点:
   需要校准数据
   实现复杂
 ```
 
-**GPTQ (Gradient-based Post-Training Quantization)**：
+**GPTQ（论文名称中的 GPTQ，不展开为 Gradient-based）**：[CITE: gptq-2022]
 ```
 原理:
-  基于梯度的二阶信息
-  迭代量化权重
+  使用近似二阶信息控制逐层权重量化误差
+  属于 one-shot post-training weight quantization
 
 步骤:
-  1. 计算海森矩阵近似
+  1. 用校准样本收集层输入并构造二阶近似
   2. 迭代量化权重
   3. 最小化量化误差
 
 优点:
-  不需要校准数据
   精度好
   开源工具成熟
 
@@ -728,15 +690,13 @@ FP4 vs INT4:
 **对比**：
 | 特性 | AWQ | GPTQ |
 |------|-----|------|
-| **精度** | 更好 | 好 |
-| **速度** | 快 | 慢 |
-| **校准数据** | 需要 | 不需要 |
+| **精度** | 取决于模型与设置 | 取决于模型与设置 |
+| **运行速度** | 取决于权重格式与 kernel | 取决于权重格式与 kernel |
+| **校准数据** | 需要激活统计 | 通常需要校准样本收集层输入 |
 | **工具支持** | vLLM, AutoGPTQ | AutoGPTQ, llama.cpp |
-| **推荐倾向** | 生产优先 | 离线/研究可选 |
+| **选择依据** | 模型支持、质量与 runtime kernel | 模型支持、质量与 runtime kernel |
 
-**推荐**：
-- 生产环境: AWQ (更快、精度更好)
-- 研究/离线: GPTQ (不需要校准数据)
+AWQ 与 GPTQ 的原始论文目标、校准过程和实验栈不同，不能仅凭方法名给出“生产/研究”的固定分工。应在目标 runtime 上比较兼容格式、量化耗时、任务质量和端到端性能。[CITE: awq-mlsys-2024] [CITE: gptq-2022]
 
 ---
 
@@ -760,7 +720,7 @@ FP4 vs INT4:
 
 **使用示例**：
 ```python
-from vLLM import LLM, SamplingParams
+from vllm import LLM, SamplingParams
 
 # AWQ 量化模型
 llm = LLM(
@@ -1035,102 +995,56 @@ Llama-2-7B (序列长度 32768,示意):
 
 ---
 
-### 8.5.2 KV Cache 量化方法
+### 8.5.2 KV Cache 量化：区分机制与框架接口
 
-**INT8 KV Cache**：
+INT8、FP8、逐 token 和逐 head 描述的是数值格式或缩放粒度，不代表任意引擎都接受同名参数。权重量化与 KV 量化也使用不同的配置入口。
+
+本书的执行模板锁定 vLLM 0.30.0，见 [版本适配卡](../docs/cards/vllm-0.30.0.md)。该版本公开了 FP8、NVFP4 以及逐 token/head 等 KV 存储选项，但具体支持仍取决于模型、硬件和后端；原有 `int8`、`dynamic_int8`、`int8_per_token` 字符串不能跨版本直接当作 KV 参数。[CITE: vllm-kv-cache-0-30-0]
+
 ```python
-from vLLM import LLM
+# 模板：在支持的 GPU/后端上运行；本仓库尚无 GPU 实测结果。
+import os
+from vllm import LLM, SamplingParams
 
 llm = LLM(
-    model="meta-llama/Llama-2-7b-hf",
-    kv_cache_dtype="int8",  # KV Cache 量化到 INT8
+    model=os.environ["MODEL_ID"],
+    revision=os.environ["MODEL_REVISION"],  # 不可变的模型 commit
+    dtype="half",
+    kv_cache_dtype="fp8",
+    max_model_len=2048,
 )
-
-# 显存节省(示意):
-# FP16: 数 GB
-# INT8: 约减半
-```
-
-**动态量化 vs 静态量化**：
-```python
-# 静态量化 (推荐):
-kv_cache_dtype="int8"
-# 预先计算好 scale 和 zero point
-# 速度快,精度好
-
-# 动态量化:
-kv_cache_dtype="dynamic_int8"
-# 每次计算时动态量化
-# 更灵活,但略慢
-```
-
-**Per-token 量化**：
-```python
-# 每个 token 独立量化
-# 精度更高,但开销更大
-
-llm = LLM(
-    model="meta-llama/Llama-2-7b-hf",
-    kv_cache_dtype="int8_per_token",
+outputs = llm.generate(
+    ["The capital of France is"],
+    SamplingParams(temperature=0, max_tokens=16),
 )
+print(outputs[0].outputs[0].text)
 ```
 
----
+0.30.0 文档的 FP8 KV 路径以默认 scale 或 `llm-compressor` 数据集校准为主；旧版本材料中的 `calculate_kv_scales` 不能继续作为 0.30.0 的通用参数。缩放因子来源、校准集、跳过量化的层（如 `--kv-cache-dtype-skip-layers`）都应写入实验记录；不同粒度的容量节省还需计入 scales、元数据和对齐开销。正式质量评估应使用与评测集分离的代表性校准集。[CITE: vllm-kv-cache-0-30-0]
 
-### 8.5.3 精度与速度平衡
+### 8.5.3 质量与性能的联合评估
 
-**精度损失评估**：
-```python
-import torch
-from vLLM import LLM
+生成文本的 token 一致率不能替代任务质量：随机解码允许不同的正确答案，而完全一致的错误答案也没有价值。比较基线与量化模型时应：
 
-# FP16 基线
-llm_fp16 = LLM(model="meta-llama/Llama-2-7b-hf")
-output_fp16 = llm_fp16.generate(prompts)
+1. 固定模型 revision、tokenizer、任务数据和解码设置；只改变 KV 配置。
+2. 对有标准答案的任务使用 exact match 或任务评分，对代码使用测试通过率；开放式任务使用预先定义的人工或模型评审规则。
+3. 分别报告短上下文、长上下文和关键业务子集的结果，给出样本数及允许的质量退化阈值。
+4. 在相同负载、预热和 SLO 下记录 TTFT、TPOT、有效吞吐、失败率及显存口径。
+5. 基线与候选依次启动，避免在同一张卡同时加载两个服务而引入显存和调度干扰。
 
-# INT8 KV Cache
-llm_int8 = LLM(
-    model="meta-llama/Llama-2-7b-hf",
-    kv_cache_dtype="int8"
-)
-output_int8 = llm_int8.generate(prompts)
+任务质量是与标准答案比较，不是与另一份生成文本比较。[贯穿实验](../code/chapter10/README.md)提供这一评测与原始记录流程；其默认变量是前缀缓存，迁移到 KV 量化时需另外记录缩放方案和精度配置。
 
-# 计算相似度
-from sklearn.metrics import accuracy_score
-similarity = accuracy_score(
-    tokenize(output_fp16),
-    tokenize(output_int8)
-)
-print(f"Similarity: {similarity:.4f}")  # > 0.98
-```
+原有“相似度大于 0.98”“19→13 GB”“40→45 requests/s”没有原始证据，已撤去。正式结果表应由实测填充：
 
-**性能提升**：
-```
-显存:
-  FP16: 19 GB
-  INT8: 13 GB (节省 6GB)
+| 项目 | 基线 | KV 量化候选 |
+| --- | --- | --- |
+| 模型/版本/硬件/负载 | 固定并留档 | 除 KV 设置外保持一致 |
+| 任务质量与样本数 | 待实测 | 待实测 |
+| TTFT/TPOT 分位数、失败率 | 待实测 | 待实测 |
+| 有效吞吐、单位合格请求成本 | 待实测 | 待实测 |
+| KV 容量与进程显存峰值 | 分开记录 | 分开记录 |
 
-吞吐量:
-  FP16: 40 requests/s
-  INT8: 45 requests/s (略快)
-```
-
-**生产环境注意事项**：
-```
-推荐:
-  - 长序列 (>8K tokens)
-  - 高并发场景
-  - 显存紧张
-
-谨慎:
-  - 短序列 (<2K tokens)
-  - 精度敏感任务
-  - 需要极致性能
-
-不推荐:
-  - 序列长度 <1K (节省有限)
-  - 精度要求极高
-```
+引擎可能按预算预分配 KV 池，因此单 token KV 更小不一定让进程显存同比下降。长上下文或高并发可能受益，但是否值得启用应由容量、质量及延迟回归共同决定，不能用固定长度阈值保证收益。
 
 ---
 
@@ -1181,7 +1095,7 @@ Stage 2: QJL residual correction
 
 **AWQ/GPTQ 模型加载**：
 ```python
-from vLLM import LLM, SamplingParams
+from vllm import LLM, SamplingParams
 
 # AWQ 量化
 llm_awq = LLM(

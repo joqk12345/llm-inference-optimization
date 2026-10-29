@@ -82,20 +82,19 @@ Share your experience applying the techniques from this book:
 
 2. **Where to submit**:
    - GitHub Issue with the "success-story" label
-   - Discord #success-stories channel
-   - Email: TODO
+   - Include reproducible commands, environment details and raw results; label hypothetical examples clearly.
 
 ### 💬 Community Contributions
 
 #### Answering Questions
 Help others in the community:
 - Monitor GitHub Issues and Discussions
-- Participate in Discord channels
+- Include chapter and section references when answering
 - Provide helpful, accurate answers
 
 #### Organizing Events
 Want to host a study group or discussion?
-- Let us know in Discord
+- Propose the event in a GitHub issue
 - We can help promote and organize
 
 #### Sharing on Social Media
@@ -108,25 +107,7 @@ Help spread the word:
 
 We value all contributions and recognize our contributors:
 
-### Monthly Recognition (Top 10)
-- Free Pro membership for 1 month
-- Mentioned in monthly community update
-- Special Discord role
-
-### Quarterly Recognition (Top 3)
-- Free 1-hour consulting session
-- Featured in "Contributor Spotlight"
-- Priority for feature requests
-
-### Annual Recognition
-- Your name in the book acknowledgments
-- Lifetime Pro membership
-- Special contributor badge
-
-### All Contributors
-- Listed in CONTRIBUTORS.md
-- Your contributions tracked on GitHub
-- Eternal gratitude! 🙏
+Contributions are visible in GitHub history. Contributor notes are maintained in [docs/contributors.md](docs/contributors.md). This repository does not currently publish a Pro membership, consulting reward, or recurring event program.
 
 ## 🎯 Contribution Areas
 
@@ -178,7 +159,7 @@ We're currently looking for help in:
    - Wait for confirmation if it's a major change
 
 2. **Making Changes**
-   - Create a descriptive branch name: `fix/chapter02-gpu-math-error`
+   - Create a descriptive branch name: `fix/chapter03-gpu-math-error`
    - Make your changes
    - Test thoroughly
    - Update documentation if needed
@@ -222,8 +203,7 @@ Violations will be addressed by the maintainers and may result in:
 
 Have questions about contributing?
 - Open a discussion with the "question" label
-- Ask in the #contributors channel on Discord
-- Email: TODO
+- Include the chapter, environment and reproduction steps in your issue
 
 ## 🙏 Thank You
 

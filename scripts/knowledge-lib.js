@@ -208,7 +208,8 @@ function deriveMetadata(filePath, order) {
   const raw = loadText(normalizedPath);
   const parsed = parseFrontmatter(raw);
   const preset = getPreset(normalizedPath);
-  const title = preset.title || parsed.data.title || extractHeading(parsed.content || raw, path.basename(normalizedPath, '.md'));
+  // The visible H1 is the canonical title; generated metadata and navigation follow it.
+  const title = extractHeading(parsed.content || raw, parsed.data.title || path.basename(normalizedPath, '.md'));
   const id = preset.id || parsed.data.id || filePathToId(normalizedPath);
   const metadata = {
     id,

@@ -87,8 +87,18 @@ summaryEntries.forEach((entry) => {
   }
 });
 
-if (summaryEntries.length !== 15) {
-  problems.push(`SUMMARY.md should contain 15 core reading-path entries, found ${summaryEntries.length}`);
+summaryEntries.forEach((entry) => {
+  const article = parseArticle(entry.filePath);
+  if (article.metadata.status !== 'published') {
+    problems.push(`SUMMARY.md includes unpublished content: ${entry.filePath}`);
+  }
+  if (entry.filePath.startsWith('chapters/') && entry.title !== article.metadata.title) {
+    problems.push(`SUMMARY.md title differs from H1: ${entry.filePath}`);
+  }
+});
+const chapterEntries = summaryEntries.filter((entry) => entry.filePath.startsWith('chapters/'));
+if (chapterEntries.length !== 11 || new Set(chapterEntries.map((entry) => entry.filePath)).size !== 11) {
+  problems.push('SUMMARY.md must include the 11 distinct manuscript chapters');
 }
 
 if (problems.length > 0) {

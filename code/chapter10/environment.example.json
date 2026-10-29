@@ -1,0 +1,13 @@
+{
+  "runtime_version": "0.30.0",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "model_revision": "REPLACE_WITH_MODEL_COMMIT",
+  "tokenizer_revision": "REPLACE_WITH_TOKENIZER_COMMIT",
+  "gpu": "REPLACE_WITH_GPU_MODEL_COUNT_AND_MEMORY",
+  "driver": "REPLACE_WITH_DRIVER_VERSION",
+  "cuda": "REPLACE_WITH_CUDA_RUNTIME_VERSION",
+  "environment_artifact": "REPLACE_WITH_IMAGE_DIGEST_OR_LOCKFILE_SHA256",
+  "server_args": ["vllm", "serve", "Qwen/Qwen2.5-0.5B-Instruct", "--revision", "REPLACE_WITH_MODEL_COMMIT", "--tokenizer-revision", "REPLACE_WITH_TOKENIZER_COMMIT", "--dtype", "half", "--max-model-len", "2048", "--seed", "0", "--no-enable-prefix-caching"],
+  "prefix_caching": false,
+  "hourly_cost": null
+}
